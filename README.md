@@ -80,4 +80,8 @@ Reglas del equipo:
 
 ## Equipo
 
-- (completar)
+- Mateo Iglesias
+- Lucio Mazzini
+- Facundo Teran
+- Matias Trejo
+- Tiago Beltran
