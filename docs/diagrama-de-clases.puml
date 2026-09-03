@@ -1,0 +1,119 @@
+@startuml CodigoAVoluntad_DiagramaDeClases_Entrega1
+hide circle
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam class {
+    BackgroundColor<<value object>> #FFF8E1
+    BorderColor #333333
+    ArrowColor #333333
+}
+class Colectivo <<entity>> {
+  - nombre: String
+  - descripcion: String
+  + crearProyecto(titulo: String, descripcion: String, habilidadesRequeridas: Set<Habilidad>, compromiso: CompromisoEsperado, modalidad: ModalidadColaboracion): Proyecto
+}
+class Proyecto <<entity>> {
+  - titulo: String
+  - descripcion: String
+  - estado: EstadoProyecto
+  + registrarColaboracion(persona: PersonaColaboradora): Colaboracion
+  + finalizar(): void
+  + estaAbierto(): boolean
+  + cumpleHabilidadesRequeridas(persona: PersonaColaboradora): boolean
+}
+class Habilidad <<entity>> {
+  - codigo: String
+  - titulo: String
+  - descripcion: String
+}
+class PersonaColaboradora <<entity>> {
+  - nombreDeFantasia: String [0..1]
+  - cuentaDeDesarrollo: String [0..1]
+  - nombre: String [0..1]
+  - apellido: String [0..1]
+  - pronombres: String [0..1]
+  - presentacion: String [0..1]
+  - datosDeContacto: String
+  + agregarHabilidad(habilidad: Habilidad): void
+  + tieneHabilidad(habilidad: Habilidad): boolean
+  + esAnonima(): boolean
+  + nombreVisible(): String
+}
+class Colaboracion <<entity>> {
+  - fechaDeInicio: Date
+}
+class Ubicacion <<value object>> {
+  - nivel: NivelUbicacion
+  - detalle: String
+  + esDeAlcanceNacional(): boolean
+}
+class CompromisoEsperado <<value object>> {
+  - unidad: UnidadDeCompromiso
+  - cantidadHoras: int
+}
+class ModalidadColaboracion <<value object>> {
+  - ofreceIncentivoEconomico: boolean
+  - posibilidadDeContratacion: boolean
+  + esUnicamenteGratuita(): boolean
+}
+enum TipoDeColectivo {
+  FUNDACION
+  ASOCIACION_BARRIAL
+  ONG
+  ASAMBLEA
+}
+enum EstadoProyecto {
+  ABIERTO
+  FINALIZADO
+}
+enum NivelUbicacion {
+  ARGENTINA
+  PROVINCIA
+  CABA
+  LOCALIDAD
+}
+enum UnidadDeCompromiso {
+  HORAS_TOTALES
+  HORAS_SEMANALES
+  HORAS_MENSUALES
+}
+Colectivo "1" *-- "0..*" Proyecto : organiza
+Colectivo "1" *-- "0..1" Ubicacion
+Colectivo ..> TipoDeColectivo
+Proyecto "1" *-- "0..*" Colaboracion
+Proyecto "0..*" -- "1..*" Habilidad : requiere
+Proyecto "1" *-- "1" CompromisoEsperado
+Proyecto "1" *-- "1" ModalidadColaboracion
+Proyecto ..> EstadoProyecto
+PersonaColaboradora "1" -- "0..*" Colaboracion : participa en
+PersonaColaboradora "0..*" -- "0..*" Habilidad : posee
+Ubicacion ..> NivelUbicacion
+CompromisoEsperado ..> UnidadDeCompromiso
+note bottom of Colaboracion
+  Se modela como **entidad** propia (no como una
+  simple lista de referencias) porque en la Segunda
+  Entrega sumará el dato de contribución anónima, y en
+  la Tercera pasará a originarse en una Postulación
+  aceptada y podrá ser desanotada. Mantenerla como
+  clase desde ahora evita rehacer esta relación luego.
+end note
+note bottom of PersonaColaboradora
+  Debe existir al menos uno de estos datos de
+  identificación: nombreDeFantasia, cuentaDeDesarrollo,
+  o (nombre + apellido).
+  datosDeContacto se deja mínimo a propósito: la
+  Segunda Entrega lo reemplaza por una colección de
+  medios de contacto tipados.
+end note
+note right of Ubicacion
+  "detalle" sólo aplica si nivel = PROVINCIA (nombre de
+  una de las 23 provincias) o nivel = LOCALIDAD (texto
+  libre). Si nivel es ARGENTINA o CABA, no se usa.
+end note
+note bottom of CompromisoEsperado
+  Junto con ModalidadColaboracion, quedan como Value
+  Objects independientes de Proyecto: en la Segunda
+  Entrega pasarán a formar parte de Perfil sin que
+  cambie su estructura interna.
+end note
+@enduml
