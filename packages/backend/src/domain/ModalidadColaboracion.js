@@ -1,12 +1,9 @@
-import { DomainError } from "../DomainError.js";
+import { DomainError } from "./DomainError.js";
 
 /**
- * Value Object. Modalidad de colaboración que ofrece un Proyecto:
- * si es únicamente gratuita, si ofrece incentivo económico y/o si
- * existe posibilidad de contratación eventual.
- *
- * Junto con CompromisoEsperado, queda independiente de Proyecto:
- * en la Segunda Entrega pasará a formar parte de Perfil.
+ * Modalidad de colaboración de un Proyecto: si ofrece incentivo
+ * económico y/o si existe posibilidad de contratación eventual.
+ * Si no ofrece ninguna de las dos, la colaboración es gratuita.
  */
 export class ModalidadColaboracion {
   #ofreceIncentivoEconomico;
@@ -32,7 +29,7 @@ export class ModalidadColaboracion {
     return this.#posibilidadDeContratacion;
   }
 
-  esUnicamenteGratuita() {
+  esGratuito() {
     return !this.#ofreceIncentivoEconomico && !this.#posibilidadDeContratacion;
   }
 

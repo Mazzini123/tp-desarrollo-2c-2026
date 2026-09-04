@@ -1,13 +1,12 @@
 /**
  * Repositorio genérico en memoria. Cada repositorio concreto lo
  * extiende indicando cómo obtener el identificador de la entidad que
- * guarda (por defecto, entity.id; HabilidadRepository lo pisa para
- * usar el código).
+ * guarda (por defecto entity.id; HabilidadRepository usa el código).
  *
  * En la Segunda Entrega este archivo se reemplaza por acceso a
- * MongoDB: el resto de las capas (services, controllers) no debería
- * tener que cambiar, porque dependen de esta misma interfaz
- * (guardar / buscarPorId / listar / eliminar).
+ * MongoDB. El resto de las capas depende de esta misma interfaz
+ * (guardar / buscarPorId / listar / eliminar), así que no debería
+ * necesitar cambios.
  */
 export class InMemoryRepository {
   #entidades = new Map();

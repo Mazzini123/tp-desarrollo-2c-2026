@@ -1,10 +1,5 @@
 import { proyectoService, colaboracionService } from "../services/index.js";
 
-export function crear(req, res) {
-  const proyecto = proyectoService.crear(req.body);
-  res.status(201).json(proyecto);
-}
-
 export function listar(req, res) {
   res.status(200).json(proyectoService.listar());
 }
@@ -15,6 +10,10 @@ export function obtenerPorId(req, res) {
 
 export function actualizar(req, res) {
   res.status(200).json(proyectoService.actualizar(req.params.id, req.body));
+}
+
+export function finalizar(req, res) {
+  res.status(200).json(proyectoService.finalizar(req.params.id));
 }
 
 export function agregarHabilidad(req, res) {
@@ -33,17 +32,10 @@ export function quitarHabilidad(req, res) {
   res.status(200).json(proyecto);
 }
 
-export function finalizar(req, res) {
-  const proyecto = proyectoService.finalizar(req.params.id);
-  res.status(200).json(proyecto);
-}
-
-// Colaboraciones anidadas bajo /proyectos/:id, porque "anotarse" es
-// siempre una operación en el contexto de un proyecto puntual.
-export function anotarColaboradora(req, res) {
+export function anotarColaborador(req, res) {
   const colaboracion = colaboracionService.registrar({
     proyectoId: req.params.id,
-    personaColaboradoraId: req.body.personaColaboradoraId,
+    colaboradorId: req.body.colaboradorId,
   });
   res.status(201).json(colaboracion);
 }

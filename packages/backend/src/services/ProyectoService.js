@@ -1,87 +1,107 @@
 import { Proyecto } from "../domain/Proyecto.js";
-import { CompromisoEsperado } from "../domain/valueObjects/CompromisoEsperado.js";
-import { ModalidadColaboracion } from "../domain/valueObjects/ModalidadColaboracion.js";
+import { Compromiso } from "../domain/Compromiso.js";
+import { ModalidadColaboracion } from "../domain/ModalidadColaboracion.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
 
 /**
- * Casos de uso sobre Proyecto. Coordina Colectivo (validar que exista
- * el dueño) y Habilidad (resolver el catálogo), que es exactamente el
- * tipo de orquestación entre entidades que no le corresponde al
- * dominio anémico.
+ * Casos de uso sobre Proyecto.
+ *
+ * Como Proyecto vive dentro de Colectivo, crear un proyecto es en
+ * realidad agregarlo a su colectivo, y guardar el colectivo entero.
+ * Buscar un proyecto implica recorrer los colectivos: eso lo
+ * encapsula ColectivoRepository.buscarProyecto.
  */
 export class ProyectoService {
-  #proyectoRepository;
+  #colectivoRepository;
   #colectivoService;
   #habilidadService;
 
-  constructor({ proyectoRepository, colectivoService, habilidadService }) {
-    this.#proyectoRepository = proyectoRepository;
+  constructor({ colectivoRepository, colectivoService, habilidadService }) {
+    this.#colectivoRepository = colectivoRepository;
     this.#colectivoService = colectivoService;
     this.#habilidadService = habilidadService;
   }
 
   crear({
+    colectivoId,
     titulo,
     descripcion,
-    colectivoId,
     compromisoEsperado,
     modalidadColaboracion,
-    habilidadesRequeridas,
+    habilidadesNecesarias,
   }) {
-    // Lanza NotFoundError si el colectivo no existe.
-    this.#colectivoService.buscarPorId(colectivoId);
-
-    const habilidades = this.#habilidadService.resolverPorCodigos(habilidadesRequeridas);
+    const colectivo = this.#colectivoService.buscarPorId(colectivoId);
+    const habilidades = this.#habilidadService.resolverPorCodigos(habilidadesNecesarias);
 
     const proyecto = new Proyecto({
       titulo,
       descripcion,
-      colectivoId,
-      compromisoEsperado: new CompromisoEsperado(compromisoEsperado),
+      compromisoEsperado: new Compromiso(compromisoEsperado),
       modalidadColaboracion: new ModalidadColaboracion(modalidadColaboracion),
-      habilidadesRequeridas: habilidades,
+      habilidadesNecesarias: habilidades,
     });
 
-    return this.#proyectoRepository.guardar(proyecto);
-  }
+    colectivo.agregarProyecto(proyecto);
+    this.#colectivoRepository.guardar(colectivo);
 
-  listar() {
-    return this.#proyectoRepository.listar();
-  }
-
-  buscarPorId(id) {
-    const proyecto = this.#proyectoRepository.buscarPorId(id);
-    if (!proyecto) {
-      throw new NotFoundError(`No existe un proyecto con id "${id}"`);
-    }
     return proyecto;
   }
 
-  actualizar(id, { titulo, descripcion }) {
-    const proyecto = this.buscarPorId(id);
-    proyecto.actualizarDatos({ titulo, descripcion });
-    return this.#proyectoRepository.guardar(proyecto);
+  listar() {
+    return this.#colectivoRepository.listarProyectos();
   }
 
-  agregarHabilidadRequerida(id, codigoHabilidad) {
-    const proyecto = this.buscarPorId(id);
+  listarPorColectivo(colectivoId) {
+    return this.#colectivoService.buscarPorId(colectivoId).proyectos;
+  }
+
+  buscarPorId(proyectoId) {
+    const resultado = this.#colectivoRepository.buscarProyecto(proyectoId);
+    if (!resultado) {
+      throw new NotFoundError(`No existe un proyecto con id "${proyectoId}"`);
+    }
+    return resultado.proyecto;
+  }
+
+  /** Devuelve { colectivo, proyecto }: lo necesitan las operaciones
+   *  que además tienen que persistir el colectivo contenedor. */
+  buscarConColectivo(proyectoId) {
+    const resultado = this.#colectivoRepository.buscarProyecto(proyectoId);
+    if (!resultado) {
+      throw new NotFoundError(`No existe un proyecto con id "${proyectoId}"`);
+    }
+    return resultado;
+  }
+
+  actualizar(proyectoId, { titulo, descripcion }) {
+    const { colectivo, proyecto } = this.buscarConColectivo(proyectoId);
+    proyecto.actualizarDatos({ titulo, descripcion });
+    this.#colectivoRepository.guardar(colectivo);
+    return proyecto;
+  }
+
+  agregarHabilidadRequerida(proyectoId, codigoHabilidad) {
+    const { colectivo, proyecto } = this.buscarConColectivo(proyectoId);
     const [habilidad] = this.#habilidadService.resolverPorCodigos([codigoHabilidad]);
 
     proyecto.agregarHabilidadRequerida(habilidad);
-    return this.#proyectoRepository.guardar(proyecto);
+    this.#colectivoRepository.guardar(colectivo);
+    return proyecto;
   }
 
-  quitarHabilidadRequerida(id, codigoHabilidad) {
-    const proyecto = this.buscarPorId(id);
+  quitarHabilidadRequerida(proyectoId, codigoHabilidad) {
+    const { colectivo, proyecto } = this.buscarConColectivo(proyectoId);
     const [habilidad] = this.#habilidadService.resolverPorCodigos([codigoHabilidad]);
 
     proyecto.quitarHabilidadRequerida(habilidad);
-    return this.#proyectoRepository.guardar(proyecto);
+    this.#colectivoRepository.guardar(colectivo);
+    return proyecto;
   }
 
-  finalizar(id) {
-    const proyecto = this.buscarPorId(id);
-    proyecto.finalizar();
-    return this.#proyectoRepository.guardar(proyecto);
+  finalizar(proyectoId) {
+    const { colectivo, proyecto } = this.buscarConColectivo(proyectoId);
+    proyecto.finalizarProyecto();
+    this.#colectivoRepository.guardar(colectivo);
+    return proyecto;
   }
 }

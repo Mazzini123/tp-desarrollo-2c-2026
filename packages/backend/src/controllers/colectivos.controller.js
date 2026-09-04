@@ -1,8 +1,7 @@
-import { colectivoService } from "../services/index.js";
+import { colectivoService, proyectoService } from "../services/index.js";
 
 export function crear(req, res) {
-  const colectivo = colectivoService.crear(req.body);
-  res.status(201).json(colectivo);
+  res.status(201).json(colectivoService.crear(req.body));
 }
 
 export function listar(req, res) {
@@ -15,4 +14,15 @@ export function obtenerPorId(req, res) {
 
 export function actualizar(req, res) {
   res.status(200).json(colectivoService.actualizar(req.params.id, req.body));
+}
+
+// Los proyectos viven dentro del colectivo, así que el alta va
+// anidada bajo /colectivos/:id/proyectos.
+export function crearProyecto(req, res) {
+  const proyecto = proyectoService.crear({ ...req.body, colectivoId: req.params.id });
+  res.status(201).json(proyecto);
+}
+
+export function listarProyectos(req, res) {
+  res.status(200).json(proyectoService.listarPorColectivo(req.params.id));
 }

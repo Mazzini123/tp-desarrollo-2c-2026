@@ -1,45 +1,39 @@
 import { randomUUID } from "node:crypto";
 import { DomainError } from "./DomainError.js";
-import { EstadoProyecto } from "./enums/EstadoProyecto.js";
+import { PROYECTO_ESTADO } from "./enums/ProyectoEstado.js";
 import { Habilidad } from "./Habilidad.js";
-import { CompromisoEsperado } from "./valueObjects/CompromisoEsperado.js";
-import { ModalidadColaboracion } from "./valueObjects/ModalidadColaboracion.js";
+import { Colaboracion } from "./Colaboracion.js";
+import { Compromiso } from "./Compromiso.js";
+import { ModalidadColaboracion } from "./ModalidadColaboracion.js";
 
 /**
- * Entidad. Proyecto de software que un Colectivo publica para que
- * personas colaboradoras se postulen. Referencia a su Colectivo por
- * id (colectivoId): el Colectivo no mantiene la lista de sus
- * Proyectos.
+ * Proyecto de software que un Colectivo publica para que
+ * colaboradores se sumen.
  *
- * Requiere al menos una habilidad al crearse. Esas habilidades son
- * siempre referencias al catálogo (ver Habilidad.js): el proyecto no
- * puede "inventar" una habilidad nueva, sólo tomarlas de una lista ya
- * validada por quien llama (típicamente ProyectoService contra
- * HabilidadRepository).
- *
- * Orquestación de casos de uso (registrar una colaboración, validar
- * que la persona tenga alguna de las habilidades requeridas, etc.)
- * vive en ProyectoService / ColaboracionService, no acá.
+ * Vive dentro del Colectivo (Colectivo tiene una lista de
+ * Proyectos), y a su vez contiene sus Colaboraciones y las
+ * Habilidades que necesita. Las habilidades son siempre referencias
+ * al catálogo: el servicio las resuelve antes de construir el
+ * proyecto.
  */
 export class Proyecto {
   #id;
   #titulo;
   #descripcion;
-  #estado;
-  #colectivoId;
-  #compromisoEsperado;
+  #colaboraciones;
+  #habilidadesNecesarias;
   #modalidadColaboracion;
-  #habilidadesRequeridas;
+  #estado;
+  #compromisoEsperado;
 
   constructor({
     id = randomUUID(),
     titulo,
     descripcion,
-    colectivoId,
-    compromisoEsperado,
+    habilidadesNecesarias,
     modalidadColaboracion,
-    habilidadesRequeridas,
-    estado = EstadoProyecto.ABIERTO,
+    compromisoEsperado,
+    estado = PROYECTO_ESTADO.ABIERTO,
   }) {
     if (!titulo || titulo.trim().length === 0) {
       throw new DomainError("El título del proyecto es obligatorio");
@@ -47,34 +41,30 @@ export class Proyecto {
     if (!descripcion || descripcion.trim().length === 0) {
       throw new DomainError("La descripción del proyecto es obligatoria");
     }
-    if (!colectivoId) {
-      throw new DomainError("El proyecto debe pertenecer a un colectivo (colectivoId)");
-    }
-    if (!(compromisoEsperado instanceof CompromisoEsperado)) {
-      throw new DomainError("compromisoEsperado debe ser una instancia de CompromisoEsperado");
+    if (!(compromisoEsperado instanceof Compromiso)) {
+      throw new DomainError("compromisoEsperado debe ser una instancia de Compromiso");
     }
     if (!(modalidadColaboracion instanceof ModalidadColaboracion)) {
       throw new DomainError(
         "modalidadColaboracion debe ser una instancia de ModalidadColaboracion",
       );
     }
-    if (!Array.isArray(habilidadesRequeridas) || habilidadesRequeridas.length === 0) {
-      throw new DomainError("El proyecto debe requerir al menos una habilidad");
+    if (!Array.isArray(habilidadesNecesarias) || habilidadesNecesarias.length === 0) {
+      throw new DomainError("El proyecto debe necesitar al menos una habilidad");
     }
-    if (!habilidadesRequeridas.every((h) => h instanceof Habilidad)) {
-      throw new DomainError("Todas las habilidades requeridas deben ser instancias de Habilidad");
+    if (!habilidadesNecesarias.every((h) => h instanceof Habilidad)) {
+      throw new DomainError("Todas las habilidades deben ser instancias de Habilidad");
     }
 
     this.#id = id;
     this.#titulo = titulo.trim();
     this.#descripcion = descripcion.trim();
-    this.#colectivoId = colectivoId;
     this.#compromisoEsperado = compromisoEsperado;
     this.#modalidadColaboracion = modalidadColaboracion;
     this.#estado = estado;
-    // dedupe por si llegan repetidas
-    this.#habilidadesRequeridas = [];
-    habilidadesRequeridas.forEach((h) => this.agregarHabilidadRequerida(h));
+    this.#colaboraciones = [];
+    this.#habilidadesNecesarias = [];
+    habilidadesNecesarias.forEach((h) => this.agregarHabilidadRequerida(h));
   }
 
   get id() {
@@ -93,10 +83,6 @@ export class Proyecto {
     return this.#estado;
   }
 
-  get colectivoId() {
-    return this.#colectivoId;
-  }
-
   get compromisoEsperado() {
     return this.#compromisoEsperado;
   }
@@ -105,38 +91,67 @@ export class Proyecto {
     return this.#modalidadColaboracion;
   }
 
-  get habilidadesRequeridas() {
-    return [...this.#habilidadesRequeridas];
+  get habilidadesNecesarias() {
+    return [...this.#habilidadesNecesarias];
+  }
+
+  get colaboraciones() {
+    return [...this.#colaboraciones];
+  }
+
+  estaAbierto() {
+    return this.#estado === PROYECTO_ESTADO.ABIERTO;
+  }
+
+  /**
+   * No existe operación inversa: una vez finalizado, el proyecto no
+   * se reabre (decisión confirmada con la cátedra).
+   */
+  finalizarProyecto() {
+    if (!this.estaAbierto()) {
+      throw new DomainError("El proyecto ya está finalizado");
+    }
+    this.#estado = PROYECTO_ESTADO.FINALIZADO;
+  }
+
+  /**
+   * El colaborador cumple si tiene al menos una de las habilidades
+   * que el proyecto necesita (requerimiento 2b del enunciado).
+   */
+  cumpleHabilidadesRequeridas(colaborador) {
+    return this.#habilidadesNecesarias.some((h) => colaborador.tieneHabilidad(h));
   }
 
   agregarHabilidadRequerida(habilidad) {
     if (!(habilidad instanceof Habilidad)) {
       throw new DomainError("Se esperaba una instancia de Habilidad");
     }
-    if (this.requiereHabilidad(habilidad)) {
+    if (this.#habilidadesNecesarias.some((h) => h.equals(habilidad))) {
       return; // idempotente
     }
-    this.#habilidadesRequeridas.push(habilidad);
+    this.#habilidadesNecesarias.push(habilidad);
   }
 
   quitarHabilidadRequerida(habilidad) {
-    if (this.#habilidadesRequeridas.length <= 1) {
-      throw new DomainError(
-        "El proyecto debe conservar al menos una habilidad requerida",
-      );
+    if (this.#habilidadesNecesarias.length <= 1) {
+      throw new DomainError("El proyecto debe conservar al menos una habilidad necesaria");
     }
-    this.#habilidadesRequeridas = this.#habilidadesRequeridas.filter(
+    this.#habilidadesNecesarias = this.#habilidadesNecesarias.filter(
       (h) => !h.equals(habilidad),
     );
   }
 
-  /**
-   * Edición de título y descripción. Deliberadamente no toca estado,
-   * colectivoId, compromiso, modalidad ni habilidades: cada uno de
-   * esos tiene su propia operación (finalizar, agregar/quitar
-   * habilidad) porque cambiarlos implica una decisión de negocio
-   * distinta a corregir un texto.
-   */
+  yaColaboraron(colaborador) {
+    return this.#colaboraciones.some((c) => c.colaborador.id === colaborador.id);
+  }
+
+  agregarColaboracion(colaboracion) {
+    if (!(colaboracion instanceof Colaboracion)) {
+      throw new DomainError("Se esperaba una instancia de Colaboracion");
+    }
+    this.#colaboraciones.push(colaboracion);
+  }
+
   actualizarDatos({ titulo, descripcion }) {
     if (titulo !== undefined) {
       if (!titulo || titulo.trim().length === 0) {
@@ -152,38 +167,16 @@ export class Proyecto {
     }
   }
 
-  requiereHabilidad(habilidad) {
-    return this.#habilidadesRequeridas.some((h) => h.equals(habilidad));
-  }
-
-  estaAbierto() {
-    return this.#estado === EstadoProyecto.ABIERTO;
-  }
-
-  /**
-   * Transición de estado simple (guardia sobre el propio dato).
-   * La regla de negocio "no se puede reabrir" se cumple porque no
-   * existe una operación inversa. Cualquier efecto colateral sobre
-   * otras entidades (rechazar postulaciones pendientes, etc., en
-   * entregas futuras) lo coordina ProyectoService, no este método.
-   */
-  finalizar() {
-    if (!this.estaAbierto()) {
-      throw new DomainError("El proyecto ya está finalizado");
-    }
-    this.#estado = EstadoProyecto.FINALIZADO;
-  }
-
   toJSON() {
     return {
       id: this.#id,
       titulo: this.#titulo,
       descripcion: this.#descripcion,
       estado: this.#estado,
-      colectivoId: this.#colectivoId,
       compromisoEsperado: this.#compromisoEsperado.toJSON(),
       modalidadColaboracion: this.#modalidadColaboracion.toJSON(),
-      habilidadesRequeridas: this.#habilidadesRequeridas.map((h) => h.toJSON()),
+      habilidadesNecesarias: this.#habilidadesNecesarias.map((h) => h.toJSON()),
+      colaboraciones: this.#colaboraciones.map((c) => c.toJSON()),
     };
   }
 }

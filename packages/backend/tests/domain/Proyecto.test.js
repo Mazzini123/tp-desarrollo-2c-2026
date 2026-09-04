@@ -1,98 +1,92 @@
 import { describe, it, expect } from "@jest/globals";
 import { Proyecto } from "../../src/domain/Proyecto.js";
+import { Colaborador } from "../../src/domain/Colaborador.js";
+import { Colaboracion } from "../../src/domain/Colaboracion.js";
 import { Habilidad } from "../../src/domain/Habilidad.js";
-import { CompromisoEsperado } from "../../src/domain/valueObjects/CompromisoEsperado.js";
-import { ModalidadColaboracion } from "../../src/domain/valueObjects/ModalidadColaboracion.js";
-import { UnidadDeCompromiso } from "../../src/domain/enums/UnidadDeCompromiso.js";
-import { EstadoProyecto } from "../../src/domain/enums/EstadoProyecto.js";
+import { Compromiso } from "../../src/domain/Compromiso.js";
+import { ModalidadColaboracion } from "../../src/domain/ModalidadColaboracion.js";
+import { PERIODO_COMPROMISO } from "../../src/domain/enums/PeriodoCompromiso.js";
+import { PROYECTO_ESTADO } from "../../src/domain/enums/ProyectoEstado.js";
 import { DomainError } from "../../src/domain/DomainError.js";
 
-function habilidadReact() {
-  return Habilidad.crear({ titulo: "Desarrollo Web React", descripcion: "" });
-}
-
-function habilidadNode() {
-  return Habilidad.crear({ titulo: "Desarrollo Node", descripcion: "" });
-}
+const react = () => Habilidad.crear({ titulo: "Desarrollo Web React", descripcion: "" });
+const node = () => Habilidad.crear({ titulo: "Desarrollo Node", descripcion: "" });
 
 function datosValidos(overrides = {}) {
   return {
     titulo: "Sitio institucional",
-    descripcion: "Rediseño del sitio de la fundación",
-    colectivoId: "colectivo-1",
-    compromisoEsperado: new CompromisoEsperado({
-      unidad: UnidadDeCompromiso.HORAS_SEMANALES,
+    descripcion: "Rediseño del sitio",
+    compromisoEsperado: new Compromiso({
       cantidadHoras: 5,
+      periodo: PERIODO_COMPROMISO.HS_SEMANALES,
     }),
     modalidadColaboracion: new ModalidadColaboracion(),
-    habilidadesRequeridas: [habilidadReact()],
+    habilidadesNecesarias: [react()],
     ...overrides,
   };
 }
 
 describe("Proyecto", () => {
-  it("se crea ABIERTO por defecto", () => {
+  it("se crea ABIERTO y sin colaboraciones", () => {
     const proyecto = new Proyecto(datosValidos());
 
-    expect(proyecto.estado).toBe(EstadoProyecto.ABIERTO);
+    expect(proyecto.estado).toBe(PROYECTO_ESTADO.ABIERTO);
     expect(proyecto.estaAbierto()).toBe(true);
-    expect(proyecto.colectivoId).toBe("colectivo-1");
+    expect(proyecto.colaboraciones).toHaveLength(0);
   });
 
-  it("rechaza crearse sin colectivoId", () => {
-    expect(() => new Proyecto(datosValidos({ colectivoId: undefined }))).toThrow(DomainError);
+  it("rechaza crearse sin habilidades necesarias", () => {
+    expect(() => new Proyecto(datosValidos({ habilidadesNecesarias: [] }))).toThrow(DomainError);
   });
 
-  it("rechaza crearse sin ninguna habilidad requerida", () => {
-    expect(() => new Proyecto(datosValidos({ habilidadesRequeridas: [] }))).toThrow(DomainError);
-  });
-
-  it("rechaza compromisoEsperado que no sea el value object esperado", () => {
+  it("rechaza un compromiso que no sea instancia de Compromiso", () => {
     expect(() => new Proyecto(datosValidos({ compromisoEsperado: { cantidadHoras: 5 } }))).toThrow(
       DomainError,
     );
   });
 
-  it("agregarHabilidadRequerida agrega una nueva y es idempotente", () => {
+  it("cumpleHabilidadesRequeridas es true si el colaborador tiene alguna", () => {
     const proyecto = new Proyecto(datosValidos());
-    const node = habilidadNode();
+    const colaborador = new Colaborador({ nombreFantasia: "ByteRunner" });
+    colaborador.agregarHabilidad(react());
 
-    proyecto.agregarHabilidadRequerida(node);
-    proyecto.agregarHabilidadRequerida(node);
-
-    expect(proyecto.habilidadesRequeridas).toHaveLength(2);
+    expect(proyecto.cumpleHabilidadesRequeridas(colaborador)).toBe(true);
   });
 
-  it("quitarHabilidadRequerida saca una habilidad si quedan otras", () => {
-    const proyecto = new Proyecto(
-      datosValidos({ habilidadesRequeridas: [habilidadReact(), habilidadNode()] }),
-    );
+  it("cumpleHabilidadesRequeridas es false si no comparte ninguna", () => {
+    const proyecto = new Proyecto(datosValidos());
+    const colaborador = new Colaborador({ nombreFantasia: "ByteRunner" });
+    colaborador.agregarHabilidad(node());
 
-    proyecto.quitarHabilidadRequerida(habilidadNode());
+    expect(proyecto.cumpleHabilidadesRequeridas(colaborador)).toBe(false);
+  });
 
-    expect(proyecto.habilidadesRequeridas).toHaveLength(1);
-    expect(proyecto.requiereHabilidad(habilidadReact())).toBe(true);
+  it("finalizarProyecto pasa a FINALIZADO y no se puede repetir", () => {
+    const proyecto = new Proyecto(datosValidos());
+    proyecto.finalizarProyecto();
+
+    expect(proyecto.estado).toBe(PROYECTO_ESTADO.FINALIZADO);
+    expect(() => proyecto.finalizarProyecto()).toThrow(DomainError);
   });
 
   it("quitarHabilidadRequerida rechaza dejar el proyecto sin habilidades", () => {
     const proyecto = new Proyecto(datosValidos());
 
-    expect(() => proyecto.quitarHabilidadRequerida(habilidadReact())).toThrow(DomainError);
+    expect(() => proyecto.quitarHabilidadRequerida(react())).toThrow(DomainError);
   });
 
-  it("finalizar pasa el proyecto a FINALIZADO", () => {
-    const proyecto = new Proyecto(datosValidos());
+  it("quitarHabilidadRequerida funciona si quedan otras", () => {
+    const proyecto = new Proyecto(datosValidos({ habilidadesNecesarias: [react(), node()] }));
+    proyecto.quitarHabilidadRequerida(node());
 
-    proyecto.finalizar();
-
-    expect(proyecto.estado).toBe(EstadoProyecto.FINALIZADO);
-    expect(proyecto.estaAbierto()).toBe(false);
+    expect(proyecto.habilidadesNecesarias).toHaveLength(1);
   });
 
-  it("finalizar rechaza finalizar dos veces (no se puede reabrir)", () => {
+  it("yaColaboraron detecta un colaborador ya anotado", () => {
     const proyecto = new Proyecto(datosValidos());
-    proyecto.finalizar();
+    const colaborador = new Colaborador({ nombreFantasia: "ByteRunner" });
+    proyecto.agregarColaboracion(new Colaboracion({ colaborador }));
 
-    expect(() => proyecto.finalizar()).toThrow(DomainError);
+    expect(proyecto.yaColaboraron(colaborador)).toBe(true);
   });
 });
