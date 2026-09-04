@@ -1,194 +1,120 @@
-@startuml CodigoAVoluntad_DiagramaDeClases_Entrega1
-hide circle
-skinparam classAttributeIconSize 0
-skinparam shadowing false
-skinparam class {
-    BackgroundColor<<value object>> #FFF8E1
-    BorderColor #333333
-    ArrowColor #333333
+@startuml
+
+' ───────────────────────── Colectivo y Ubicación ─────────────────────────
+
+class Colectivo {
+  -nombre: String
+  -descripcion: String
+  -tipoColectivo: TIPO_COLECTIVO
+  -ubicacion: Ubicacion
+  -proyectos: Proyecto[]
 }
 
-class Colectivo <<entity>> {
-  - id: String
-  - nombre: String
-  - descripcion: String
-  - tipo: TipoDeColectivo
-  - ubicacion: Ubicacion [0..1]
-}
-
-class Proyecto <<entity>> {
-  - id: String
-  - titulo: String
-  - descripcion: String
-  - estado: EstadoProyecto
-  + agregarHabilidadRequerida(habilidad: Habilidad): void
-  + quitarHabilidadRequerida(habilidad: Habilidad): void
-}
-
-class Habilidad <<entity>> {
-  - codigo: String
-  - titulo: String
-  - descripcion: String
-}
-
-class PersonaColaboradora <<entity>> {
-  - id: String
-  - nombreDeFantasia: String [0..1]
-  - cuentaDeDesarrollo: String [0..1]
-  - nombre: String [0..1]
-  - apellido: String [0..1]
-  - pronombres: String [0..1]
-  - presentacion: String [0..1]
-  - datosDeContacto: String
-  + agregarHabilidad(habilidad: Habilidad): void
-  + quitarHabilidad(habilidad: Habilidad): void
-}
-
-class Colaboracion <<entity>> {
-  - id: String
-  - fechaDeInicio: Date
-}
-
-class Ubicacion <<value object>> {
-  - nivel: NivelUbicacion
-  - detalle: String [0..1]
-  + esDeAlcanceNacional(): boolean
-  + equals(otra: Ubicacion): boolean
-}
-
-class CompromisoEsperado <<value object>> {
-  - unidad: UnidadDeCompromiso
-  - cantidadHoras: int
-  + equals(otro: CompromisoEsperado): boolean
-}
-
-class ModalidadColaboracion <<value object>> {
-  - ofreceIncentivoEconomico: boolean
-  - posibilidadDeContratacion: boolean
-  + esUnicamenteGratuita(): boolean
-  + equals(otra: ModalidadColaboracion): boolean
-}
-
-enum TipoDeColectivo {
+enum TIPO_COLECTIVO {
   FUNDACION
   ASOCIACION_BARRIAL
   ONG
   ASAMBLEA
 }
 
-enum EstadoProyecto {
-  ABIERTO
-  FINALIZADO
+class Ubicacion {
+  -tipoUbicacion: TIPO_UBICACION
+  -nombre: String
+
+  +esDeAlcanceNacional(): boolean
 }
 
-enum NivelUbicacion {
+enum TIPO_UBICACION {
   ARGENTINA
   PROVINCIA
   CABA
   LOCALIDAD
 }
 
-enum UnidadDeCompromiso {
-  HORAS_TOTALES
-  HORAS_SEMANALES
-  HORAS_MENSUALES
+Colectivo --> TIPO_COLECTIVO
+Colectivo --> "*" Proyecto
+Colectivo --> "0..1" Ubicacion
+Ubicacion --> TIPO_UBICACION
+
+' ───────────────────────── Proyecto y Compromiso ─────────────────────────
+
+class Proyecto {
+  -titulo: String
+  -descripcion: String
+  -colaboraciones: Colaboracion[]
+  -habilidadesNecesarias: Habilidad[]
+  -modalidadColaboracion: ModalidadColaboracion
+  -estado: PROYECTO_ESTADO
+  -compromisoEsperado: Compromiso
+
+  +finalizarProyecto(): void
+  +estaAbierto(): Boolean
+  +cumpleHabilidadesRequeridas(persona: Colaborador): Boolean
+  +agregarHabilidadRequerida(habilidad: Habilidad): void
+  +quitarHabilidadRequeridad(habilidad: Habilidad): void
 }
 
-Colectivo "1" *-- "0..1" Ubicacion
-Colectivo ..> TipoDeColectivo
+enum PROYECTO_ESTADO {
+  ABIERTO
+  FINALIZADO
+}
 
-Proyecto "0..*" --> "1" Colectivo : pertenece a
-Proyecto "1" *-- "1" CompromisoEsperado
-Proyecto "1" *-- "1" ModalidadColaboracion
-Proyecto "0..*" --> "1..*" Habilidad : requiere
-Proyecto ..> EstadoProyecto
+class ModalidadColaboracion {
+  -ofreceIncentivoEconomico: Boolean
+  -posibilidadDeContratacion: Boolean
 
-Colaboracion "0..*" --> "1" Proyecto
-Colaboracion "0..*" --> "1" PersonaColaboradora
+  +esGratuito(): Boolean
+}
 
-PersonaColaboradora "0..*" --> "0..*" Habilidad : posee
+class Compromiso {
+  -cantidadHoras: Int
+  -periodo: PERIODO_COMPROMISO
+}
 
-Ubicacion ..> NivelUbicacion
-CompromisoEsperado ..> UnidadDeCompromiso
+enum PERIODO_COMPROMISO {
+  HS_TOTALES
+  HS_SEMANALES
+  HS_MENSUALES
+}
 
-note as N1
-  **Modelo anémico bajo arquitectura de capas**
+Proyecto --> PROYECTO_ESTADO
+Proyecto --> Compromiso
+Proyecto --> ModalidadColaboracion
+Compromiso --> PERIODO_COMPROMISO
 
-  Las entidades sólo mantienen estado, validan sus
-  invariantes en el constructor y exponen operaciones
-  estructurales (agregar / quitar de una colección).
+' ───────────────────────── Habilidad y Colaboración ─────────────────────────
 
-  La lógica de los casos de uso vive en la capa de
-  servicios, no en el dominio:
+class Habilidad {
+  -titulo: String
+  -codigo: String
+  -descripcion: String
+  -fechaCreacion: LocalDateTime
+  -usuario: String
+  -activo: Boolean
+}
 
-  * ColectivoService: alta y modificación de colectivos
-  * ProyectoService: alta y modificación de proyectos,
-    cierre manual (pasar estado a FINALIZADO)
-  * ColaboracionService: anotar una persona a un
-    proyecto, validando que el proyecto esté ABIERTO,
-    que la persona tenga al menos una de las
-    habilidades requeridas y que no esté ya anotada
-  * HabilidadService: alta del catálogo de habilidades
-end note
+class Colaboracion {
+  -fecha: Date
+  -colaborador: Colaborador
+}
 
-note as N2
-  **Dos sentidos de "habilidad"**
+class Colaborador {
+  -nombreFantasia: String
+  -nombre: String
+  -apellido: String
+  -cuentaGit: String
+  -habilidades: Habilidad[]
+  -pronombres: String[]
+  -presentacion: String
 
-  Habilidad es el catálogo global, precargado por seed
-  antes de que arranque el servidor.
+  +tieneHabilidad(habilidad: Habilidad): boolean
+  +agregarHabilidad(habilidad: Habilidad): void
+  +quitarHabilidad(habilidad: Habilidad): void
+}
 
-  Las habilidades requeridas de un Proyecto y las
-  habilidades de una PersonaColaboradora son siempre
-  referencias a entradas de ese catálogo: no se pueden
-  inventar habilidades nuevas al crear un proyecto ni al
-  registrar una persona. La validación la hace el
-  servicio contra el repositorio de habilidades.
-
-  El código es el título normalizado en snake_case.
-end note
-
-note bottom of Colaboracion
-  Agregado independiente, no una lista dentro de
-  Proyecto. Referencia al proyecto y a la persona.
-
-  Se modela como entidad propia porque en la Segunda
-  Entrega suma el dato de contribución anónima, y en la
-  Tercera pasa a originarse en una Postulación aceptada
-  y puede desanotarse.
-
-  Una persona no puede anotarse dos veces al mismo
-  proyecto: el servicio lanza error (decisión de
-  cátedra, para que la UI pueda reaccionar).
-end note
-
-note bottom of PersonaColaboradora
-  Debe existir al menos uno de estos datos de
-  identificación: nombreDeFantasia, cuentaDeDesarrollo,
-  o (nombre + apellido).
-
-  datosDeContacto se modela pero NO se expone en la API
-  en esta entrega. En la Segunda pasa a ser una
-  colección de medios de contacto tipados y su
-  visibilidad queda atada a perfiles.
-end note
-
-note right of Ubicacion
-  "detalle" sólo aplica si nivel = PROVINCIA (una de las
-  23 provincias) o nivel = LOCALIDAD (texto libre).
-  Si nivel es ARGENTINA o CABA, no se usa.
-end note
-
-note bottom of CompromisoEsperado
-  Junto con ModalidadColaboracion quedan como Value
-  Objects independientes de Proyecto: en la Segunda
-  Entrega pasan a formar parte de Perfil sin que cambie
-  su estructura interna.
-end note
-
-note bottom of TipoDeColectivo
-  La clasificación puede ampliarse con nuevos tipos,
-  pero no varía el comportamiento según el tipo, por eso
-  alcanza un enumerativo y no hace falta polimorfismo.
-end note
+Proyecto --> "*" Habilidad
+Proyecto --> "*" Colaboracion
+Colaboracion --> Colaborador
+Colaborador --> "*" Habilidad
 
 @enduml
