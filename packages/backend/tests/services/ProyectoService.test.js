@@ -1,81 +1,84 @@
 import { describe, it, expect } from "@jest/globals";
 import {
   armarServicios,
+  prepararCatalogo,
   crearColectivoDeEjemplo,
   crearProyectoDeEjemplo,
 } from "./testHelpers.js";
 import { DomainError } from "../../src/domain/DomainError.js";
 import { NotFoundError } from "../../src/errors/NotFoundError.js";
-import { EstadoProyecto } from "../../src/domain/enums/EstadoProyecto.js";
+import { PROYECTO_ESTADO } from "../../src/domain/enums/ProyectoEstado.js";
 
-function prepararCatalogo(habilidadService) {
-  habilidadService.crear({ titulo: "Desarrollo Web React", descripcion: "" });
-  habilidadService.crear({ titulo: "Desarrollo Node", descripcion: "" });
+function escenario() {
+  const servicios = armarServicios();
+  prepararCatalogo(servicios.habilidadService);
+  const colectivo = crearColectivoDeEjemplo(servicios.colectivoService);
+  return { ...servicios, colectivo };
 }
 
 describe("ProyectoService", () => {
-  it("crea un proyecto asociado a un colectivo existente", () => {
-    const { habilidadService, colectivoService, proyectoService } = armarServicios();
-    prepararCatalogo(habilidadService);
-    const colectivo = crearColectivoDeEjemplo(colectivoService);
-
+  it("crea el proyecto dentro de su colectivo", () => {
+    const { proyectoService, colectivoService, colectivo } = escenario();
     const proyecto = crearProyectoDeEjemplo(proyectoService, colectivo.id);
 
-    expect(proyecto.colectivoId).toBe(colectivo.id);
-    expect(proyecto.estado).toBe(EstadoProyecto.ABIERTO);
-    expect(proyecto.habilidadesRequeridas).toHaveLength(1);
+    expect(proyecto.estado).toBe(PROYECTO_ESTADO.ABIERTO);
+    expect(colectivoService.buscarPorId(colectivo.id).proyectos).toHaveLength(1);
   });
 
-  it("rechaza crear un proyecto para un colectivo que no existe", () => {
-    const { habilidadService, proyectoService } = armarServicios();
-    prepararCatalogo(habilidadService);
+  it("rechaza crear para un colectivo inexistente", () => {
+    const { proyectoService } = escenario();
 
     expect(() => crearProyectoDeEjemplo(proyectoService, "no-existe")).toThrow(NotFoundError);
   });
 
-  it("rechaza crear un proyecto con una habilidad que no está en el catálogo", () => {
-    const { colectivoService, proyectoService } = armarServicios();
-    const colectivo = crearColectivoDeEjemplo(colectivoService);
+  it("rechaza una habilidad fuera del catálogo", () => {
+    const { proyectoService, colectivo } = escenario();
 
     expect(() =>
       crearProyectoDeEjemplo(proyectoService, colectivo.id, {
-        habilidadesRequeridas: ["habilidad_inexistente"],
+        habilidadesNecesarias: ["habilidad_inventada"],
       }),
     ).toThrow(DomainError);
   });
 
-  it("finalizar pasa el proyecto a FINALIZADO", () => {
-    const { habilidadService, colectivoService, proyectoService } = armarServicios();
-    prepararCatalogo(habilidadService);
-    const colectivo = crearColectivoDeEjemplo(colectivoService);
+  it("buscarPorId encuentra el proyecto navegando desde los colectivos", () => {
+    const { proyectoService, colectivo } = escenario();
     const proyecto = crearProyectoDeEjemplo(proyectoService, colectivo.id);
 
-    const finalizado = proyectoService.finalizar(proyecto.id);
-
-    expect(finalizado.estado).toBe(EstadoProyecto.FINALIZADO);
+    expect(proyectoService.buscarPorId(proyecto.id).id).toBe(proyecto.id);
   });
 
-  it("finalizar dos veces rechaza (no se puede reabrir)", () => {
-    const { habilidadService, colectivoService, proyectoService } = armarServicios();
-    prepararCatalogo(habilidadService);
-    const colectivo = crearColectivoDeEjemplo(colectivoService);
+  it("buscarPorId lanza NotFoundError si no existe", () => {
+    const { proyectoService } = escenario();
+
+    expect(() => proyectoService.buscarPorId("no-existe")).toThrow(NotFoundError);
+  });
+
+  it("finalizar cierra el proyecto y no se puede repetir", () => {
+    const { proyectoService, colectivo } = escenario();
     const proyecto = crearProyectoDeEjemplo(proyectoService, colectivo.id);
+
     proyectoService.finalizar(proyecto.id);
 
+    expect(proyectoService.buscarPorId(proyecto.id).estado).toBe(PROYECTO_ESTADO.FINALIZADO);
     expect(() => proyectoService.finalizar(proyecto.id)).toThrow(DomainError);
   });
 
-  it("agregarHabilidadRequerida suma una habilidad del catálogo", () => {
-    const { habilidadService, colectivoService, proyectoService } = armarServicios();
-    prepararCatalogo(habilidadService);
-    const colectivo = crearColectivoDeEjemplo(colectivoService);
+  it("agregarHabilidadRequerida suma una del catálogo", () => {
+    const { proyectoService, colectivo } = escenario();
     const proyecto = crearProyectoDeEjemplo(proyectoService, colectivo.id);
 
-    const actualizado = proyectoService.agregarHabilidadRequerida(
-      proyecto.id,
-      "desarrollo_node",
-    );
+    proyectoService.agregarHabilidadRequerida(proyecto.id, "desarrollo_node");
 
-    expect(actualizado.habilidadesRequeridas).toHaveLength(2);
+    expect(proyectoService.buscarPorId(proyecto.id).habilidadesNecesarias).toHaveLength(2);
+  });
+
+  it("listar devuelve los proyectos de todos los colectivos", () => {
+    const { proyectoService, colectivoService, colectivo } = escenario();
+    const otro = crearColectivoDeEjemplo(colectivoService, { nombre: "Otra ONG" });
+    crearProyectoDeEjemplo(proyectoService, colectivo.id);
+    crearProyectoDeEjemplo(proyectoService, otro.id);
+
+    expect(proyectoService.listar()).toHaveLength(2);
   });
 });

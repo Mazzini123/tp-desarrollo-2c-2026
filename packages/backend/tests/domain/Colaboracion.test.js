@@ -1,51 +1,22 @@
 import { describe, it, expect } from "@jest/globals";
 import { Colaboracion } from "../../src/domain/Colaboracion.js";
+import { Colaborador } from "../../src/domain/Colaborador.js";
 import { DomainError } from "../../src/domain/DomainError.js";
 
 describe("Colaboracion", () => {
-  it("se crea con proyectoId, personaColaboradoraId y fecha por defecto", () => {
-    const colaboracion = new Colaboracion({
-      proyectoId: "proyecto-1",
-      personaColaboradoraId: "persona-1",
-    });
+  it("se crea con un colaborador y fecha por defecto", () => {
+    const colaborador = new Colaborador({ nombreFantasia: "ByteRunner" });
+    const colaboracion = new Colaboracion({ colaborador });
 
-    expect(colaboracion.proyectoId).toBe("proyecto-1");
-    expect(colaboracion.personaColaboradoraId).toBe("persona-1");
-    expect(colaboracion.fechaDeInicio).toBeInstanceOf(Date);
-    expect(colaboracion.id).toBeDefined();
+    expect(colaboracion.colaborador).toBe(colaborador);
+    expect(colaboracion.fecha).toBeInstanceOf(Date);
   });
 
-  it("acepta una fechaDeInicio explícita", () => {
-    const fecha = new Date("2026-01-15T00:00:00.000Z");
-    const colaboracion = new Colaboracion({
-      proyectoId: "proyecto-1",
-      personaColaboradoraId: "persona-1",
-      fechaDeInicio: fecha,
-    });
-
-    expect(colaboracion.fechaDeInicio).toBe(fecha);
+  it("rechaza crearse sin colaborador", () => {
+    expect(() => new Colaboracion({})).toThrow(DomainError);
   });
 
-  it("rechaza crearse sin proyectoId", () => {
-    expect(
-      () => new Colaboracion({ personaColaboradoraId: "persona-1" }),
-    ).toThrow(DomainError);
-  });
-
-  it("rechaza crearse sin personaColaboradoraId", () => {
-    expect(
-      () => new Colaboracion({ proyectoId: "proyecto-1" }),
-    ).toThrow(DomainError);
-  });
-
-  it("rechaza una fechaDeInicio inválida", () => {
-    expect(
-      () =>
-        new Colaboracion({
-          proyectoId: "proyecto-1",
-          personaColaboradoraId: "persona-1",
-          fechaDeInicio: new Date("no es una fecha"),
-        }),
-    ).toThrow(DomainError);
+  it("rechaza un colaborador que no sea instancia de Colaborador", () => {
+    expect(() => new Colaboracion({ colaborador: { id: "x" } })).toThrow(DomainError);
   });
 });

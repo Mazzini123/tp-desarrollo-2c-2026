@@ -1,34 +1,34 @@
 import { randomUUID } from "node:crypto";
 import { DomainError } from "./DomainError.js";
-import { esTipoDeColectivoValido } from "./enums/TipoDeColectivo.js";
-import { Ubicacion } from "./valueObjects/Ubicacion.js";
+import { esTipoColectivoValido } from "./enums/TipoColectivo.js";
+import { Ubicacion } from "./Ubicacion.js";
+import { Proyecto } from "./Proyecto.js";
 
 /**
- * Entidad. Organización que lleva adelante una determinada causa
- * (fundación, ONG, asamblea, asociación barrial) y publica Proyectos
- * para que personas colaboradoras se sumen.
+ * Organización que lleva adelante una causa y publica Proyectos.
  *
- * No conoce a sus Proyectos: la relación se expresa al revés,
- * Proyecto referencia al Colectivo al que pertenece (ver Proyecto.js).
- * El alta, la modificación y cualquier operación que involucre a
- * varias entidades vive en ColectivoService / ProyectoService, no acá.
+ * Es la raíz del agregado: contiene sus Proyectos, que a su vez
+ * contienen sus Colaboraciones. Por eso el único repositorio que
+ * existe para esta rama del modelo es ColectivoRepository: a un
+ * proyecto se llega navegando desde su colectivo.
  */
 export class Colectivo {
   #id;
   #nombre;
   #descripcion;
-  #tipo;
+  #tipoColectivo;
   #ubicacion;
+  #proyectos;
 
-  constructor({ id = randomUUID(), nombre, descripcion, tipo, ubicacion = null }) {
+  constructor({ id = randomUUID(), nombre, descripcion, tipoColectivo, ubicacion = null }) {
     if (!nombre || nombre.trim().length === 0) {
       throw new DomainError("El nombre del colectivo es obligatorio");
     }
     if (!descripcion || descripcion.trim().length === 0) {
       throw new DomainError("La descripción del colectivo es obligatoria");
     }
-    if (!esTipoDeColectivoValido(tipo)) {
-      throw new DomainError(`Tipo de colectivo inválido: ${tipo}`);
+    if (!esTipoColectivoValido(tipoColectivo)) {
+      throw new DomainError(`Tipo de colectivo inválido: ${tipoColectivo}`);
     }
     if (ubicacion !== null && !(ubicacion instanceof Ubicacion)) {
       throw new DomainError("ubicacion debe ser una instancia de Ubicacion");
@@ -37,8 +37,9 @@ export class Colectivo {
     this.#id = id;
     this.#nombre = nombre.trim();
     this.#descripcion = descripcion.trim();
-    this.#tipo = tipo;
+    this.#tipoColectivo = tipoColectivo;
     this.#ubicacion = ubicacion;
+    this.#proyectos = [];
   }
 
   get id() {
@@ -53,20 +54,29 @@ export class Colectivo {
     return this.#descripcion;
   }
 
-  get tipo() {
-    return this.#tipo;
+  get tipoColectivo() {
+    return this.#tipoColectivo;
   }
 
   get ubicacion() {
     return this.#ubicacion;
   }
 
-  /**
-   * Modificación de datos editables. No permite cambiar el tipo:
-   * de necesitarse, es una decisión de negocio que puede requerir
-   * revisión administrativa y por eso queda fuera de esta operación
-   * estructural simple.
-   */
+  get proyectos() {
+    return [...this.#proyectos];
+  }
+
+  agregarProyecto(proyecto) {
+    if (!(proyecto instanceof Proyecto)) {
+      throw new DomainError("Se esperaba una instancia de Proyecto");
+    }
+    this.#proyectos.push(proyecto);
+  }
+
+  buscarProyecto(proyectoId) {
+    return this.#proyectos.find((p) => p.id === proyectoId) ?? null;
+  }
+
   actualizarDatos({ nombre, descripcion, ubicacion }) {
     if (nombre !== undefined) {
       if (!nombre || nombre.trim().length === 0) {
@@ -93,8 +103,9 @@ export class Colectivo {
       id: this.#id,
       nombre: this.#nombre,
       descripcion: this.#descripcion,
-      tipo: this.#tipo,
+      tipoColectivo: this.#tipoColectivo,
       ubicacion: this.#ubicacion ? this.#ubicacion.toJSON() : null,
+      proyectos: this.#proyectos.map((p) => p.toJSON()),
     };
   }
 }

@@ -1,5 +1,5 @@
 import { Colectivo } from "../domain/Colectivo.js";
-import { Ubicacion } from "../domain/valueObjects/Ubicacion.js";
+import { Ubicacion } from "../domain/Ubicacion.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
 
 function construirUbicacion(datos) {
@@ -14,11 +14,11 @@ export class ColectivoService {
     this.#colectivoRepository = colectivoRepository;
   }
 
-  crear({ nombre, descripcion, tipo, ubicacion }) {
+  crear({ nombre, descripcion, tipoColectivo, ubicacion }) {
     const colectivo = new Colectivo({
       nombre,
       descripcion,
-      tipo,
+      tipoColectivo,
       ubicacion: construirUbicacion(ubicacion),
     });
 

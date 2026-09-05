@@ -1,74 +1,80 @@
 import { describe, it, expect } from "@jest/globals";
 import { Colectivo } from "../../src/domain/Colectivo.js";
-import { Ubicacion } from "../../src/domain/valueObjects/Ubicacion.js";
-import { TipoDeColectivo } from "../../src/domain/enums/TipoDeColectivo.js";
-import { NivelUbicacion } from "../../src/domain/enums/NivelUbicacion.js";
+import { Proyecto } from "../../src/domain/Proyecto.js";
+import { Ubicacion } from "../../src/domain/Ubicacion.js";
+import { Habilidad } from "../../src/domain/Habilidad.js";
+import { Compromiso } from "../../src/domain/Compromiso.js";
+import { ModalidadColaboracion } from "../../src/domain/ModalidadColaboracion.js";
+import { TIPO_COLECTIVO } from "../../src/domain/enums/TipoColectivo.js";
+import { TIPO_UBICACION } from "../../src/domain/enums/TipoUbicacion.js";
+import { PERIODO_COMPROMISO } from "../../src/domain/enums/PeriodoCompromiso.js";
 import { DomainError } from "../../src/domain/DomainError.js";
 
 function datosValidos(overrides = {}) {
   return {
     nombre: "Fundación Ejemplo",
     descripcion: "Trabajamos por una causa",
-    tipo: TipoDeColectivo.FUNDACION,
+    tipoColectivo: TIPO_COLECTIVO.FUNDACION,
     ...overrides,
   };
 }
 
+function unProyecto() {
+  return new Proyecto({
+    titulo: "Sitio",
+    descripcion: "Rediseño",
+    compromisoEsperado: new Compromiso({
+      cantidadHoras: 5,
+      periodo: PERIODO_COMPROMISO.HS_SEMANALES,
+    }),
+    modalidadColaboracion: new ModalidadColaboracion(),
+    habilidadesNecesarias: [Habilidad.crear({ titulo: "Desarrollo Web React" })],
+  });
+}
+
 describe("Colectivo", () => {
-  it("se crea con datos válidos, sin ubicación", () => {
+  it("se crea sin proyectos", () => {
     const colectivo = new Colectivo(datosValidos());
 
-    expect(colectivo.nombre).toBe("Fundación Ejemplo");
-    expect(colectivo.tipo).toBe(TipoDeColectivo.FUNDACION);
-    expect(colectivo.ubicacion).toBeNull();
+    expect(colectivo.proyectos).toHaveLength(0);
     expect(colectivo.id).toBeDefined();
   });
 
-  it("se crea con ubicación", () => {
-    const ubicacion = new Ubicacion({ nivel: NivelUbicacion.CABA });
+  it("rechaza tipo inválido", () => {
+    expect(() => new Colectivo(datosValidos({ tipoColectivo: "COOPERATIVA" }))).toThrow(
+      DomainError,
+    );
+  });
+
+  it("acepta ubicación", () => {
+    const ubicacion = new Ubicacion({ tipoUbicacion: TIPO_UBICACION.CABA });
     const colectivo = new Colectivo(datosValidos({ ubicacion }));
 
     expect(colectivo.ubicacion).toBe(ubicacion);
   });
 
-  it("rechaza nombre vacío", () => {
-    expect(() => new Colectivo(datosValidos({ nombre: "" }))).toThrow(DomainError);
-  });
-
-  it("rechaza tipo inválido", () => {
-    expect(() => new Colectivo(datosValidos({ tipo: "COOPERATIVA" }))).toThrow(DomainError);
-  });
-
-  it("rechaza ubicacion que no sea instancia de Ubicacion", () => {
-    expect(() => new Colectivo(datosValidos({ ubicacion: { nivel: "CABA" } }))).toThrow(
-      DomainError,
-    );
-  });
-
-  it("actualizarDatos permite cambiar nombre, descripcion y ubicacion", () => {
+  it("agregarProyecto lo suma a la lista", () => {
     const colectivo = new Colectivo(datosValidos());
-    const nuevaUbicacion = new Ubicacion({ nivel: NivelUbicacion.ARGENTINA });
+    const proyecto = unProyecto();
+    colectivo.agregarProyecto(proyecto);
 
-    colectivo.actualizarDatos({
-      nombre: "Nuevo nombre",
-      descripcion: "Nueva descripción",
-      ubicacion: nuevaUbicacion,
-    });
+    expect(colectivo.proyectos).toHaveLength(1);
+  });
 
-    expect(colectivo.nombre).toBe("Nuevo nombre");
-    expect(colectivo.descripcion).toBe("Nueva descripción");
-    expect(colectivo.ubicacion).toBe(nuevaUbicacion);
+  it("buscarProyecto lo encuentra por id", () => {
+    const colectivo = new Colectivo(datosValidos());
+    const proyecto = unProyecto();
+    colectivo.agregarProyecto(proyecto);
+
+    expect(colectivo.buscarProyecto(proyecto.id)).toBe(proyecto);
+    expect(colectivo.buscarProyecto("no-existe")).toBeNull();
   });
 
   it("actualizarDatos no toca el tipo", () => {
     const colectivo = new Colectivo(datosValidos());
     colectivo.actualizarDatos({ nombre: "Otro nombre" });
 
-    expect(colectivo.tipo).toBe(TipoDeColectivo.FUNDACION);
-  });
-
-  it("actualizarDatos rechaza nombre vacío", () => {
-    const colectivo = new Colectivo(datosValidos());
-    expect(() => colectivo.actualizarDatos({ nombre: "" })).toThrow(DomainError);
+    expect(colectivo.nombre).toBe("Otro nombre");
+    expect(colectivo.tipoColectivo).toBe(TIPO_COLECTIVO.FUNDACION);
   });
 });

@@ -5,40 +5,30 @@ import { DomainError } from "../../src/domain/DomainError.js";
 describe("HabilidadService", () => {
   it("crea una habilidad y calcula su código", () => {
     const { habilidadService } = armarServicios();
-
-    const habilidad = habilidadService.crear({
-      titulo: "Desarrollo Web React",
-      descripcion: "Frontend con React",
-    });
+    const habilidad = habilidadService.crear({ titulo: "Desarrollo Web React" });
 
     expect(habilidad.codigo).toBe("desarrollo_web_react");
     expect(habilidadService.listar()).toHaveLength(1);
   });
 
-  it("rechaza crear dos habilidades con el mismo código", () => {
+  it("rechaza dos habilidades con el mismo código", () => {
     const { habilidadService } = armarServicios();
-    habilidadService.crear({ titulo: "Desarrollo Web React", descripcion: "" });
+    habilidadService.crear({ titulo: "Desarrollo Web React" });
 
-    expect(() =>
-      habilidadService.crear({ titulo: "Desarrollo Web React", descripcion: "otra" }),
-    ).toThrow(DomainError);
+    expect(() => habilidadService.crear({ titulo: "Desarrollo Web React" })).toThrow(DomainError);
   });
 
-  it("resolverPorCodigos rechaza un código que no existe en el catálogo", () => {
+  it("resolverPorCodigos rechaza un código inexistente", () => {
     const { habilidadService } = armarServicios();
-    habilidadService.crear({ titulo: "Desarrollo Web React", descripcion: "" });
 
-    expect(() => habilidadService.resolverPorCodigos(["balanceo_en_un_pie"])).toThrow(
-      DomainError,
-    );
+    expect(() => habilidadService.resolverPorCodigos(["balanceo_en_un_pie"])).toThrow(DomainError);
   });
 
-  it("resolverPorCodigos devuelve las habilidades del catálogo", () => {
+  it("resolverPorCodigos rechaza una habilidad dada de baja", () => {
     const { habilidadService } = armarServicios();
-    habilidadService.crear({ titulo: "Desarrollo Web React", descripcion: "" });
+    const habilidad = habilidadService.crear({ titulo: "Desarrollo Node" });
+    habilidad.desactivar();
 
-    const [habilidad] = habilidadService.resolverPorCodigos(["desarrollo_web_react"]);
-
-    expect(habilidad.titulo).toBe("Desarrollo Web React");
+    expect(() => habilidadService.resolverPorCodigos(["desarrollo_node"])).toThrow(DomainError);
   });
 });

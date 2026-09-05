@@ -1,8 +1,7 @@
 import { habilidadService } from "../services/index.js";
 
 export function crear(req, res) {
-  const habilidad = habilidadService.crear(req.body);
-  res.status(201).json(habilidad);
+  res.status(201).json(habilidadService.crear(req.body));
 }
 
 export function listar(req, res) {

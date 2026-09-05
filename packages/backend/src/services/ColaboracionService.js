@@ -2,59 +2,73 @@ import { Colaboracion } from "../domain/Colaboracion.js";
 import { DomainError } from "../domain/DomainError.js";
 
 /**
- * El caso de uso central del requerimiento 2b: anotar una persona
- * colaboradora a un proyecto. Reúne tres reglas que ninguna entidad
- * puede validar por sí sola porque necesitan mirar a las otras:
+ * Requerimiento 2b: anotar un colaborador a un proyecto.
+ *
+ * Reúne tres reglas que ninguna entidad puede validar sola porque
+ * necesitan mirar a las otras:
  *
  *  1. El proyecto debe estar ABIERTO.
- *  2. La persona debe tener al menos una de las habilidades
- *     requeridas por el proyecto.
- *  3. La persona no puede estar ya anotada en ese proyecto (si lo
- *     intenta, se rompe explícitamente: así lo pidió la cátedra,
- *     para que la UI decida cómo reaccionar).
+ *  2. El colaborador debe tener al menos una de las habilidades que
+ *     el proyecto necesita.
+ *  3. No puede estar ya anotado en ese proyecto (si lo intenta, se
+ *     rompe explícitamente: así lo pidió la cátedra, para que la UI
+ *     pueda reaccionar).
+ *
+ * Como la Colaboracion vive dentro del Proyecto, y el Proyecto
+ * dentro del Colectivo, al final se persiste el colectivo entero.
  */
 export class ColaboracionService {
-  #colaboracionRepository;
+  #colectivoRepository;
   #proyectoService;
-  #personaColaboradoraService;
+  #colaboradorService;
 
-  constructor({ colaboracionRepository, proyectoService, personaColaboradoraService }) {
-    this.#colaboracionRepository = colaboracionRepository;
+  constructor({ colectivoRepository, proyectoService, colaboradorService }) {
+    this.#colectivoRepository = colectivoRepository;
     this.#proyectoService = proyectoService;
-    this.#personaColaboradoraService = personaColaboradoraService;
+    this.#colaboradorService = colaboradorService;
   }
 
-  registrar({ proyectoId, personaColaboradoraId }) {
-    const proyecto = this.#proyectoService.buscarPorId(proyectoId);
-    const persona = this.#personaColaboradoraService.buscarPorId(personaColaboradoraId);
+  registrar({ proyectoId, colaboradorId }) {
+    const { colectivo, proyecto } = this.#proyectoService.buscarConColectivo(proyectoId);
+    const colaborador = this.#colaboradorService.buscarPorId(colaboradorId);
 
     if (!proyecto.estaAbierto()) {
       throw new DomainError("No se puede anotar a un proyecto que ya está finalizado");
     }
 
-    const cumpleAlgunaHabilidad = persona.habilidades.some((h) => proyecto.requiereHabilidad(h));
-    if (!cumpleAlgunaHabilidad) {
+    if (!proyecto.cumpleHabilidadesRequeridas(colaborador)) {
       throw new DomainError(
-        "La persona debe tener al menos una de las habilidades requeridas por el proyecto",
+        "El colaborador debe tener al menos una de las habilidades que necesita el proyecto",
       );
     }
 
-    if (this.#colaboracionRepository.existeColaboracion(proyectoId, personaColaboradoraId)) {
-      throw new DomainError("La persona ya está anotada en este proyecto");
+    if (proyecto.yaColaboraron(colaborador)) {
+      throw new DomainError("El colaborador ya está anotado en este proyecto");
     }
 
-    const colaboracion = new Colaboracion({ proyectoId, personaColaboradoraId });
-    return this.#colaboracionRepository.guardar(colaboracion);
+    const colaboracion = new Colaboracion({ colaborador });
+    proyecto.agregarColaboracion(colaboracion);
+    this.#colectivoRepository.guardar(colectivo);
+
+    return colaboracion;
   }
 
   listarPorProyecto(proyectoId) {
-    // Lanza NotFoundError si el proyecto no existe.
-    this.#proyectoService.buscarPorId(proyectoId);
-    return this.#colaboracionRepository.buscarPorProyecto(proyectoId);
+    return this.#proyectoService.buscarPorId(proyectoId).colaboraciones;
   }
 
-  listarPorPersona(personaColaboradoraId) {
-    this.#personaColaboradoraService.buscarPorId(personaColaboradoraId);
-    return this.#colaboracionRepository.buscarPorPersona(personaColaboradoraId);
+  /**
+   * Historial de un colaborador en la plataforma. Como las
+   * colaboraciones viven dentro de los proyectos, hay que recorrer
+   * todos los colectivos y sus proyectos.
+   */
+  listarPorColaborador(colaboradorId) {
+    const colaborador = this.#colaboradorService.buscarPorId(colaboradorId);
+
+    return this.#colectivoRepository.listarProyectos().flatMap((proyecto) =>
+      proyecto.colaboraciones
+        .filter((c) => c.colaborador.id === colaborador.id)
+        .map((c) => ({ proyectoId: proyecto.id, colaboracion: c })),
+    );
   }
 }

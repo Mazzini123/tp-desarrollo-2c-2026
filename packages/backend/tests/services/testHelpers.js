@@ -1,76 +1,80 @@
 import { ColectivoRepository } from "../../src/repositories/ColectivoRepository.js";
-import { ProyectoRepository } from "../../src/repositories/ProyectoRepository.js";
+import { ColaboradorRepository } from "../../src/repositories/ColaboradorRepository.js";
 import { HabilidadRepository } from "../../src/repositories/HabilidadRepository.js";
-import { PersonaColaboradoraRepository } from "../../src/repositories/PersonaColaboradoraRepository.js";
-import { ColaboracionRepository } from "../../src/repositories/ColaboracionRepository.js";
 
 import { ColectivoService } from "../../src/services/ColectivoService.js";
 import { ProyectoService } from "../../src/services/ProyectoService.js";
 import { HabilidadService } from "../../src/services/HabilidadService.js";
-import { PersonaColaboradoraService } from "../../src/services/PersonaColaboradoraService.js";
+import { ColaboradorService } from "../../src/services/ColaboradorService.js";
 import { ColaboracionService } from "../../src/services/ColaboracionService.js";
 
-import { TipoDeColectivo } from "../../src/domain/enums/TipoDeColectivo.js";
-import { UnidadDeCompromiso } from "../../src/domain/enums/UnidadDeCompromiso.js";
+import { TIPO_COLECTIVO } from "../../src/domain/enums/TipoColectivo.js";
+import { PERIODO_COMPROMISO } from "../../src/domain/enums/PeriodoCompromiso.js";
 
+/**
+ * Cada test arma su propio grafo de dependencias en vez de usar los
+ * singletons de src/services/index.js, para no compartir estado.
+ */
 export function armarServicios() {
   const colectivoRepository = new ColectivoRepository();
-  const proyectoRepository = new ProyectoRepository();
+  const colaboradorRepository = new ColaboradorRepository();
   const habilidadRepository = new HabilidadRepository();
-  const personaColaboradoraRepository = new PersonaColaboradoraRepository();
-  const colaboracionRepository = new ColaboracionRepository();
 
   const habilidadService = new HabilidadService({ habilidadRepository });
   const colectivoService = new ColectivoService({ colectivoRepository });
   const proyectoService = new ProyectoService({
-    proyectoRepository,
+    colectivoRepository,
     colectivoService,
     habilidadService,
   });
-  const personaColaboradoraService = new PersonaColaboradoraService({
-    personaColaboradoraRepository,
+  const colaboradorService = new ColaboradorService({
+    colaboradorRepository,
     habilidadService,
   });
   const colaboracionService = new ColaboracionService({
-    colaboracionRepository,
+    colectivoRepository,
     proyectoService,
-    personaColaboradoraService,
+    colaboradorService,
   });
 
   return {
     habilidadService,
     colectivoService,
     proyectoService,
-    personaColaboradoraService,
+    colaboradorService,
     colaboracionService,
   };
+}
+
+export function prepararCatalogo(habilidadService) {
+  habilidadService.crear({ titulo: "Desarrollo Web React", descripcion: "" });
+  habilidadService.crear({ titulo: "Desarrollo Node", descripcion: "" });
 }
 
 export function crearColectivoDeEjemplo(colectivoService, overrides = {}) {
   return colectivoService.crear({
     nombre: "Fundación Ejemplo",
     descripcion: "Trabajamos por una causa",
-    tipo: TipoDeColectivo.FUNDACION,
+    tipoColectivo: TIPO_COLECTIVO.FUNDACION,
     ...overrides,
   });
 }
 
 export function crearProyectoDeEjemplo(proyectoService, colectivoId, overrides = {}) {
   return proyectoService.crear({
+    colectivoId,
     titulo: "Sitio institucional",
     descripcion: "Rediseño del sitio",
-    colectivoId,
-    compromisoEsperado: { unidad: UnidadDeCompromiso.HORAS_SEMANALES, cantidadHoras: 5 },
+    compromisoEsperado: { cantidadHoras: 5, periodo: PERIODO_COMPROMISO.HS_SEMANALES },
     modalidadColaboracion: {},
-    habilidadesRequeridas: ["desarrollo_web_react"],
+    habilidadesNecesarias: ["desarrollo_web_react"],
     ...overrides,
   });
 }
 
-export function crearPersonaDeEjemplo(personaColaboradoraService, overrides = {}) {
-  return personaColaboradoraService.crear({
-    nombreDeFantasia: "ByteRunner",
-    datosDeContacto: "byte@example.com",
+export function crearColaboradorDeEjemplo(colaboradorService, overrides = {}) {
+  return colaboradorService.crear({
+    nombreFantasia: "ByteRunner",
     habilidades: [],
     ...overrides,
   });
