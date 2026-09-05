@@ -1,5 +1,5 @@
 import { Colaboracion } from "../domain/Colaboracion.js";
-import { DomainError } from "../domain/DomainError.js";
+import { DomainError, ConflictError } from "../errors/index.js";
 
 /**
  * Requerimiento 2b: anotar un colaborador a un proyecto.
@@ -33,7 +33,7 @@ export class ColaboracionService {
     const colaborador = this.#colaboradorService.buscarPorId(colaboradorId);
 
     if (!proyecto.estaAbierto()) {
-      throw new DomainError("No se puede anotar a un proyecto que ya está finalizado");
+      throw new ConflictError("No se puede anotar a un proyecto que ya está finalizado");
     }
 
     if (!proyecto.cumpleHabilidadesRequeridas(colaborador)) {
@@ -43,7 +43,7 @@ export class ColaboracionService {
     }
 
     if (proyecto.yaColaboraron(colaborador)) {
-      throw new DomainError("El colaborador ya está anotado en este proyecto");
+      throw new ConflictError("El colaborador ya está anotado en este proyecto");
     }
 
     const colaboracion = new Colaboracion({ colaborador });

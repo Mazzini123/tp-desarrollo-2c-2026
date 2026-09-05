@@ -1,6 +1,6 @@
 import { describe, it, expect } from "@jest/globals";
 import { Habilidad, normalizarASnakeCase } from "../../src/domain/Habilidad.js";
-import { DomainError } from "../../src/domain/DomainError.js";
+import { DomainError } from "../../src/errors/index.js";
 
 describe("Habilidad", () => {
   it("normaliza el título a snake_case sin acentos", () => {

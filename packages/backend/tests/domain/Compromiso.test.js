@@ -1,7 +1,7 @@
 import { describe, it, expect } from "@jest/globals";
 import { Compromiso } from "../../src/domain/Compromiso.js";
 import { PERIODO_COMPROMISO } from "../../src/domain/enums/PeriodoCompromiso.js";
-import { DomainError } from "../../src/domain/DomainError.js";
+import { DomainError } from "../../src/errors/index.js";
 
 describe("Compromiso", () => {
   it("se crea con horas positivas y período válido", () => {

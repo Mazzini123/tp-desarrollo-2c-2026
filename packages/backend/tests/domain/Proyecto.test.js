@@ -7,7 +7,7 @@ import { Compromiso } from "../../src/domain/Compromiso.js";
 import { ModalidadColaboracion } from "../../src/domain/ModalidadColaboracion.js";
 import { PERIODO_COMPROMISO } from "../../src/domain/enums/PeriodoCompromiso.js";
 import { PROYECTO_ESTADO } from "../../src/domain/enums/ProyectoEstado.js";
-import { DomainError } from "../../src/domain/DomainError.js";
+import { DomainError, ConflictError } from "../../src/errors/index.js";
 
 const react = () => Habilidad.crear({ titulo: "Desarrollo Web React", descripcion: "" });
 const node = () => Habilidad.crear({ titulo: "Desarrollo Node", descripcion: "" });
@@ -66,7 +66,7 @@ describe("Proyecto", () => {
     proyecto.finalizarProyecto();
 
     expect(proyecto.estado).toBe(PROYECTO_ESTADO.FINALIZADO);
-    expect(() => proyecto.finalizarProyecto()).toThrow(DomainError);
+    expect(() => proyecto.finalizarProyecto()).toThrow(ConflictError);
   });
 
   it("quitarHabilidadRequerida rechaza dejar el proyecto sin habilidades", () => {

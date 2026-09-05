@@ -1,7 +1,7 @@
 import { Proyecto } from "../domain/Proyecto.js";
 import { Compromiso } from "../domain/Compromiso.js";
 import { ModalidadColaboracion } from "../domain/ModalidadColaboracion.js";
-import { NotFoundError } from "../errors/NotFoundError.js";
+import { NotFoundError } from "../errors/index.js";
 
 /**
  * Casos de uso sobre Proyecto.

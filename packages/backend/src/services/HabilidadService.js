@@ -1,4 +1,4 @@
-import { DomainError } from "../domain/DomainError.js";
+import { DomainError, ConflictError } from "../errors/index.js";
 import { Habilidad } from "../domain/Habilidad.js";
 
 /**
@@ -17,7 +17,7 @@ export class HabilidadService {
     const habilidad = Habilidad.crear({ titulo, descripcion, usuario });
 
     if (this.#habilidadRepository.existeCodigo(habilidad.codigo)) {
-      throw new DomainError(`Ya existe una habilidad con el código "${habilidad.codigo}"`);
+      throw new ConflictError(`Ya existe una habilidad con el código "${habilidad.codigo}"`);
     }
 
     return this.#habilidadRepository.guardar(habilidad);

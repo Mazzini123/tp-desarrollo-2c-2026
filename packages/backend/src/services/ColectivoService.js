@@ -1,6 +1,6 @@
 import { Colectivo } from "../domain/Colectivo.js";
 import { Ubicacion } from "../domain/Ubicacion.js";
-import { NotFoundError } from "../errors/NotFoundError.js";
+import { NotFoundError } from "../errors/index.js";
 
 function construirUbicacion(datos) {
   if (!datos) return null;

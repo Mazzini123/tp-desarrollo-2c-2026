@@ -1,6 +1,6 @@
 import { describe, it, expect } from "@jest/globals";
 import { armarServicios, crearColectivoDeEjemplo } from "./testHelpers.js";
-import { NotFoundError } from "../../src/errors/NotFoundError.js";
+import { NotFoundError } from "../../src/errors/index.js";
 import { TIPO_UBICACION } from "../../src/domain/enums/TipoUbicacion.js";
 
 describe("ColectivoService", () => {

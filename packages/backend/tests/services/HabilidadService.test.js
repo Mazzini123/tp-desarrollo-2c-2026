@@ -1,6 +1,6 @@
 import { describe, it, expect } from "@jest/globals";
 import { armarServicios } from "./testHelpers.js";
-import { DomainError } from "../../src/domain/DomainError.js";
+import { DomainError, ConflictError } from "../../src/errors/index.js";
 
 describe("HabilidadService", () => {
   it("crea una habilidad y calcula su código", () => {
@@ -15,7 +15,7 @@ describe("HabilidadService", () => {
     const { habilidadService } = armarServicios();
     habilidadService.crear({ titulo: "Desarrollo Web React" });
 
-    expect(() => habilidadService.crear({ titulo: "Desarrollo Web React" })).toThrow(DomainError);
+    expect(() => habilidadService.crear({ titulo: "Desarrollo Web React" })).toThrow(ConflictError);
   });
 
   it("resolverPorCodigos rechaza un código inexistente", () => {

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "@jest/globals";
 import { armarServicios, prepararCatalogo, crearColaboradorDeEjemplo } from "./testHelpers.js";
-import { DomainError } from "../../src/domain/DomainError.js";
-import { NotFoundError } from "../../src/errors/NotFoundError.js";
+import { DomainError } from "../../src/errors/index.js";
+import { NotFoundError } from "../../src/errors/index.js";
 
 describe("ColaboradorService", () => {
   it("crea un colaborador con habilidades del catálogo", () => {
