@@ -1,7 +1,7 @@
 import { describe, it, expect } from "@jest/globals";
 import { Colaboracion } from "../../src/domain/Colaboracion.js";
 import { Colaborador } from "../../src/domain/Colaborador.js";
-import { DomainError } from "../../src/domain/DomainError.js";
+import { DomainError } from "../../src/errors/index.js";
 
 describe("Colaboracion", () => {
   it("se crea con un colaborador y fecha por defecto", () => {

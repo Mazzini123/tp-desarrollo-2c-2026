@@ -1,7 +1,7 @@
 import { describe, it, expect } from "@jest/globals";
 import { Colaborador } from "../../src/domain/Colaborador.js";
 import { Habilidad } from "../../src/domain/Habilidad.js";
-import { DomainError } from "../../src/domain/DomainError.js";
+import { DomainError } from "../../src/errors/index.js";
 
 function react() {
   return Habilidad.crear({ titulo: "Desarrollo Web React", descripcion: "" });

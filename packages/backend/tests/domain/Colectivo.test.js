@@ -8,7 +8,7 @@ import { ModalidadColaboracion } from "../../src/domain/ModalidadColaboracion.js
 import { TIPO_COLECTIVO } from "../../src/domain/enums/TipoColectivo.js";
 import { TIPO_UBICACION } from "../../src/domain/enums/TipoUbicacion.js";
 import { PERIODO_COMPROMISO } from "../../src/domain/enums/PeriodoCompromiso.js";
-import { DomainError } from "../../src/domain/DomainError.js";
+import { DomainError } from "../../src/errors/index.js";
 
 function datosValidos(overrides = {}) {
   return {

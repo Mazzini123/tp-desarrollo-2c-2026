@@ -1,5 +1,5 @@
 import { Colaborador } from "../domain/Colaborador.js";
-import { NotFoundError } from "../errors/NotFoundError.js";
+import { NotFoundError } from "../errors/index.js";
 
 export class ColaboradorService {
   #colaboradorRepository;

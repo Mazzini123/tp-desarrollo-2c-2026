@@ -1,7 +1,7 @@
 import { describe, it, expect } from "@jest/globals";
 import { Ubicacion } from "../../src/domain/Ubicacion.js";
 import { TIPO_UBICACION } from "../../src/domain/enums/TipoUbicacion.js";
-import { DomainError } from "../../src/domain/DomainError.js";
+import { DomainError } from "../../src/errors/index.js";
 
 describe("Ubicacion", () => {
   it("ARGENTINA es de alcance nacional y no usa nombre", () => {

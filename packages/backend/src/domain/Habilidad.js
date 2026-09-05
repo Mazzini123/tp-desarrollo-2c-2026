@@ -1,6 +1,6 @@
-import { DomainError } from "./DomainError.js";
+import { DomainError } from "../errors/index.js";
 
-function normalizarASnakeCase(titulo) {
+export function normalizarASnakeCase(titulo) {
   return titulo
     .trim()
     .toLowerCase()
@@ -12,24 +12,15 @@ function normalizarASnakeCase(titulo) {
 
 /**
  * Catálogo global de habilidades, precargado por el equipo
- * administrativo de la plataforma. Los proyectos y los colaboradores
- * sólo pueden referenciar habilidades de este catálogo, nunca
- * inventar una nueva.
+ * administrativo. Los proyectos y los colaboradores sólo pueden
+ * referenciar habilidades de este catálogo, nunca inventar una.
  *
  * El código, por ahora, es el título normalizado en snake_case.
- *
- * fechaCreacion, usuario y activo son datos de auditoría: permiten
- * dar de baja una habilidad sin borrarla (los proyectos que ya la
- * referencian siguen siendo válidos).
+ * fechaCreacion, usuario y activo son datos de auditoría: "activo"
+ * permite dar de baja una habilidad sin borrarla, de modo que los
+ * proyectos que ya la referencian sigan siendo válidos.
  */
 export class Habilidad {
-  #titulo;
-  #codigo;
-  #descripcion;
-  #fechaCreacion;
-  #usuario;
-  #activo;
-
   constructor({
     titulo,
     codigo,
@@ -44,16 +35,13 @@ export class Habilidad {
     if (!codigo || codigo.trim().length === 0) {
       throw new DomainError("El código de la habilidad es obligatorio");
     }
-    if (!(fechaCreacion instanceof Date) || Number.isNaN(fechaCreacion.getTime())) {
-      throw new DomainError("fechaCreacion debe ser una fecha válida");
-    }
 
-    this.#titulo = titulo.trim();
-    this.#codigo = codigo;
-    this.#descripcion = descripcion;
-    this.#fechaCreacion = fechaCreacion;
-    this.#usuario = usuario;
-    this.#activo = activo;
+    this.titulo = titulo.trim();
+    this.codigo = codigo;
+    this.descripcion = descripcion;
+    this.fechaCreacion = fechaCreacion;
+    this.usuario = usuario;
+    this.activo = activo;
   }
 
   /** Alta de una habilidad nueva: calcula el código desde el título. */
@@ -66,52 +54,15 @@ export class Habilidad {
     });
   }
 
-  get titulo() {
-    return this.#titulo;
-  }
-
-  get codigo() {
-    return this.#codigo;
-  }
-
-  get descripcion() {
-    return this.#descripcion;
-  }
-
-  get fechaCreacion() {
-    return this.#fechaCreacion;
-  }
-
-  get usuario() {
-    return this.#usuario;
-  }
-
-  get activo() {
-    return this.#activo;
-  }
-
   desactivar() {
-    this.#activo = false;
+    this.activo = false;
   }
 
   activar() {
-    this.#activo = true;
+    this.activo = true;
   }
 
   equals(otra) {
-    return otra instanceof Habilidad && otra.codigo === this.#codigo;
-  }
-
-  toJSON() {
-    return {
-      titulo: this.#titulo,
-      codigo: this.#codigo,
-      descripcion: this.#descripcion,
-      fechaCreacion: this.#fechaCreacion.toISOString(),
-      usuario: this.#usuario,
-      activo: this.#activo,
-    };
+    return otra instanceof Habilidad && otra.codigo === this.codigo;
   }
 }
-
-export { normalizarASnakeCase };

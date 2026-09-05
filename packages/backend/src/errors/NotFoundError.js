@@ -1,13 +1,8 @@
-/**
- * Error de aplicación (no de dominio): se pide un recurso que no
- * existe en el repositorio. Lo lanzan los services, no las entidades,
- * porque buscar por id es un detalle de infraestructura, no una
- * regla de negocio.
- */
-export class NotFoundError extends Error {
+import { AppError } from "./AppError.js";
+
+/** 404 Not Found. Se pidió un recurso que no existe. */
+export class NotFoundError extends AppError {
   constructor(mensaje) {
-    super(mensaje);
-    this.name = "NotFoundError";
-    this.status = 404;
+    super(mensaje, 404);
   }
 }

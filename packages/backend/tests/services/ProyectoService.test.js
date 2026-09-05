@@ -5,8 +5,8 @@ import {
   crearColectivoDeEjemplo,
   crearProyectoDeEjemplo,
 } from "./testHelpers.js";
-import { DomainError } from "../../src/domain/DomainError.js";
-import { NotFoundError } from "../../src/errors/NotFoundError.js";
+import { DomainError, ConflictError } from "../../src/errors/index.js";
+import { NotFoundError } from "../../src/errors/index.js";
 import { PROYECTO_ESTADO } from "../../src/domain/enums/ProyectoEstado.js";
 
 function escenario() {
@@ -61,7 +61,7 @@ describe("ProyectoService", () => {
     proyectoService.finalizar(proyecto.id);
 
     expect(proyectoService.buscarPorId(proyecto.id).estado).toBe(PROYECTO_ESTADO.FINALIZADO);
-    expect(() => proyectoService.finalizar(proyecto.id)).toThrow(DomainError);
+    expect(() => proyectoService.finalizar(proyecto.id)).toThrow(ConflictError);
   });
 
   it("agregarHabilidadRequerida suma una del catálogo", () => {

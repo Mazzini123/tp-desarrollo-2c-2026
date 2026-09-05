@@ -6,7 +6,7 @@ import {
   crearProyectoDeEjemplo,
   crearColaboradorDeEjemplo,
 } from "./testHelpers.js";
-import { DomainError } from "../../src/domain/DomainError.js";
+import { DomainError, ConflictError } from "../../src/errors/index.js";
 
 function escenario(overridesColaborador = {}) {
   const servicios = armarServicios();
@@ -54,7 +54,7 @@ describe("ColaboracionService", () => {
 
     expect(() =>
       colaboracionService.registrar({ proyectoId: proyecto.id, colaboradorId: colaborador.id }),
-    ).toThrow(DomainError);
+    ).toThrow(ConflictError);
   });
 
   it("rechaza anotar dos veces al mismo colaborador", () => {
@@ -65,7 +65,7 @@ describe("ColaboracionService", () => {
 
     expect(() =>
       colaboracionService.registrar({ proyectoId: proyecto.id, colaboradorId: colaborador.id }),
-    ).toThrow(DomainError);
+    ).toThrow(ConflictError);
   });
 
   it("listarPorColaborador arma el historial recorriendo los proyectos", () => {

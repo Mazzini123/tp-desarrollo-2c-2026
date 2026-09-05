@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import router from "./routes/index.js";
+import { AppError } from "./errors/index.js";
 
 const app = express();
 
@@ -20,10 +21,22 @@ app.use((req, res) => {
   res.status(404).json({ error: "Recurso no encontrado" });
 });
 
-// Manejador de errores centralizado
+/**
+ * Manejador de errores centralizado.
+ *
+ * Gracias a AppError, acá no hace falta conocer cada tipo concreto:
+ * cualquier subclase trae su propio status. Lo que no sea un
+ * AppError es algo que no contemplamos, así que va como 500 y se
+ * loguea para poder investigarlo.
+ */
 app.use((err, req, res, _next) => {
+  if (err instanceof AppError) {
+    res.status(err.status).json({ error: err.message });
+    return;
+  }
+
   console.error(err);
-  res.status(err.status || 500).json({ error: err.message || "Error interno" });
+  res.status(500).json({ error: "Error interno del servidor" });
 });
 
 export default app;
