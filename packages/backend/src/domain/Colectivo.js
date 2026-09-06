@@ -3,6 +3,7 @@ import { DomainError } from "../errors/index.js";
 import { esTipoColectivoValido } from "./enums/TipoColectivo.js";
 import { Ubicacion } from "./Ubicacion.js";
 import { Proyecto } from "./Proyecto.js";
+import { tieneContenido } from "../utils/validaciones.js";
 
 /**
  * Organización que lleva adelante una causa y publica Proyectos.
@@ -14,10 +15,10 @@ import { Proyecto } from "./Proyecto.js";
  */
 export class Colectivo {
   constructor({ id = randomUUID(), nombre, descripcion, tipoColectivo, ubicacion = null }) {
-    if (!nombre || nombre.trim().length === 0) {
+    if (!tieneContenido(nombre)) {
       throw new DomainError("El nombre del colectivo es obligatorio");
     }
-    if (!descripcion || descripcion.trim().length === 0) {
+    if (!tieneContenido(descripcion)) {
       throw new DomainError("La descripción del colectivo es obligatoria");
     }
     if (!esTipoColectivoValido(tipoColectivo)) {

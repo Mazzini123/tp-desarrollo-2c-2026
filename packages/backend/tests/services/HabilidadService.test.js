@@ -8,7 +8,7 @@ describe("HabilidadService", () => {
     const habilidad = habilidadService.crear({ titulo: "Desarrollo Web React" });
 
     expect(habilidad.codigo).toBe("desarrollo_web_react");
-    expect(habilidadService.listar()).toHaveLength(1);
+    expect(habilidadService.listarTodas()).toHaveLength(1);
   });
 
   it("rechaza dos habilidades con el mismo código", () => {

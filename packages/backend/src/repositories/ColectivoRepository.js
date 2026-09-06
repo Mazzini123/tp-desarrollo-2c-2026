@@ -24,4 +24,14 @@ export class ColectivoRepository extends InMemoryRepository {
   listarProyectos() {
     return this.listar().flatMap((colectivo) => colectivo.proyectos);
   }
+
+  listarProyectosPaginado(numeroPagina, limitePorPagina) {
+    const todos = this.listarProyectos();
+    const inicio = (numeroPagina - 1) * limitePorPagina;
+
+    return {
+      items: todos.slice(inicio, inicio + limitePorPagina),
+      total: todos.length,
+    };
+  }
 }

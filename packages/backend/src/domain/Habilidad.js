@@ -1,4 +1,5 @@
 import { DomainError } from "../errors/index.js";
+import { tieneContenido } from "../utils/validaciones.js";
 
 export function normalizarASnakeCase(titulo) {
   return titulo
@@ -29,10 +30,10 @@ export class Habilidad {
     usuario = "admin",
     activo = true,
   }) {
-    if (!titulo || titulo.trim().length === 0) {
+    if (!tieneContenido(titulo)) {
       throw new DomainError("El título de la habilidad es obligatorio");
     }
-    if (!codigo || codigo.trim().length === 0) {
+    if (!tieneContenido(codigo)) {
       throw new DomainError("El código de la habilidad es obligatorio");
     }
 

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import * as colaboradoresController from "../controllers/colaboradores.controller.js";
+import { ColaboradorController } from "../controllers/ColaboradorController.js";
 import { validate } from "../middlewares/validate.js";
 import {
   crearColaboradorSchema,
@@ -8,19 +8,20 @@ import {
 import { agregarHabilidadSchema } from "../schemas/proyecto.schema.js";
 
 const router = Router();
+const colaboradorController = new ColaboradorController();
 
-router.post("/", validate(crearColaboradorSchema), colaboradoresController.crear);
-router.get("/", colaboradoresController.listar);
-router.get("/:id", colaboradoresController.obtenerPorId);
-router.put("/:id", validate(actualizarColaboradorSchema), colaboradoresController.actualizar);
+router.post("/", validate(crearColaboradorSchema), colaboradorController.crear);
+router.get("/", colaboradorController.listar);
+router.get("/:id", colaboradorController.obtenerPorId);
+router.put("/:id", validate(actualizarColaboradorSchema), colaboradorController.actualizar);
 
 router.post(
   "/:id/habilidades",
   validate(agregarHabilidadSchema),
-  colaboradoresController.agregarHabilidad,
+  colaboradorController.agregarHabilidad,
 );
-router.delete("/:id/habilidades/:codigoHabilidad", colaboradoresController.quitarHabilidad);
+router.delete("/:id/habilidades/:codigoHabilidad", colaboradorController.quitarHabilidad);
 
-router.get("/:id/colaboraciones", colaboradoresController.listarColaboraciones);
+router.get("/:id/colaboraciones", colaboradorController.listarColaboraciones);
 
 export default router;

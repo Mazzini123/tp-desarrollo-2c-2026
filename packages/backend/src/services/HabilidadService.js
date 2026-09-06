@@ -1,30 +1,37 @@
 import { DomainError, ConflictError } from "../errors/index.js";
 import { Habilidad } from "../domain/Habilidad.js";
+import { armarPaginado } from "./paginacion.js";
 
 /**
- * Alta y consulta del catálogo de habilidades. Precargado por seed
- * al arrancar el proceso, pero se expone también el alta para cuando
- * el equipo administrativo necesite sumar una habilidad nueva.
+ * Alta y consulta del catálogo de habilidades. Precargado por seed al
+ * arrancar, pero se expone el alta para cuando el equipo
+ * administrativo necesite sumar una habilidad nueva.
  */
 export class HabilidadService {
-  #habilidadRepository;
-
   constructor({ habilidadRepository }) {
-    this.#habilidadRepository = habilidadRepository;
+    this.habilidadRepository = habilidadRepository;
   }
 
   crear({ titulo, descripcion, usuario }) {
     const habilidad = Habilidad.crear({ titulo, descripcion, usuario });
 
-    if (this.#habilidadRepository.existeCodigo(habilidad.codigo)) {
+    if (this.habilidadRepository.existeCodigo(habilidad.codigo)) {
       throw new ConflictError(`Ya existe una habilidad con el código "${habilidad.codigo}"`);
     }
 
-    return this.#habilidadRepository.guardar(habilidad);
+    return this.habilidadRepository.guardar(habilidad);
   }
 
-  listar() {
-    return this.#habilidadRepository.listar();
+  listar({ numeroPagina = 1, limitePorPagina = 10 } = {}) {
+    return armarPaginado(
+      this.habilidadRepository.listarPaginado(numeroPagina, limitePorPagina),
+      numeroPagina,
+      limitePorPagina,
+    );
+  }
+
+  listarTodas() {
+    return this.habilidadRepository.listar();
   }
 
   /**
@@ -38,7 +45,7 @@ export class HabilidadService {
     }
 
     return codigos.map((codigo) => {
-      const habilidad = this.#habilidadRepository.buscarPorId(codigo);
+      const habilidad = this.habilidadRepository.buscarPorId(codigo);
       if (!habilidad) {
         throw new DomainError(`No existe una habilidad con el código "${codigo}"`);
       }

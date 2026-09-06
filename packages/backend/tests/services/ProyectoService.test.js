@@ -73,12 +73,66 @@ describe("ProyectoService", () => {
     expect(proyectoService.buscarPorId(proyecto.id).habilidadesNecesarias).toHaveLength(2);
   });
 
+  it("no permite modificar un proyecto finalizado", () => {
+    const { proyectoService, colectivo } = escenario();
+    const proyecto = crearProyectoDeEjemplo(proyectoService, colectivo.id);
+    proyectoService.finalizar(proyecto.id);
+
+    expect(() => proyectoService.actualizar(proyecto.id, { titulo: "Otro" })).toThrow(
+      ConflictError,
+    );
+  });
+
+  it("no permite agregar habilidades a un proyecto finalizado", () => {
+    const { proyectoService, colectivo } = escenario();
+    const proyecto = crearProyectoDeEjemplo(proyectoService, colectivo.id);
+    proyectoService.finalizar(proyecto.id);
+
+    expect(() =>
+      proyectoService.agregarHabilidadRequerida(proyecto.id, "desarrollo_node"),
+    ).toThrow(ConflictError);
+  });
+
+  it("no permite quitar habilidades de un proyecto finalizado", () => {
+    const { proyectoService, colectivo } = escenario();
+    const proyecto = crearProyectoDeEjemplo(proyectoService, colectivo.id, {
+      habilidadesNecesarias: ["desarrollo_web_react", "desarrollo_node"],
+    });
+    proyectoService.finalizar(proyecto.id);
+
+    expect(() =>
+      proyectoService.quitarHabilidadRequerida(proyecto.id, "desarrollo_node"),
+    ).toThrow(ConflictError);
+  });
+
+  it("listar pagina y calcula el total de páginas", () => {
+    const { proyectoService, colectivo } = escenario();
+    crearProyectoDeEjemplo(proyectoService, colectivo.id, { titulo: "Uno" });
+    crearProyectoDeEjemplo(proyectoService, colectivo.id, { titulo: "Dos" });
+    crearProyectoDeEjemplo(proyectoService, colectivo.id, { titulo: "Tres" });
+
+    const pagina = proyectoService.listar({ numeroPagina: 2, limitePorPagina: 2 });
+
+    expect(pagina.items).toHaveLength(1);
+    expect(pagina.total).toBe(3);
+    expect(pagina.totalPaginas).toBe(2);
+  });
+
+  it("listar sin elementos devuelve cero páginas, no una vacía", () => {
+    const { proyectoService } = escenario();
+
+    const pagina = proyectoService.listar({ numeroPagina: 1, limitePorPagina: 10 });
+
+    expect(pagina.items).toHaveLength(0);
+    expect(pagina.totalPaginas).toBe(0);
+  });
+
   it("listar devuelve los proyectos de todos los colectivos", () => {
     const { proyectoService, colectivoService, colectivo } = escenario();
     const otro = crearColectivoDeEjemplo(colectivoService, { nombre: "Otra ONG" });
     crearProyectoDeEjemplo(proyectoService, colectivo.id);
     crearProyectoDeEjemplo(proyectoService, otro.id);
 
-    expect(proyectoService.listar()).toHaveLength(2);
+    expect(proyectoService.listar().items).toHaveLength(2);
   });
 });

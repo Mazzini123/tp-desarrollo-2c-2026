@@ -19,7 +19,7 @@ const HABILIDADES_INICIALES = [
 ];
 
 export function cargarHabilidadesIniciales() {
-  if (habilidadService.listar().length > 0) return;
+  if (habilidadService.listarTodas().length > 0) return;
 
   HABILIDADES_INICIALES.forEach((datos) =>
     habilidadService.crear({ ...datos, usuario: "seed" }),
