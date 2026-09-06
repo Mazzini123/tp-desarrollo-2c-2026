@@ -1,5 +1,5 @@
 import { Router } from "express";
-import * as proyectosController from "../controllers/proyectos.controller.js";
+import { ProyectoController } from "../controllers/ProyectoController.js";
 import { validate } from "../middlewares/validate.js";
 import {
   actualizarProyectoSchema,
@@ -8,26 +8,22 @@ import {
 } from "../schemas/proyecto.schema.js";
 
 const router = Router();
+const proyectoController = new ProyectoController();
 
-// El alta está en POST /colectivos/:id/proyectos, porque un proyecto
-// no existe fuera de su colectivo.
-router.get("/", proyectosController.listar);
-router.get("/:id", proyectosController.obtenerPorId);
-router.put("/:id", validate(actualizarProyectoSchema), proyectosController.actualizar);
-router.patch("/:id/cierre", proyectosController.finalizar);
+// El alta está en POST /colectivos/:id/proyectos.
+router.get("/", proyectoController.listar);
+router.get("/:id", proyectoController.obtenerPorId);
+router.put("/:id", validate(actualizarProyectoSchema), proyectoController.actualizar);
+router.patch("/:id/cierre", proyectoController.finalizar);
 
-router.post(
-  "/:id/habilidades",
-  validate(agregarHabilidadSchema),
-  proyectosController.agregarHabilidad,
-);
-router.delete("/:id/habilidades/:codigoHabilidad", proyectosController.quitarHabilidad);
+router.post("/:id/habilidades", validate(agregarHabilidadSchema), proyectoController.agregarHabilidad);
+router.delete("/:id/habilidades/:codigoHabilidad", proyectoController.quitarHabilidad);
 
 router.post(
   "/:id/colaboraciones",
   validate(anotarColaboradorSchema),
-  proyectosController.anotarColaborador,
+  proyectoController.anotarColaborador,
 );
-router.get("/:id/colaboraciones", proyectosController.listarColaboraciones);
+router.get("/:id/colaboraciones", proyectoController.listarColaboraciones);
 
 export default router;

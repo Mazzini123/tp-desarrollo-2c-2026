@@ -5,6 +5,7 @@ import { Habilidad } from "./Habilidad.js";
 import { Colaboracion } from "./Colaboracion.js";
 import { Compromiso } from "./Compromiso.js";
 import { ModalidadColaboracion } from "./ModalidadColaboracion.js";
+import { tieneContenido } from "../utils/validaciones.js";
 
 /**
  * Proyecto que un Colectivo publica para que colaboradores se sumen.
@@ -24,10 +25,10 @@ export class Proyecto {
     compromisoEsperado,
     estado = PROYECTO_ESTADO.ABIERTO,
   }) {
-    if (!titulo || titulo.trim().length === 0) {
+    if (!tieneContenido(titulo)) {
       throw new DomainError("El título del proyecto es obligatorio");
     }
-    if (!descripcion || descripcion.trim().length === 0) {
+    if (!tieneContenido(descripcion)) {
       throw new DomainError("La descripción del proyecto es obligatoria");
     }
     if (!(compromisoEsperado instanceof Compromiso)) {

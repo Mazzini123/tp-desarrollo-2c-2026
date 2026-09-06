@@ -1,3 +1,5 @@
+import { esValorDeEnum } from "../../utils/validaciones.js";
+
 export const TIPO_UBICACION = Object.freeze({
   ARGENTINA: "ARGENTINA",
   PROVINCIA: "PROVINCIA",
@@ -5,6 +7,4 @@ export const TIPO_UBICACION = Object.freeze({
   LOCALIDAD: "LOCALIDAD",
 });
 
-export function esTipoUbicacionValido(valor) {
-  return Object.values(TIPO_UBICACION).includes(valor);
-}
+export const esTipoUbicacionValido = (valor) => esValorDeEnum(TIPO_UBICACION, valor);

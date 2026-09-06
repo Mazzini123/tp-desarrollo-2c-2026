@@ -31,4 +31,17 @@ export class InMemoryRepository {
   eliminar(id) {
     return this.#entidades.delete(id);
   }
+
+  /**
+   * Corta la lista según la página pedida. La fórmula del offset
+   * vive acá, en el repositorio: es la capa que sabe cómo está
+   * guardada la colección y cómo recortarla.
+   */
+  listarPaginado(numeroPagina, limitePorPagina) {
+    const todos = this.listar();
+    const inicio = (numeroPagina - 1) * limitePorPagina;
+    const fin = inicio + limitePorPagina;
+
+    return { items: todos.slice(inicio, fin), total: todos.length };
+  }
 }

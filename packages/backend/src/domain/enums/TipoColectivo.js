@@ -1,3 +1,5 @@
+import { esValorDeEnum } from "../../utils/validaciones.js";
+
 export const TIPO_COLECTIVO = Object.freeze({
   FUNDACION: "FUNDACION",
   ASOCIACION_BARRIAL: "ASOCIACION_BARRIAL",
@@ -5,6 +7,4 @@ export const TIPO_COLECTIVO = Object.freeze({
   ASAMBLEA: "ASAMBLEA",
 });
 
-export function esTipoColectivoValido(valor) {
-  return Object.values(TIPO_COLECTIVO).includes(valor);
-}
+export const esTipoColectivoValido = (valor) => esValorDeEnum(TIPO_COLECTIVO, valor);

@@ -1,5 +1,6 @@
 import { DomainError } from "../errors/index.js";
 import { TIPO_UBICACION, esTipoUbicacionValido } from "./enums/TipoUbicacion.js";
+import { tieneContenido } from "../utils/validaciones.js";
 
 export const PROVINCIAS = Object.freeze([
   "Buenos Aires", "Catamarca", "Chaco", "Chubut", "Cordoba", "Corrientes",
@@ -26,7 +27,7 @@ export class Ubicacion {
         `Para PROVINCIA, nombre debe ser una de las 23 provincias argentinas. Recibido: ${nombre}`,
       );
     }
-    if (tipoUbicacion === TIPO_UBICACION.LOCALIDAD && (!nombre || nombre.trim().length === 0)) {
+    if (tipoUbicacion === TIPO_UBICACION.LOCALIDAD && !tieneContenido(nombre)) {
       throw new DomainError("Para LOCALIDAD, nombre es obligatorio");
     }
 

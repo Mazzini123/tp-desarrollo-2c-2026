@@ -9,7 +9,7 @@ describe("ColectivoService", () => {
     const colectivo = crearColectivoDeEjemplo(colectivoService);
 
     expect(colectivo.id).toBeDefined();
-    expect(colectivoService.listar()).toHaveLength(1);
+    expect(colectivoService.listar().items).toHaveLength(1);
   });
 
   it("crea un colectivo con ubicación", () => {

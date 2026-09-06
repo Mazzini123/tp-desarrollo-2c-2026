@@ -1,6 +1,7 @@
 import { Colectivo } from "../domain/Colectivo.js";
 import { Ubicacion } from "../domain/Ubicacion.js";
 import { NotFoundError } from "../errors/index.js";
+import { armarPaginado } from "./paginacion.js";
 
 function construirUbicacion(datos) {
   if (!datos) return null;
@@ -8,10 +9,8 @@ function construirUbicacion(datos) {
 }
 
 export class ColectivoService {
-  #colectivoRepository;
-
   constructor({ colectivoRepository }) {
-    this.#colectivoRepository = colectivoRepository;
+    this.colectivoRepository = colectivoRepository;
   }
 
   crear({ nombre, descripcion, tipoColectivo, ubicacion }) {
@@ -22,15 +21,19 @@ export class ColectivoService {
       ubicacion: construirUbicacion(ubicacion),
     });
 
-    return this.#colectivoRepository.guardar(colectivo);
+    return this.colectivoRepository.guardar(colectivo);
   }
 
-  listar() {
-    return this.#colectivoRepository.listar();
+  listar({ numeroPagina = 1, limitePorPagina = 10 } = {}) {
+    return armarPaginado(
+      this.colectivoRepository.listarPaginado(numeroPagina, limitePorPagina),
+      numeroPagina,
+      limitePorPagina,
+    );
   }
 
   buscarPorId(id) {
-    const colectivo = this.#colectivoRepository.buscarPorId(id);
+    const colectivo = this.colectivoRepository.buscarPorId(id);
     if (!colectivo) {
       throw new NotFoundError(`No existe un colectivo con id "${id}"`);
     }
@@ -46,6 +49,6 @@ export class ColectivoService {
       ubicacion: ubicacion === undefined ? undefined : construirUbicacion(ubicacion),
     });
 
-    return this.#colectivoRepository.guardar(colectivo);
+    return this.colectivoRepository.guardar(colectivo);
   }
 }
