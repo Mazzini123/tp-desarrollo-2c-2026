@@ -1,6 +1,4 @@
-import { DomainError } from "../errors/index.js";
-import { TIPO_UBICACION, esTipoUbicacionValido } from "./enums/TipoUbicacion.js";
-import { tieneContenido } from "../utils/validaciones.js";
+import { TIPO_UBICACION } from "./enums/TipoUbicacion.js";
 
 export const PROVINCIAS = Object.freeze([
   "Buenos Aires", "Catamarca", "Chaco", "Chubut", "Cordoba", "Corrientes",
@@ -10,27 +8,8 @@ export const PROVINCIAS = Object.freeze([
   "Tucuman",
 ]);
 
-/**
- * Ubicación (opcional) de un Colectivo.
- *
- * "nombre" sólo aplica si tipoUbicacion es PROVINCIA (una de las 23
- * provincias) o LOCALIDAD (texto libre). Si es ARGENTINA o CABA, no
- * se usa.
- */
 export class Ubicacion {
   constructor({ tipoUbicacion, nombre = null }) {
-    if (!esTipoUbicacionValido(tipoUbicacion)) {
-      throw new DomainError(`Tipo de ubicación inválido: ${tipoUbicacion}`);
-    }
-    if (tipoUbicacion === TIPO_UBICACION.PROVINCIA && !PROVINCIAS.includes(nombre)) {
-      throw new DomainError(
-        `Para PROVINCIA, nombre debe ser una de las 23 provincias argentinas. Recibido: ${nombre}`,
-      );
-    }
-    if (tipoUbicacion === TIPO_UBICACION.LOCALIDAD && !tieneContenido(nombre)) {
-      throw new DomainError("Para LOCALIDAD, nombre es obligatorio");
-    }
-
     this.tipoUbicacion = tipoUbicacion;
     this.nombre =
       tipoUbicacion === TIPO_UBICACION.PROVINCIA || tipoUbicacion === TIPO_UBICACION.LOCALIDAD

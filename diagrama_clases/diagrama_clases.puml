@@ -8,6 +8,8 @@ class Colectivo {
   -tipoColectivo: TIPO_COLECTIVO
   -ubicacion: Ubicacion
   -proyectos: Proyecto[]
+
+  +agregarProyecto(proyecto: Proyecto): null
 }
 
 enum TIPO_COLECTIVO {
@@ -49,9 +51,12 @@ class Proyecto {
 
   +finalizarProyecto(): void
   +estaAbierto(): Boolean
-  +cumpleHabilidadesRequeridas(persona: Colaborador): Boolean
+  +yaColaboraron(colaborador): boolean
+  +cumpleAlgunaHabilidadRequerida(persona: Colaborador): Boolean
   +agregarHabilidadRequerida(habilidad: Habilidad): void
-  +quitarHabilidadRequeridad(habilidad: Habilidad): void
+  +quitarHabilidadRequerida(habilidad: Habilidad): void
+  +agregarColaboracion(colaboracion: Colaboracion): void
+  +quitarColaboracion(colaboracion: Colaboracion): void
 }
 
 enum PROYECTO_ESTADO {
@@ -104,9 +109,11 @@ class Colaborador {
   -apellido: String
   -cuentaGit: String
   -habilidades: Habilidad[]
-  -pronombres: String[]
+  -pronombres: Set<String>
   -presentacion: String
 
+  +agregarPronombre(pronombre: String): void
+  +quitarPronombre(pronombre: String): void
   +tieneHabilidad(habilidad: Habilidad): boolean
   +agregarHabilidad(habilidad: Habilidad): void
   +quitarHabilidad(habilidad: Habilidad): void

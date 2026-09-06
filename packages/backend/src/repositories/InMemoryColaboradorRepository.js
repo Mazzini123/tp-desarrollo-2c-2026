@@ -1,3 +1,3 @@
 import { InMemoryRepository } from "./InMemoryRepository.js";
 
-export class ColaboradorRepository extends InMemoryRepository {}
+export class InMemoryColaboradorRepository extends InMemoryRepository {}

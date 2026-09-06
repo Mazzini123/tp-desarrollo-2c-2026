@@ -1,8 +1,6 @@
 import { InMemoryRepository } from "./InMemoryRepository.js";
 
-export class HabilidadRepository extends InMemoryRepository {
-  // Identidad por código: dos habilidades con el mismo código son
-  // la misma habilidad.
+export class InMemoryHabilidadRepository extends InMemoryRepository {
   obtenerId(entidad) {
     return entidad.codigo;
   }

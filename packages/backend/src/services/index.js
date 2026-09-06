@@ -1,19 +1,16 @@
-import {
-  colectivoRepository,
-  colaboradorRepository,
-  habilidadRepository,
-} from "../repositories/index.js";
+import { InMemoryColectivoRepository } from "../repositories/InMemoryColectivoRepository.js";
+import { InMemoryColaboradorRepository } from "../repositories/InMemoryColaboradorRepository.js";
+import { InMemoryHabilidadRepository } from "../repositories/InMemoryHabilidadRepository.js";
 import { ColectivoService } from "./ColectivoService.js";
 import { ProyectoService } from "./ProyectoService.js";
 import { HabilidadService } from "./HabilidadService.js";
 import { ColaboradorService } from "./ColaboradorService.js";
 import { ColaboracionService } from "./ColaboracionService.js";
 
-/**
- * Composition root de la capa de servicios: arma cada servicio con
- * los repositorios (y servicios) de los que depende. Los controllers
- * importan de acá, nunca instancian un service directamente.
- */
+const colectivoRepository = new InMemoryColectivoRepository();
+const colaboradorRepository = new InMemoryColaboradorRepository();
+const habilidadRepository = new InMemoryHabilidadRepository();
+
 export const habilidadService = new HabilidadService({ habilidadRepository });
 
 export const colectivoService = new ColectivoService({ colectivoRepository });

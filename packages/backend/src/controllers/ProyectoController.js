@@ -1,5 +1,12 @@
 import { BaseController } from "./BaseController.js";
 import { proyectoService, colaboracionService } from "../services/index.js";
+import {
+  actualizarProyectoSchema,
+  agregarHabilidadSchema,
+  anotarColaboradorSchema,
+  cambiarEstadoProyectoSchema,
+} from "../schemas/proyectoSchema.js";
+import { serializarColaborador } from "../utils/serializadores.js";
 
 export class ProyectoController extends BaseController {
   constructor(servicioProyecto = proyectoService, servicioColaboracion = colaboracionService) {
@@ -27,15 +34,26 @@ export class ProyectoController extends BaseController {
   };
 
   actualizar = (req, res) => {
+    const body = req.body;
+    const resultado = actualizarProyectoSchema.safeParse(body);
+    if (resultado.error) {
+      return this.manejarError(res, resultado.error);
+    }
+
     try {
-      const proyecto = this.proyectoService.actualizar(req.params.id, req.body);
+      const proyecto = this.proyectoService.actualizar(req.params.id, resultado.data);
       return res.status(200).json({ status: "success", data: proyecto });
     } catch (error) {
       return this.manejarError(res, error);
     }
   };
 
-  finalizar = (req, res) => {
+  cambiarEstado = (req, res) => {
+    const resultado = cambiarEstadoProyectoSchema.safeParse(req.body);
+    if (resultado.error) {
+      return this.manejarError(res, resultado.error);
+    }
+
     try {
       const proyecto = this.proyectoService.finalizar(req.params.id);
       return res.status(200).json({ status: "success", data: proyecto });
@@ -45,10 +63,16 @@ export class ProyectoController extends BaseController {
   };
 
   agregarHabilidad = (req, res) => {
+    const body = req.body;
+    const resultado = agregarHabilidadSchema.safeParse(body);
+    if (resultado.error) {
+      return this.manejarError(res, resultado.error);
+    }
+
     try {
       const proyecto = this.proyectoService.agregarHabilidadRequerida(
         req.params.id,
-        req.body.codigoHabilidad,
+        resultado.data.codigoHabilidad,
       );
       return res.status(200).json({ status: "success", data: proyecto });
     } catch (error) {
@@ -69,12 +93,21 @@ export class ProyectoController extends BaseController {
   };
 
   anotarColaborador = (req, res) => {
+    const body = req.body;
+    const resultado = anotarColaboradorSchema.safeParse(body);
+    if (resultado.error) {
+      return this.manejarError(res, resultado.error);
+    }
+
     try {
       const colaboracion = this.colaboracionService.registrar({
         proyectoId: req.params.id,
-        colaboradorId: req.body.colaboradorId,
+        colaboradorId: resultado.data.colaboradorId,
       });
-      return res.status(201).json({ status: "success", data: colaboracion });
+      return res.status(201).json({
+        status: "success",
+        data: { ...colaboracion, colaborador: serializarColaborador(colaboracion.colaborador) },
+      });
     } catch (error) {
       return this.manejarError(res, error);
     }
@@ -83,7 +116,11 @@ export class ProyectoController extends BaseController {
   listarColaboraciones = (req, res) => {
     try {
       const colaboraciones = this.colaboracionService.listarPorProyecto(req.params.id);
-      return res.status(200).json({ status: "success", data: colaboraciones });
+      const data = colaboraciones.map((colaboracion) => ({
+        ...colaboracion,
+        colaborador: serializarColaborador(colaboracion.colaborador),
+      }));
+      return res.status(200).json({ status: "success", data });
     } catch (error) {
       return this.manejarError(res, error);
     }

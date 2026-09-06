@@ -21,7 +21,6 @@ export const crearProyectoSchema = z
     descripcion: z.string().min(1),
     compromisoEsperado: compromisoSchema,
     modalidadColaboracion: modalidadColaboracionSchema.default({}),
-    // Al menos una habilidad: el enunciado lo exige y la cátedra lo confirmó.
     habilidadesNecesarias: z.array(z.string().min(1)).min(1),
   })
   .strict();
@@ -39,4 +38,8 @@ export const agregarHabilidadSchema = z
 
 export const anotarColaboradorSchema = z
   .object({ colaboradorId: z.string().min(1) })
+  .strict();
+
+export const cambiarEstadoProyectoSchema = z
+  .object({ estado: z.literal("finalizar") })
   .strict();

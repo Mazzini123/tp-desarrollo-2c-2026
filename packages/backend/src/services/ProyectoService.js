@@ -1,17 +1,12 @@
 import { Proyecto } from "../domain/Proyecto.js";
 import { Compromiso } from "../domain/Compromiso.js";
 import { ModalidadColaboracion } from "../domain/ModalidadColaboracion.js";
-import { NotFoundError, ConflictError } from "../errors/index.js";
-import { armarPaginado } from "./paginacion.js";
+import { DomainError } from "../errors/DomainError.js";
+import { NotFoundError } from "../errors/NotFoundError.js";
+import { ConflictError } from "../errors/ConflictError.js";
+import { esPeriodoCompromisoValido } from "../domain/enums/PeriodoCompromiso.js";
+import { armarPaginado } from "../utils/paginacion.js";
 
-/**
- * Casos de uso sobre Proyecto.
- *
- * Como Proyecto vive dentro de Colectivo, crear un proyecto es
- * agregarlo a su colectivo y guardar el colectivo entero. Buscar un
- * proyecto implica recorrer los colectivos: eso lo encapsula
- * ColectivoRepository.buscarProyecto.
- */
 export class ProyectoService {
   constructor({ colectivoRepository, colectivoService, habilidadService }) {
     this.colectivoRepository = colectivoRepository;
@@ -27,13 +22,17 @@ export class ProyectoService {
     modalidadColaboracion,
     habilidadesNecesarias,
   }) {
+    if (!Array.isArray(habilidadesNecesarias) || habilidadesNecesarias.length === 0) {
+      throw new DomainError("El proyecto debe necesitar al menos una habilidad");
+    }
+
     const colectivo = this.colectivoService.buscarPorId(colectivoId);
     const habilidades = this.habilidadService.resolverPorCodigos(habilidadesNecesarias);
 
     const proyecto = new Proyecto({
       titulo,
       descripcion,
-      compromisoEsperado: new Compromiso(compromisoEsperado),
+      compromisoEsperado: this.construirCompromiso(compromisoEsperado),
       modalidadColaboracion: new ModalidadColaboracion(modalidadColaboracion),
       habilidadesNecesarias: habilidades,
     });
@@ -56,12 +55,6 @@ export class ProyectoService {
     return this.colectivoService.buscarPorId(colectivoId).proyectos;
   }
 
-  /**
-   * Devuelve { colectivo, proyecto }. Es el único buscador: el
-   * colectivo contenedor hace falta para persistir cualquier cambio
-   * sobre el proyecto, así que devolver sólo el proyecto llevaba a
-   * tener dos métodos casi idénticos.
-   */
   buscarProyectoConColectivo(proyectoId) {
     const resultado = this.colectivoRepository.buscarProyecto(proyectoId);
     if (!resultado) {
@@ -74,11 +67,6 @@ export class ProyectoService {
     return this.buscarProyectoConColectivo(proyectoId).proyecto;
   }
 
-  /**
-   * Un proyecto finalizado es historia: no se le cambian los datos ni
-   * las habilidades que pedía, porque las colaboraciones que ya
-   * ocurrieron se registraron bajo esas condiciones.
-   */
   verificarAbierto(proyecto, accion) {
     if (!proyecto.estaAbierto()) {
       throw new ConflictError(`No se puede ${accion} un proyecto finalizado`);
@@ -89,7 +77,13 @@ export class ProyectoService {
     const { colectivo, proyecto } = this.buscarProyectoConColectivo(proyectoId);
     this.verificarAbierto(proyecto, "modificar");
 
-    proyecto.actualizarDatos({ titulo, descripcion });
+    if (titulo !== undefined) {
+      proyecto.titulo = titulo.trim();
+    }
+    if (descripcion !== undefined) {
+      proyecto.descripcion = descripcion.trim();
+    }
+
     this.colectivoRepository.guardar(colectivo);
     return proyecto;
   }
@@ -108,6 +102,10 @@ export class ProyectoService {
     const { colectivo, proyecto } = this.buscarProyectoConColectivo(proyectoId);
     this.verificarAbierto(proyecto, "quitar habilidades de");
 
+    if (proyecto.habilidadesNecesarias.length <= 1) {
+      throw new DomainError("El proyecto debe conservar al menos una habilidad necesaria");
+    }
+
     const [habilidad] = this.habilidadService.resolverPorCodigos([codigoHabilidad]);
     proyecto.quitarHabilidadRequerida(habilidad);
     this.colectivoRepository.guardar(colectivo);
@@ -116,8 +114,23 @@ export class ProyectoService {
 
   finalizar(proyectoId) {
     const { colectivo, proyecto } = this.buscarProyectoConColectivo(proyectoId);
+    this.verificarAbierto(proyecto, "finalizar");
+
     proyecto.finalizarProyecto();
     this.colectivoRepository.guardar(colectivo);
     return proyecto;
+  }
+
+  construirCompromiso(datos) {
+    const { cantidadHoras, periodo } = datos;
+
+    if (!Number.isInteger(cantidadHoras) || cantidadHoras <= 0) {
+      throw new DomainError("cantidadHoras debe ser un entero positivo");
+    }
+    if (!esPeriodoCompromisoValido(periodo)) {
+      throw new DomainError(`Período de compromiso inválido: ${periodo}`);
+    }
+
+    return new Compromiso(datos);
   }
 }
