@@ -8,12 +8,9 @@ export const crearColaboradorSchema = z
     cuentaGit: z.string().min(1).nullish(),
     pronombres: z.array(z.string()).default([]),
     presentacion: z.string().nullish(),
-    habilidades: z.array(z.string().min(1)).default([]),
+    codigosHabilidades: z.array(z.string().min(1)).default([]),
   })
   .strict();
-// La regla "debe tener al menos un dato de identificación" no se
-// valida acá: no es forma, es negocio, y vive en el constructor de
-// Colaborador.
 
 export const actualizarColaboradorSchema = z
   .object({

@@ -1,4 +1,5 @@
 import { BaseController } from "./BaseController.js";
+import { crearHabilidadSchema } from "../schemas/habilidadSchema.js";
 import { habilidadService } from "../services/index.js";
 
 export class HabilidadController extends BaseController {
@@ -8,8 +9,14 @@ export class HabilidadController extends BaseController {
   }
 
   crear = (req, res) => {
+    const body = req.body;
+    const resultado = crearHabilidadSchema.safeParse(body);
+    if (resultado.error) {
+      return this.manejarError(res, resultado.error);
+    }
+
     try {
-      const habilidad = this.habilidadService.crear(req.body);
+      const habilidad = this.habilidadService.crear(resultado.data);
       return res.status(201).json({ status: "success", data: habilidad });
     } catch (error) {
       return this.manejarError(res, error);

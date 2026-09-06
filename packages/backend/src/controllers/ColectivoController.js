@@ -1,11 +1,8 @@
 import { BaseController } from "./BaseController.js";
+import { crearColectivoSchema, actualizarColectivoSchema } from "../schemas/colectivoSchema.js";
+import { crearProyectoSchema } from "../schemas/proyectoSchema.js";
 import { colectivoService, proyectoService } from "../services/index.js";
 
-/**
- * Los métodos se escriben como propiedades con función flecha para
- * que `this` siga apuntando al controlador cuando el router los pasa
- * como callback.
- */
 export class ColectivoController extends BaseController {
   constructor(servicioColectivo = colectivoService, servicioProyecto = proyectoService) {
     super();
@@ -14,8 +11,14 @@ export class ColectivoController extends BaseController {
   }
 
   crear = (req, res) => {
+    const body = req.body;
+    const resultado = crearColectivoSchema.safeParse(body);
+    if (resultado.error) {
+      return this.manejarError(res, resultado.error);
+    }
+
     try {
-      const colectivo = this.colectivoService.crear(req.body);
+      const colectivo = this.colectivoService.crear(resultado.data);
       return res.status(201).json({ status: "success", data: colectivo });
     } catch (error) {
       return this.manejarError(res, error);
@@ -41,8 +44,14 @@ export class ColectivoController extends BaseController {
   };
 
   actualizar = (req, res) => {
+    const body = req.body;
+    const resultado = actualizarColectivoSchema.safeParse(body);
+    if (resultado.error) {
+      return this.manejarError(res, resultado.error);
+    }
+
     try {
-      const colectivo = this.colectivoService.actualizar(req.params.id, req.body);
+      const colectivo = this.colectivoService.actualizar(req.params.id, resultado.data);
       return res.status(200).json({ status: "success", data: colectivo });
     } catch (error) {
       return this.manejarError(res, error);
@@ -50,8 +59,17 @@ export class ColectivoController extends BaseController {
   };
 
   crearProyecto = (req, res) => {
+    const body = req.body;
+    const resultado = crearProyectoSchema.safeParse(body);
+    if (resultado.error) {
+      return this.manejarError(res, resultado.error);
+    }
+
     try {
-      const proyecto = this.proyectoService.crear({ ...req.body, colectivoId: req.params.id });
+      const proyecto = this.proyectoService.crear({
+        ...resultado.data,
+        colectivoId: req.params.id,
+      });
       return res.status(201).json({ status: "success", data: proyecto });
     } catch (error) {
       return this.manejarError(res, error);

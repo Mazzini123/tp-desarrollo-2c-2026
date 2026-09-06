@@ -1,15 +1,12 @@
-/**
- * Modalidad de colaboración de un Proyecto. Si no ofrece incentivo
- * económico ni posibilidad de contratación, la colaboración es
- * gratuita.
- */
 export class ModalidadColaboracion {
-  constructor({ ofreceIncentivoEconomico = false, posibilidadDeContratacion = false } = {}) {
+  constructor({ ofreceIncentivoEconomico, posibilidadDeContratacion } = {}) {
     this.ofreceIncentivoEconomico = ofreceIncentivoEconomico;
     this.posibilidadDeContratacion = posibilidadDeContratacion;
   }
 
   esGratuito() {
-    return !this.ofreceIncentivoEconomico && !this.posibilidadDeContratacion;
+    // Preguntar logica
+    // Enunciado: Si ofrecen un incentivo económico y/o si existe la posibilidad de contratación eventual.
+    return (this.ofreceIncentivoEconomico && this.posibilidadDeContratacion) || (this.ofreceIncentivoEconomico || this.posibilidadDeContratacion);
   }
 }

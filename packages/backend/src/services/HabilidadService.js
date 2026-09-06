@@ -1,23 +1,25 @@
-import { DomainError, ConflictError } from "../errors/index.js";
-import { Habilidad } from "../domain/Habilidad.js";
-import { armarPaginado } from "./paginacion.js";
+import { DomainError } from "../errors/DomainError.js";
+import { ConflictError } from "../errors/ConflictError.js";
+import { Habilidad, normalizarASnakeCase } from "../domain/Habilidad.js";
+import { tieneContenido } from "../utils/validaciones.js";
+import { armarPaginado } from "../utils/paginacion.js";
 
-/**
- * Alta y consulta del catálogo de habilidades. Precargado por seed al
- * arrancar, pero se expone el alta para cuando el equipo
- * administrativo necesite sumar una habilidad nueva.
- */
 export class HabilidadService {
   constructor({ habilidadRepository }) {
     this.habilidadRepository = habilidadRepository;
   }
 
   crear({ titulo, descripcion, usuario }) {
-    const habilidad = Habilidad.crear({ titulo, descripcion, usuario });
-
-    if (this.habilidadRepository.existeCodigo(habilidad.codigo)) {
-      throw new ConflictError(`Ya existe una habilidad con el código "${habilidad.codigo}"`);
+    if (!tieneContenido(titulo)) {
+      throw new DomainError("El título de la habilidad es obligatorio");
     }
+
+    const codigo = normalizarASnakeCase(titulo);
+    if (this.habilidadRepository.existeCodigo(codigo)) {
+      throw new ConflictError(`Ya existe una habilidad con el código "${codigo}"`);
+    }
+
+    const habilidad = new Habilidad({ titulo, descripcion, usuario });
 
     return this.habilidadRepository.guardar(habilidad);
   }
@@ -34,11 +36,6 @@ export class HabilidadService {
     return this.habilidadRepository.listar();
   }
 
-  /**
-   * Resuelve códigos contra el catálogo. Lanza si alguno no existe o
-   * está dado de baja: ni un proyecto ni un colaborador pueden
-   * referenciar una habilidad inventada o inactiva.
-   */
   resolverPorCodigos(codigos) {
     if (!Array.isArray(codigos) || codigos.length === 0) {
       throw new DomainError("Se debe indicar al menos un código de habilidad");

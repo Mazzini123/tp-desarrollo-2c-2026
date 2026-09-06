@@ -18,7 +18,6 @@ export const crearColectivoSchema = z
   })
   .strict();
 
-// El tipo de colectivo no se puede cambiar en una edición.
 export const actualizarColectivoSchema = z
   .object({
     nombre: z.string().min(1).optional(),

@@ -5,8 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "dev": "node --watch index.js",
-    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest"
+    "dev": "node --watch index.js"
   },
   "license": "ISC",
   "dependencies": {
@@ -14,8 +13,5 @@
     "dotenv": "^17.2.0",
     "express": "^5.1.0",
     "zod": "^4.5.4"
-  },
-  "devDependencies": {
-    "jest": "^30.0.0"
   }
 }

@@ -1,19 +1,8 @@
-import { AppError, BadRequestError } from "../errors/index.js";
+import { AppError } from "../errors/AppError.js";
+import { BadRequestError } from "../errors/BadRequestError.js";
+import { ZodError } from "zod";
 
-/**
- * Comportamiento común a todos los controladores: traducir la query
- * de paginación y traducir errores a códigos HTTP.
- *
- * Nada de esto es lógica de negocio. Son las dos tareas propias de la
- * capa: convertir lo que llega por HTTP al lenguaje del dominio, y
- * convertir lo que vuelve del dominio a HTTP.
- */
 export class BaseController {
-  /**
-   * req.query trae strings ("2"), el service necesita números (2).
-   * Además pone los valores por defecto, para que un GET sin
-   * parámetros siga funcionando.
-   */
   extraerPaginacion(query) {
     const numeroPagina = query?.page === undefined ? 1 : Number(query.page);
     const limitePorPagina = query?.limit === undefined ? 10 : Number(query.limit);
@@ -30,8 +19,6 @@ export class BaseController {
     }
   }
 
-  /** Respuesta paginada con los metadatos que el frontend necesita
-   *  para dibujar los botones de página. */
   responderPaginado(res, { items, numeroPagina, limitePorPagina, totalPaginas, total }) {
     return res.status(200).json({
       status: "success",
@@ -45,15 +32,17 @@ export class BaseController {
     });
   }
 
-  /**
-   * Traduce el error al código HTTP. Gracias a AppError no hace falta
-   * conocer cada tipo concreto: cada subclase trae su status. Lo que
-   * no es AppError es algo que no contemplamos, así que va como 500 y
-   * se loguea.
-   */
   manejarError(res, error) {
     if (error instanceof AppError) {
       return res.status(error.status).json({ status: "fail", message: error.message });
+    }
+
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Datos inválidos",
+        issues: error.issues,
+      });
     }
 
     console.error(error);
