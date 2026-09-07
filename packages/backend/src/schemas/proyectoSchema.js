@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { PERIODO_COMPROMISO } from "../domain/enums/PeriodoCompromiso.js";
+import { MODALIDAD_COLABORACION } from "../domain/enums/ModalidadColaboracion.js";
 
 export const compromisoSchema = z
   .object({
@@ -8,19 +9,18 @@ export const compromisoSchema = z
   })
   .strict();
 
-export const modalidadColaboracionSchema = z
-  .object({
-    ofreceIncentivoEconomico: z.boolean().optional(),
-    posibilidadDeContratacion: z.boolean().optional(),
-  })
-  .strict();
+export const modalidadColaboracionSchema = z.enum(
+  Object.values(MODALIDAD_COLABORACION),
+);
 
 export const crearProyectoSchema = z
   .object({
     titulo: z.string().min(1),
     descripcion: z.string().min(1),
     compromisoEsperado: compromisoSchema,
-    modalidadColaboracion: modalidadColaboracionSchema.default({}),
+    modalidadColaboracion: modalidadColaboracionSchema.default(
+      MODALIDAD_COLABORACION.GRATUITA,
+    ),
     habilidadesNecesarias: z.array(z.string().min(1)).min(1),
   })
   .strict();

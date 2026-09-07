@@ -45,7 +45,7 @@ class Proyecto {
   -descripcion: String
   -colaboraciones: Colaboracion[]
   -habilidadesNecesarias: Habilidad[]
-  -modalidadColaboracion: ModalidadColaboracion
+  -modalidadColaboracion: MODALIDAD_COLABORACION
   -estado: PROYECTO_ESTADO
   -compromisoEsperado: Compromiso
 
@@ -64,11 +64,10 @@ enum PROYECTO_ESTADO {
   FINALIZADO
 }
 
-class ModalidadColaboracion {
-  -ofreceIncentivoEconomico: Boolean
-  -posibilidadDeContratacion: Boolean
-
-  +esGratuito(): Boolean
+enum MODALIDAD_COLABORACION {
+  GRATUITA
+  OFRECE_INCENTIVO_ECONOMICO
+  EXISTE_POSIBILIDAD_DE_CONTRATACION
 }
 
 class Compromiso {
@@ -84,7 +83,7 @@ enum PERIODO_COMPROMISO {
 
 Proyecto --> PROYECTO_ESTADO
 Proyecto --> Compromiso
-Proyecto --> ModalidadColaboracion
+Proyecto --> MODALIDAD_COLABORACION
 Compromiso --> PERIODO_COMPROMISO
 
 ' ───────────────────────── Habilidad y Colaboración ─────────────────────────
