@@ -1,0 +1,208 @@
+{
+  "info": {
+    "name": "Código a Voluntad — Entrega 1",
+    "description": "Colección para probar los requisitos de la Entrega 1 del TP Integrador DDS 2C 2026.\n\nQué prueba (lo que pide el enunciado):\n- Carga de colectivos, colaboradoras, habilidades y proyectos.\n- Anotar una colaboradora a un proyecto, validando que tenga al menos una de las habilidades requeridas.\n- Cierre manual del proyecto: una vez finalizado, no se puede anotar más gente.\n- Health check.\n\nCómo usar:\n1. Levantá el backend: `npm run dev:backend` (queda en http://localhost:8000).\n2. Importá esta colección en Postman.\n3. Click en la colección -> botón Run -> Run. Corre los requests en orden y verifica los códigos de estado. Los IDs se pasan solos de un paso al siguiente.\n\nNota: las entidades están en memoria, así que cada reinicio del server borra los datos. Por eso el flujo crea todo desde cero cada corrida.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8000" },
+    { "key": "colectivoId", "value": "" },
+    { "key": "colaboradorConHabId", "value": "" },
+    { "key": "colaboradorSinHabId", "value": "" },
+    { "key": "proyectoId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "01 - Health check",
+      "request": { "method": "GET", "url": "{{baseUrl}}/health" },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('status ok', () => pm.expect(pm.response.json().data.status).to.eql('ok'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Habilidades precargadas (seed)",
+      "request": { "method": "GET", "url": "{{baseUrl}}/habilidades" },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('hay habilidades del seed', () => pm.expect(pm.response.json().data.length).to.be.above(0));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - Crear colectivo",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Fundación Verde\",\n  \"tipoColectivo\": \"FUNDACION\",\n  \"descripcion\": \"Cuida el ambiente\"\n}" },
+        "url": "{{baseUrl}}/colectivos"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "pm.collectionVariables.set('colectivoId', pm.response.json().data.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - Crear colaboradora CON habilidad (desarrollo_node)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"nombreFantasia\": \"nodeDev\",\n  \"codigosHabilidades\": [\"desarrollo_node\"]\n}" },
+        "url": "{{baseUrl}}/colaboradores"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "pm.collectionVariables.set('colaboradorConHabId', pm.response.json().data.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - Crear colaboradora SIN la habilidad requerida",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"nombreFantasia\": \"otroSkill\",\n  \"codigosHabilidades\": [\"desarrollo_web_react\"]\n}" },
+        "url": "{{baseUrl}}/colaboradores"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "pm.collectionVariables.set('colaboradorSinHabId', pm.response.json().data.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 - Crear proyecto del colectivo (requiere desarrollo_node)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"titulo\": \"App de reciclaje\",\n  \"descripcion\": \"Backend de la app\",\n  \"compromisoEsperado\": { \"cantidadHoras\": 10, \"periodo\": \"HS_SEMANALES\" },\n  \"habilidadesNecesarias\": [\"desarrollo_node\"]\n}" },
+        "url": "{{baseUrl}}/colectivos/{{colectivoId}}/proyectos"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "pm.test('nace ABIERTO', () => pm.expect(pm.response.json().data.estado).to.eql('ABIERTO'));",
+              "pm.collectionVariables.set('proyectoId', pm.response.json().data.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 - Anotar colaboradora CON habilidad (debe funcionar)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"colaboradorId\": \"{{colaboradorConHabId}}\"\n}" },
+        "url": "{{baseUrl}}/proyectos/{{proyectoId}}/colaboraciones"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [ "pm.test('201 Created', () => pm.response.to.have.status(201));" ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 - Anotar SIN habilidad (debe fallar 400)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"colaboradorId\": \"{{colaboradorSinHabId}}\"\n}" },
+        "url": "{{baseUrl}}/proyectos/{{proyectoId}}/colaboraciones"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [ "pm.test('400 Bad Request', () => pm.response.to.have.status(400));" ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 - Finalizar proyecto (cierre manual)",
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"estado\": \"finalizar\"\n}" },
+        "url": "{{baseUrl}}/proyectos/{{proyectoId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('queda FINALIZADO', () => pm.expect(pm.response.json().data.estado).to.eql('FINALIZADO'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 - Anotar en proyecto cerrado (debe fallar 409)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"colaboradorId\": \"{{colaboradorSinHabId}}\"\n}" },
+        "url": "{{baseUrl}}/proyectos/{{proyectoId}}/colaboraciones"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [ "pm.test('409 Conflict', () => pm.response.to.have.status(409));" ]
+          }
+        }
+      ]
+    }
+  ]
+}

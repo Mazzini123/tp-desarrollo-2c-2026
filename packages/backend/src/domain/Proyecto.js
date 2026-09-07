@@ -1,12 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { PROYECTO_ESTADO } from "./enums/ProyectoEstado.js";
+import { MODALIDAD_COLABORACION } from "./enums/ModalidadColaboracion.js";
 
 export class Proyecto {
   constructor({
     id = randomUUID(),
     titulo,
     descripcion,
-    modalidadColaboracion,
+    modalidadColaboracion = MODALIDAD_COLABORACION.GRATUITA,
     compromisoEsperado,
     habilidadesNecesarias = [],
     estado = PROYECTO_ESTADO.ABIERTO,

@@ -1,10 +1,13 @@
 import { Proyecto } from "../domain/Proyecto.js";
 import { Compromiso } from "../domain/Compromiso.js";
-import { ModalidadColaboracion } from "../domain/ModalidadColaboracion.js";
 import { DomainError } from "../errors/DomainError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
 import { ConflictError } from "../errors/ConflictError.js";
 import { esPeriodoCompromisoValido } from "../domain/enums/PeriodoCompromiso.js";
+import {
+  MODALIDAD_COLABORACION,
+  esModalidadColaboracionValida,
+} from "../domain/enums/ModalidadColaboracion.js";
 import { armarPaginado } from "../utils/paginacion.js";
 
 export class ProyectoService {
@@ -33,7 +36,7 @@ export class ProyectoService {
       titulo,
       descripcion,
       compromisoEsperado: this.construirCompromiso(compromisoEsperado),
-      modalidadColaboracion: new ModalidadColaboracion(modalidadColaboracion),
+      modalidadColaboracion: this.resolverModalidadColaboracion(modalidadColaboracion),
       habilidadesNecesarias: habilidades,
     });
 
@@ -119,6 +122,18 @@ export class ProyectoService {
     proyecto.finalizarProyecto();
     this.colectivoRepository.guardar(colectivo);
     return proyecto;
+  }
+
+  resolverModalidadColaboracion(modalidadColaboracion) {
+    if (modalidadColaboracion === undefined || modalidadColaboracion === null) {
+      return MODALIDAD_COLABORACION.GRATUITA;
+    }
+    if (!esModalidadColaboracionValida(modalidadColaboracion)) {
+      throw new DomainError(
+        `Modalidad de colaboración inválida: ${modalidadColaboracion}`,
+      );
+    }
+    return modalidadColaboracion;
   }
 
   construirCompromiso(datos) {
