@@ -3,6 +3,11 @@
 Plataforma que conecta colectivos (fundaciones, ONGs, asambleas, organizaciones
 territoriales) con personas colaboradoras del ámbito del desarrollo de software.
 
+## Documentación
+
+Documentación del trabajo práctico (API REST, dominio, git flow, etc.):
+[Google Drive](https://drive.google.com/drive/u/2/folders/1bh2M-NIkymUHaHRwEcv2dzRxbNwmOpFu)
+
 ## Estructura
 
 Monorepo con npm workspaces:
@@ -37,6 +42,11 @@ npm run dev:backend
 ```
 
 Verificación: `curl http://localhost:8000/health`
+
+## Despliegue
+
+El backend está desplegado en Oracle Cloud:
+[http://147.15.102.156:8000/health](http://147.15.102.156:8000/health)
 
 ## Scripts
 
