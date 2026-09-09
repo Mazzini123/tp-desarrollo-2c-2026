@@ -1,0 +1,126 @@
+@startuml
+
+' ───────────────────────── Colectivo y Ubicación ─────────────────────────
+
+class Colectivo {
+  -nombre: string
+  -descripcion: string
+  -tipoColectivo: TIPO_COLECTIVO
+  -ubicacion: Ubicacion
+  -proyectos: Array<Proyecto>
+
+  +agregarProyecto(proyecto: Proyecto): null
+}
+
+enum TIPO_COLECTIVO {
+  FUNDACION
+  ASOCIACION_BARRIAL
+  ONG
+  ASAMBLEA
+}
+
+class Ubicacion {
+  -tipoUbicacion: TIPO_UBICACION
+  -nombre: string
+
+  +esDeAlcanceNacional(): boolean
+}
+
+enum TIPO_UBICACION {
+  ARGENTINA
+  PROVINCIA
+  CABA
+  LOCALIDAD
+}
+
+Colectivo --> TIPO_COLECTIVO
+Colectivo --> "*" Proyecto
+Colectivo --> "0..1" Ubicacion
+Ubicacion --> TIPO_UBICACION
+
+' ───────────────────────── Proyecto y Compromiso ─────────────────────────
+
+class Proyecto {
+  -titulo: string
+  -descripcion: string
+  -colaboraciones: Array<Colaboracion>
+  -habilidadesNecesarias: Array<Habilidad>
+  -modalidadColaboracion: MODALIDAD_COLABORACION
+  -estado: PROYECTO_ESTADO
+  -compromisoEsperado: Compromiso
+
+  +finalizarProyecto(): void
+  +estaAbierto(): boolean
+  +yaColaboraron(colaborador): boolean
+  +cumpleAlgunaHabilidadRequerida(persona: Colaborador): boolean
+  +agregarHabilidadRequerida(habilidad: Habilidad): void
+  +quitarHabilidadRequerida(habilidad: Habilidad): void
+  +agregarColaboracion(colaboracion: Colaboracion): void
+  +quitarColaboracion(colaboracion: Colaboracion): void
+}
+
+enum PROYECTO_ESTADO {
+  ABIERTO
+  FINALIZADO
+}
+
+enum MODALIDAD_COLABORACION {
+  GRATUITA
+  OFRECE_INCENTIVO_ECONOMICO
+  EXISTE_POSIBILIDAD_DE_CONTRATACION
+}
+
+class Compromiso {
+  -cantidadHoras: number
+  -periodo: PERIODO_COMPROMISO
+}
+
+enum PERIODO_COMPROMISO {
+  HS_TOTALES
+  HS_SEMANALES
+  HS_MENSUALES
+}
+
+Proyecto --> PROYECTO_ESTADO
+Proyecto --> Compromiso
+Proyecto --> MODALIDAD_COLABORACION
+Compromiso --> PERIODO_COMPROMISO
+
+' ───────────────────────── Habilidad y Colaboración ─────────────────────────
+
+class Habilidad {
+  -titulo: string
+  -codigo: string
+  -descripcion: string
+  -fechaCreacion: Date
+  -usuario: string
+  -activo: boolean
+}
+
+class Colaboracion {
+  -fecha: Date
+  -colaborador: Colaborador
+}
+
+class Colaborador {
+  -nombreFantasia: string
+  -nombre: string
+  -apellido: string
+  -cuentaGit: string
+  -habilidades: Array<Habilidad>
+  -pronombres: Set<string>
+  -presentacion: string
+
+  +agregarPronombre(pronombre: string): void
+  +quitarPronombre(pronombre: string): void
+  +tieneHabilidad(habilidad: Habilidad): boolean
+  +agregarHabilidad(habilidad: Habilidad): void
+  +quitarHabilidad(habilidad: Habilidad): void
+}
+
+Proyecto --> "*" Habilidad
+Proyecto --> "*" Colaboracion
+Colaboracion --> Colaborador
+Colaborador --> "*" Habilidad
+
+@enduml
