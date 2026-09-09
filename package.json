@@ -2,15 +2,18 @@
   "name": "tp-desarrollo-2c-2026",
   "version": "1.0.0",
   "private": true,
-  "description": "Plataforma C\u00f3digo a Voluntad - TP Integrador DDS 2C 2026",
+  "description": "Plataforma Código a Voluntad - TP Integrador DDS 2C 2026",
   "workspaces": [
     "packages/*"
   ],
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev:backend": "npm run dev --workspace=backend",
     "start:backend": "npm start --workspace=backend",
-    "start:frontend": "npm start --workspace=frontend",
-    "start:dev": "concurrently \"npm run dev:backend\" \"npm run start:frontend\"",
+    "// start:frontend (deshabilitado hasta 3a entrega": "npm start --workspace=frontend",
+    "// start:dev (deshabilitado hasta 3a entrega": "concurrently \"npm run dev:backend\" \"npm run start:frontend\"",
     "lint": "eslint .",
     "format": "prettier . --write"
   },

@@ -3,11 +3,11 @@
 ' ───────────────────────── Colectivo y Ubicación ─────────────────────────
 
 class Colectivo {
-  -nombre: String
-  -descripcion: String
+  -nombre: string
+  -descripcion: string
   -tipoColectivo: TIPO_COLECTIVO
   -ubicacion: Ubicacion
-  -proyectos: Proyecto[]
+  -proyectos: Array<Proyecto>
 
   +agregarProyecto(proyecto: Proyecto): null
 }
@@ -21,7 +21,7 @@ enum TIPO_COLECTIVO {
 
 class Ubicacion {
   -tipoUbicacion: TIPO_UBICACION
-  -nombre: String
+  -nombre: string
 
   +esDeAlcanceNacional(): boolean
 }
@@ -41,18 +41,18 @@ Ubicacion --> TIPO_UBICACION
 ' ───────────────────────── Proyecto y Compromiso ─────────────────────────
 
 class Proyecto {
-  -titulo: String
-  -descripcion: String
-  -colaboraciones: Colaboracion[]
-  -habilidadesNecesarias: Habilidad[]
+  -titulo: string
+  -descripcion: string
+  -colaboraciones: Array<Colaboracion>
+  -habilidadesNecesarias: Array<Habilidad>
   -modalidadColaboracion: MODALIDAD_COLABORACION
   -estado: PROYECTO_ESTADO
   -compromisoEsperado: Compromiso
 
   +finalizarProyecto(): void
-  +estaAbierto(): Boolean
+  +estaAbierto(): boolean
   +yaColaboraron(colaborador): boolean
-  +cumpleAlgunaHabilidadRequerida(persona: Colaborador): Boolean
+  +cumpleAlgunaHabilidadRequerida(persona: Colaborador): boolean
   +agregarHabilidadRequerida(habilidad: Habilidad): void
   +quitarHabilidadRequerida(habilidad: Habilidad): void
   +agregarColaboracion(colaboracion: Colaboracion): void
@@ -71,7 +71,7 @@ enum MODALIDAD_COLABORACION {
 }
 
 class Compromiso {
-  -cantidadHoras: Int
+  -cantidadHoras: number
   -periodo: PERIODO_COMPROMISO
 }
 
@@ -89,12 +89,12 @@ Compromiso --> PERIODO_COMPROMISO
 ' ───────────────────────── Habilidad y Colaboración ─────────────────────────
 
 class Habilidad {
-  -titulo: String
-  -codigo: String
-  -descripcion: String
-  -fechaCreacion: LocalDateTime
-  -usuario: String
-  -activo: Boolean
+  -titulo: string
+  -codigo: string
+  -descripcion: string
+  -fechaCreacion: Date
+  -usuario: string
+  -activo: boolean
 }
 
 class Colaboracion {
@@ -103,16 +103,16 @@ class Colaboracion {
 }
 
 class Colaborador {
-  -nombreFantasia: String
-  -nombre: String
-  -apellido: String
-  -cuentaGit: String
-  -habilidades: Habilidad[]
-  -pronombres: Set<String>
-  -presentacion: String
+  -nombreFantasia: string
+  -nombre: string
+  -apellido: string
+  -cuentaGit: string
+  -habilidades: Array<Habilidad>
+  -pronombres: Set<string>
+  -presentacion: string
 
-  +agregarPronombre(pronombre: String): void
-  +quitarPronombre(pronombre: String): void
+  +agregarPronombre(pronombre: string): void
+  +quitarPronombre(pronombre: string): void
   +tieneHabilidad(habilidad: Habilidad): boolean
   +agregarHabilidad(habilidad: Habilidad): void
   +quitarHabilidad(habilidad: Habilidad): void

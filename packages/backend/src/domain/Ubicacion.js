@@ -1,4 +1,4 @@
-import { TIPO_UBICACION } from "./enums/TipoUbicacion.js";
+import { TIPO_UBICACION } from "./enums/TIPO_UBICACION.js";
 
 export const PROVINCIAS = Object.freeze([
   "Buenos Aires", "Catamarca", "Chaco", "Chubut", "Cordoba", "Corrientes",

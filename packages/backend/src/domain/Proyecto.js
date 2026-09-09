@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { PROYECTO_ESTADO } from "./enums/ProyectoEstado.js";
-import { MODALIDAD_COLABORACION } from "./enums/ModalidadColaboracion.js";
+import { PROYECTO_ESTADO } from "./enums/PROYECTO_ESTADO.js";
+import { MODALIDAD_COLABORACION } from "./enums/MODALIDAD_COLABORACION.js";
 
 export class Proyecto {
   constructor({
@@ -56,6 +56,6 @@ export class Proyecto {
   }
 
   quitarColaboracion(colaboracion) {
-    this.colaboraciones = this.colaboraciones.filter((c) => !c.equals(colaboracion));
+    this.colaboraciones = this.colaboraciones.filter((c) => c !== colaboracion);
   }
 }

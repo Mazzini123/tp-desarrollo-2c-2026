@@ -1,5 +1,6 @@
 import { DomainError } from "../errors/DomainError.js";
 import { ConflictError } from "../errors/ConflictError.js";
+import { NotFoundError } from "../errors/NotFoundError.js";
 import { Habilidad, normalizarASnakeCase } from "../domain/Habilidad.js";
 import { tieneContenido } from "../utils/validaciones.js";
 import { armarPaginado } from "../utils/paginacion.js";
@@ -44,7 +45,7 @@ export class HabilidadService {
     return codigos.map((codigo) => {
       const habilidad = this.habilidadRepository.buscarPorId(codigo);
       if (!habilidad) {
-        throw new DomainError(`No existe una habilidad con el código "${codigo}"`);
+        throw new NotFoundError(`No existe una habilidad con el código "${codigo}"`);
       }
       if (!habilidad.activo) {
         throw new DomainError(`La habilidad "${codigo}" está dada de baja`);

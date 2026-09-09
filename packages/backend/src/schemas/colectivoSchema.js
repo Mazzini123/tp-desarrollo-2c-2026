@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { TIPO_COLECTIVO } from "../domain/enums/TipoColectivo.js";
-import { TIPO_UBICACION } from "../domain/enums/TipoUbicacion.js";
+import { TIPO_COLECTIVO } from "../domain/enums/TIPO_COLECTIVO.js";
+import { TIPO_UBICACION } from "../domain/enums/TIPO_UBICACION.js";
 
 export const ubicacionSchema = z
   .object({
