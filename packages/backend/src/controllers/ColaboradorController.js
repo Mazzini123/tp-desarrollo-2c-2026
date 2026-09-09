@@ -2,7 +2,7 @@ import { BaseController } from "./BaseController.js";
 import { colaboradorService, colaboracionService } from "../services/index.js";
 import { actualizarColaboradorSchema, crearColaboradorSchema } from "../schemas/colaboradorSchema.js";
 import { agregarHabilidadSchema } from "../schemas/proyectoSchema.js";
-import { serializarColaborador } from "../utils/serializadores.js";
+import { serializar } from "../utils/serializadores.js";
 
 export class ColaboradorController extends BaseController {
   constructor(servicioColaborador = colaboradorService, servicioColaboracion = colaboracionService) {
@@ -20,7 +20,7 @@ export class ColaboradorController extends BaseController {
 
     try {
       const colaborador = this.colaboradorService.crear(resultado.data);
-      return res.status(201).json({ status: "success", data: serializarColaborador(colaborador) });
+      return res.status(201).json({ status: "success", data: serializar(colaborador) });
     } catch (error) {
       return this.manejarError(res, error);
     }
@@ -32,7 +32,7 @@ export class ColaboradorController extends BaseController {
       const pagina = this.colaboradorService.listar(paginacion);
       return this.responderPaginado(res, {
         ...pagina,
-        items: pagina.items.map(serializarColaborador),
+        items: pagina.items.map(serializar),
       });
     } catch (error) {
       return this.manejarError(res, error);
@@ -42,7 +42,7 @@ export class ColaboradorController extends BaseController {
   obtenerPorId = (req, res) => {
     try {
       const colaborador = this.colaboradorService.buscarPorId(req.params.id);
-      return res.status(200).json({ status: "success", data: serializarColaborador(colaborador) });
+      return res.status(200).json({ status: "success", data: serializar(colaborador) });
     } catch (error) {
       return this.manejarError(res, error);
     }
@@ -57,7 +57,7 @@ export class ColaboradorController extends BaseController {
 
     try {
       const colaborador = this.colaboradorService.actualizar(req.params.id, resultado.data);
-      return res.status(200).json({ status: "success", data: serializarColaborador(colaborador) });
+      return res.status(200).json({ status: "success", data: serializar(colaborador) });
     } catch (error) {
       return this.manejarError(res, error);
     }
@@ -75,7 +75,7 @@ export class ColaboradorController extends BaseController {
         req.params.id,
         resultado.data.codigoHabilidad,
       );
-      return res.status(200).json({ status: "success", data: serializarColaborador(colaborador) });
+      return res.status(200).json({ status: "success", data: serializar(colaborador) });
     } catch (error) {
       return this.manejarError(res, error);
     }
@@ -87,7 +87,7 @@ export class ColaboradorController extends BaseController {
         req.params.id,
         req.params.codigoHabilidad,
       );
-      return res.status(200).json({ status: "success", data: serializarColaborador(colaborador) });
+      return res.status(200).json({ status: "success", data: serializar(colaborador) });
     } catch (error) {
       return this.manejarError(res, error);
     }
@@ -98,10 +98,7 @@ export class ColaboradorController extends BaseController {
       const colaboraciones = this.colaboracionService.listarPorColaborador(req.params.id);
       const data = colaboraciones.map(({ proyectoId, colaboracion }) => ({
         proyectoId,
-        colaboracion: {
-          ...colaboracion,
-          colaborador: serializarColaborador(colaboracion.colaborador),
-        },
+        colaboracion: serializar(colaboracion),
       }));
       return res.status(200).json({ status: "success", data });
     } catch (error) {

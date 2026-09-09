@@ -6,7 +6,7 @@ import {
   anotarColaboradorSchema,
   cambiarEstadoProyectoSchema,
 } from "../schemas/proyectoSchema.js";
-import { serializarColaborador } from "../utils/serializadores.js";
+import { serializar } from "../utils/serializadores.js";
 
 export class ProyectoController extends BaseController {
   constructor(servicioProyecto = proyectoService, servicioColaboracion = colaboracionService) {
@@ -106,7 +106,7 @@ export class ProyectoController extends BaseController {
       });
       return res.status(201).json({
         status: "success",
-        data: { ...colaboracion, colaborador: serializarColaborador(colaboracion.colaborador) },
+        data: serializar(colaboracion),
       });
     } catch (error) {
       return this.manejarError(res, error);
@@ -116,10 +116,7 @@ export class ProyectoController extends BaseController {
   listarColaboraciones = (req, res) => {
     try {
       const colaboraciones = this.colaboracionService.listarPorProyecto(req.params.id);
-      const data = colaboraciones.map((colaboracion) => ({
-        ...colaboracion,
-        colaborador: serializarColaborador(colaboracion.colaborador),
-      }));
+      const data = colaboraciones.map((colaboracion) => serializar(colaboracion));
       return res.status(200).json({ status: "success", data });
     } catch (error) {
       return this.manejarError(res, error);

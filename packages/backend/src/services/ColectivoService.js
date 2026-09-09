@@ -2,8 +2,8 @@ import { Colectivo } from "../domain/Colectivo.js";
 import { Ubicacion, PROVINCIAS } from "../domain/Ubicacion.js";
 import { DomainError } from "../errors/DomainError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
-import { esTipoColectivoValido } from "../domain/enums/TipoColectivo.js";
-import { TIPO_UBICACION, esTipoUbicacionValido } from "../domain/enums/TipoUbicacion.js";
+import { esTipoColectivoValido } from "../domain/enums/TIPO_COLECTIVO.js";
+import { TIPO_UBICACION, esTipoUbicacionValido } from "../domain/enums/TIPO_UBICACION.js";
 import { tieneContenido } from "../utils/validaciones.js";
 import { armarPaginado } from "../utils/paginacion.js";
 

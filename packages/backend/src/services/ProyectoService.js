@@ -3,11 +3,11 @@ import { Compromiso } from "../domain/Compromiso.js";
 import { DomainError } from "../errors/DomainError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
 import { ConflictError } from "../errors/ConflictError.js";
-import { esPeriodoCompromisoValido } from "../domain/enums/PeriodoCompromiso.js";
+import { esPeriodoCompromisoValido } from "../domain/enums/PERIODO_COMPROMISO.js";
 import {
   MODALIDAD_COLABORACION,
   esModalidadColaboracionValida,
-} from "../domain/enums/ModalidadColaboracion.js";
+} from "../domain/enums/MODALIDAD_COLABORACION.js";
 import { armarPaginado } from "../utils/paginacion.js";
 
 export class ProyectoService {

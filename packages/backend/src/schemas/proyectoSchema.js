@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { PERIODO_COMPROMISO } from "../domain/enums/PeriodoCompromiso.js";
-import { MODALIDAD_COLABORACION } from "../domain/enums/ModalidadColaboracion.js";
+import { PERIODO_COMPROMISO } from "../domain/enums/PERIODO_COMPROMISO.js";
+import { MODALIDAD_COLABORACION } from "../domain/enums/MODALIDAD_COLABORACION.js";
 
 export const compromisoSchema = z
   .object({
