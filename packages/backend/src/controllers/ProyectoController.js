@@ -1,125 +1,63 @@
 import { BaseController } from "./BaseController.js";
-import { proyectoService, colaboracionService } from "../services/index.js";
-import {
-  actualizarProyectoSchema,
-  agregarHabilidadSchema,
-  anotarColaboradorSchema,
-  cambiarEstadoProyectoSchema,
-} from "../schemas/proyectoSchema.js";
-import { serializar } from "../utils/serializadores.js";
 
 export class ProyectoController extends BaseController {
-  constructor(servicioProyecto = proyectoService, servicioColaboracion = colaboracionService) {
+  constructor({ proyectoService, colaboracionService }) {
     super();
-    this.proyectoService = servicioProyecto;
-    this.colaboracionService = servicioColaboracion;
+    this.proyectoService = proyectoService;
+    this.colaboracionService = colaboracionService;
   }
 
   listar = (req, res) => {
-    try {
-      const paginacion = this.extraerPaginacion(req.query);
-      return this.responderPaginado(res, this.proyectoService.listar(paginacion));
-    } catch (error) {
-      return this.manejarError(res, error);
-    }
+    const paginacion = this.aPaginacionDeDominio(req.paginacion);
+    this.responderPaginado(res, this.proyectoService.listar(paginacion));
   };
 
   obtenerPorId = (req, res) => {
-    try {
-      const proyecto = this.proyectoService.buscarPorId(req.params.id);
-      return res.status(200).json({ status: "success", data: proyecto });
-    } catch (error) {
-      return this.manejarError(res, error);
-    }
+    res.status(200).json(this.proyectoService.buscarPorId(req.params.id));
   };
 
   actualizar = (req, res) => {
-    const body = req.body;
-    const resultado = actualizarProyectoSchema.safeParse(body);
-    if (resultado.error) {
-      return this.manejarError(res, resultado.error);
-    }
-
-    try {
-      const proyecto = this.proyectoService.actualizar(req.params.id, resultado.data);
-      return res.status(200).json({ status: "success", data: proyecto });
-    } catch (error) {
-      return this.manejarError(res, error);
-    }
+    res.status(200).json(this.proyectoService.actualizar(req.params.id, req.body));
   };
 
-  cambiarEstado = (req, res) => {
-    const resultado = cambiarEstadoProyectoSchema.safeParse(req.body);
-    if (resultado.error) {
-      return this.manejarError(res, resultado.error);
-    }
-
-    try {
-      const proyecto = this.proyectoService.finalizar(req.params.id);
-      return res.status(200).json({ status: "success", data: proyecto });
-    } catch (error) {
-      return this.manejarError(res, error);
-    }
+  /**
+   * Correccion E1: era PATCH /proyectos/:id con body { estado: "finalizar" }.
+   * Ahora es POST /proyectos/:id/finalizacion: se crea la finalizacion del
+   * proyecto. Sin body, porque no hay nada que elegir — es una accion, no la
+   * edicion de un campo.
+   */
+  finalizar = (req, res) => {
+    res.status(200).json(this.proyectoService.finalizar(req.params.id));
   };
 
   agregarHabilidad = (req, res) => {
-    const body = req.body;
-    const resultado = agregarHabilidadSchema.safeParse(body);
-    if (resultado.error) {
-      return this.manejarError(res, resultado.error);
-    }
-
-    try {
-      const proyecto = this.proyectoService.agregarHabilidadRequerida(
-        req.params.id,
-        resultado.data.codigoHabilidad,
-      );
-      return res.status(200).json({ status: "success", data: proyecto });
-    } catch (error) {
-      return this.manejarError(res, error);
-    }
+    const proyecto = this.proyectoService.agregarHabilidadRequerida(
+      req.params.id,
+      req.body.codigoHabilidad,
+    );
+    res.status(200).json(proyecto);
   };
 
   quitarHabilidad = (req, res) => {
-    try {
-      const proyecto = this.proyectoService.quitarHabilidadRequerida(
-        req.params.id,
-        req.params.codigoHabilidad,
-      );
-      return res.status(200).json({ status: "success", data: proyecto });
-    } catch (error) {
-      return this.manejarError(res, error);
-    }
+    const proyecto = this.proyectoService.quitarHabilidadRequerida(
+      req.params.id,
+      req.params.codigoHabilidad,
+    );
+    res.status(200).json(proyecto);
   };
 
   anotarColaborador = (req, res) => {
-    const body = req.body;
-    const resultado = anotarColaboradorSchema.safeParse(body);
-    if (resultado.error) {
-      return this.manejarError(res, resultado.error);
-    }
-
-    try {
-      const colaboracion = this.colaboracionService.registrar({
-        proyectoId: req.params.id,
-        colaboradorId: resultado.data.colaboradorId,
-      });
-      return res.status(201).json({
-        status: "success",
-        data: serializar(colaboracion),
-      });
-    } catch (error) {
-      return this.manejarError(res, error);
-    }
+    const colaboracion = this.colaboracionService.registrar({
+      proyectoId: req.params.id,
+      colaboradorId: req.body.colaboradorId,
+    });
+    // Correccion A4: sin `serializar`. res.json() ya lleva el objeto a JSON;
+    // el unico motivo por el que existia esa funcion era convertir el Set de
+    // pronombres, y ese Set ya no esta (correccion C1).
+    res.status(201).json(colaboracion);
   };
 
   listarColaboraciones = (req, res) => {
-    try {
-      const colaboraciones = this.colaboracionService.listarPorProyecto(req.params.id);
-      const data = colaboraciones.map((colaboracion) => serializar(colaboracion));
-      return res.status(200).json({ status: "success", data });
-    } catch (error) {
-      return this.manejarError(res, error);
-    }
+    res.status(200).json(this.colaboracionService.listarPorProyecto(req.params.id));
   };
 }

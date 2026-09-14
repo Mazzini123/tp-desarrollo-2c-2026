@@ -6,7 +6,7 @@ export const crearColaboradorSchema = z
     nombre: z.string().min(1).nullish(),
     apellido: z.string().min(1).nullish(),
     cuentaGit: z.string().min(1).nullish(),
-    pronombres: z.array(z.string()).default([]),
+    pronombres: z.array(z.string().min(1)).default([]),
     presentacion: z.string().nullish(),
     codigosHabilidades: z.array(z.string().min(1)).default([]),
   })
@@ -14,7 +14,11 @@ export const crearColaboradorSchema = z
 
 export const actualizarColaboradorSchema = z
   .object({
-    pronombres: z.array(z.string()).optional(),
+    pronombres: z.array(z.string().min(1)).optional(),
     presentacion: z.string().nullish(),
   })
+  .strict();
+
+export const agregarPronombreSchema = z
+  .object({ pronombre: z.string().min(1) })
   .strict();

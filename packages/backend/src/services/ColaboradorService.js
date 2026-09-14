@@ -21,8 +21,10 @@ export class ColaboradorService {
       presentacion,
     });
 
+    // Alta: la intencion es "dejame esta lista", asi que se deduplica en
+    // silencio en vez de tirar 409 por un duplicado del propio payload.
     if (pronombres) {
-      pronombres.forEach((p) => colaborador.agregarPronombre(p));
+      colaborador.reemplazarPronombres(pronombres);
     }
 
     if (codigosHabilidades && codigosHabilidades.length > 0) {
@@ -55,13 +57,29 @@ export class ColaboradorService {
     const colaborador = this.buscarPorId(id);
 
     if (pronombres !== undefined) {
-      colaborador.pronombres = new Set(pronombres);
+      colaborador.reemplazarPronombres(pronombres);
     }
 
     if (presentacion !== undefined) {
       colaborador.presentacion = presentacion;
     }
 
+    return this.colaboradorRepository.guardar(colaborador);
+  }
+
+  /**
+   * Agregar de a uno. El ConflictError por duplicado lo tira el dominio
+   * (Colaborador.agregarPronombre) y llega al cliente como 409.
+   */
+  agregarPronombre(id, pronombre) {
+    const colaborador = this.buscarPorId(id);
+    colaborador.agregarPronombre(pronombre);
+    return this.colaboradorRepository.guardar(colaborador);
+  }
+
+  quitarPronombre(id, pronombre) {
+    const colaborador = this.buscarPorId(id);
+    colaborador.quitarPronombre(pronombre);
     return this.colaboradorRepository.guardar(colaborador);
   }
 

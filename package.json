@@ -15,7 +15,8 @@
     "// start:frontend (deshabilitado hasta 3a entrega": "npm start --workspace=frontend",
     "// start:dev (deshabilitado hasta 3a entrega": "concurrently \"npm run dev:backend\" \"npm run start:frontend\"",
     "lint": "eslint .",
-    "format": "prettier . --write"
+    "format": "prettier . --write",
+    "test": "npm test --workspace=backend"
   },
   "license": "ISC",
   "devDependencies": {
@@ -24,6 +25,7 @@
     "cross-env": "^10.1.0",
     "eslint": "^9.31.0",
     "globals": "^16.3.0",
+    "jest": "^30.5.1",
     "prettier": "3.6.2"
   }
 }

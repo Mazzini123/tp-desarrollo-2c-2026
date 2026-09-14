@@ -1,27 +1,31 @@
-import { AppError } from "../errors/AppError.js";
-import { BadRequestError } from "../errors/BadRequestError.js";
-import { ZodError } from "zod";
-
+/**
+ * Lo unico que queda compartido entre controllers es la forma de la respuesta
+ * paginada.
+ *
+ * Se fue `manejarError` (correccion A1): ahora la traduccion de excepcion a
+ * HTTP la hace `middlewares/manejadorErrores.js`, una sola vez, al final de la
+ * cadena de Express.
+ *
+ * Se fueron `extraerPaginacion` y `validarEnteroPositivo` (correccion A2):
+ * hacian a mano lo que Zod ya hace en `schemas/paginacionSchema.js`.
+ */
 export class BaseController {
-  extraerPaginacion(query) {
-    const numeroPagina = query?.page === undefined ? 1 : Number(query.page);
-    const limitePorPagina = query?.limit === undefined ? 10 : Number(query.limit);
-
-    this.validarEnteroPositivo(numeroPagina, "page");
-    this.validarEnteroPositivo(limitePorPagina, "limit");
-
-    return { numeroPagina, limitePorPagina };
+  /**
+   * Traduce la paginacion del vocabulario HTTP (page/limit) al del dominio
+   * (numeroPagina/limitePorPagina). Esa traduccion es justamente la
+   * responsabilidad de esta capa.
+   */
+  aPaginacionDeDominio({ page, limit }) {
+    return { numeroPagina: page, limitePorPagina: limit };
   }
 
-  validarEnteroPositivo(numero, parametro) {
-    if (!Number.isInteger(numero) || numero <= 0) {
-      throw new BadRequestError(`${parametro} debe ser un entero positivo`);
-    }
-  }
-
+  /**
+   * Correccion A3: se fue el `status: "success"` del body. El codigo HTTP ya
+   * dice si salio bien. El `meta`, en cambio, se queda: page, per_page, total
+   * y total_pages no viajan en ningun header.
+   */
   responderPaginado(res, { items, numeroPagina, limitePorPagina, totalPaginas, total }) {
-    return res.status(200).json({
-      status: "success",
+    res.status(200).json({
       data: items,
       meta: {
         page: numeroPagina,
@@ -30,22 +34,5 @@ export class BaseController {
         total_pages: totalPaginas,
       },
     });
-  }
-
-  manejarError(res, error) {
-    if (error instanceof AppError) {
-      return res.status(error.status).json({ status: "fail", message: error.message });
-    }
-
-    if (error instanceof ZodError) {
-      return res.status(400).json({
-        status: "fail",
-        message: "Datos inválidos",
-        issues: error.issues,
-      });
-    }
-
-    console.error(error);
-    return res.status(500).json({ status: "error", message: "Error interno del servidor" });
   }
 }
