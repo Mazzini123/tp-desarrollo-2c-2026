@@ -1,108 +1,68 @@
 import { BaseController } from "./BaseController.js";
-import { colaboradorService, colaboracionService } from "../services/index.js";
-import { actualizarColaboradorSchema, crearColaboradorSchema } from "../schemas/colaboradorSchema.js";
-import { agregarHabilidadSchema } from "../schemas/proyectoSchema.js";
-import { serializar } from "../utils/serializadores.js";
 
 export class ColaboradorController extends BaseController {
-  constructor(servicioColaborador = colaboradorService, servicioColaboracion = colaboracionService) {
+  constructor({ colaboradorService, colaboracionService }) {
     super();
-    this.colaboradorService = servicioColaborador;
-    this.colaboracionService = servicioColaboracion;
+    this.colaboradorService = colaboradorService;
+    this.colaboracionService = colaboracionService;
   }
 
   crear = (req, res) => {
-    const body = req.body;
-    const resultado = crearColaboradorSchema.safeParse(body);
-    if (resultado.error) {
-      return this.manejarError(res, resultado.error);
-    }
-
-    try {
-      const colaborador = this.colaboradorService.crear(resultado.data);
-      return res.status(201).json({ status: "success", data: serializar(colaborador) });
-    } catch (error) {
-      return this.manejarError(res, error);
-    }
+    res.status(201).json(this.colaboradorService.crear(req.body));
   };
 
   listar = (req, res) => {
-    try {
-      const paginacion = this.extraerPaginacion(req.query);
-      const pagina = this.colaboradorService.listar(paginacion);
-      return this.responderPaginado(res, {
-        ...pagina,
-        items: pagina.items.map(serializar),
-      });
-    } catch (error) {
-      return this.manejarError(res, error);
-    }
+    const paginacion = this.aPaginacionDeDominio(req.paginacion);
+    this.responderPaginado(res, this.colaboradorService.listar(paginacion));
   };
 
   obtenerPorId = (req, res) => {
-    try {
-      const colaborador = this.colaboradorService.buscarPorId(req.params.id);
-      return res.status(200).json({ status: "success", data: serializar(colaborador) });
-    } catch (error) {
-      return this.manejarError(res, error);
-    }
+    res.status(200).json(this.colaboradorService.buscarPorId(req.params.id));
   };
 
   actualizar = (req, res) => {
-    const body = req.body;
-    const resultado = actualizarColaboradorSchema.safeParse(body);
-    if (resultado.error) {
-      return this.manejarError(res, resultado.error);
-    }
+    res.status(200).json(this.colaboradorService.actualizar(req.params.id, req.body));
+  };
 
-    try {
-      const colaborador = this.colaboradorService.actualizar(req.params.id, resultado.data);
-      return res.status(200).json({ status: "success", data: serializar(colaborador) });
-    } catch (error) {
-      return this.manejarError(res, error);
-    }
+  /**
+   * Correccion C1. El profesor razono sobre "la operacion de agregar un
+   * pronombre" y ese endpoint no existia: los pronombres solo se podian
+   * reemplazar en bloque con PUT. Estos dos exponen los metodos de dominio y
+   * son los que devuelven el 409 por duplicado.
+   */
+  agregarPronombre = (req, res) => {
+    const colaborador = this.colaboradorService.agregarPronombre(
+      req.params.id,
+      req.body.pronombre,
+    );
+    res.status(200).json(colaborador);
+  };
+
+  quitarPronombre = (req, res) => {
+    const colaborador = this.colaboradorService.quitarPronombre(
+      req.params.id,
+      req.params.pronombre,
+    );
+    res.status(200).json(colaborador);
   };
 
   agregarHabilidad = (req, res) => {
-    const body = req.body;
-    const resultado = agregarHabilidadSchema.safeParse(body);
-    if (resultado.error) {
-      return this.manejarError(res, resultado.error);
-    }
-
-    try {
-      const colaborador = this.colaboradorService.agregarHabilidad(
-        req.params.id,
-        resultado.data.codigoHabilidad,
-      );
-      return res.status(200).json({ status: "success", data: serializar(colaborador) });
-    } catch (error) {
-      return this.manejarError(res, error);
-    }
+    const colaborador = this.colaboradorService.agregarHabilidad(
+      req.params.id,
+      req.body.codigoHabilidad,
+    );
+    res.status(200).json(colaborador);
   };
 
   quitarHabilidad = (req, res) => {
-    try {
-      const colaborador = this.colaboradorService.quitarHabilidad(
-        req.params.id,
-        req.params.codigoHabilidad,
-      );
-      return res.status(200).json({ status: "success", data: serializar(colaborador) });
-    } catch (error) {
-      return this.manejarError(res, error);
-    }
+    const colaborador = this.colaboradorService.quitarHabilidad(
+      req.params.id,
+      req.params.codigoHabilidad,
+    );
+    res.status(200).json(colaborador);
   };
 
   listarColaboraciones = (req, res) => {
-    try {
-      const colaboraciones = this.colaboracionService.listarPorColaborador(req.params.id);
-      const data = colaboraciones.map(({ proyectoId, colaboracion }) => ({
-        proyectoId,
-        colaboracion: serializar(colaboracion),
-      }));
-      return res.status(200).json({ status: "success", data });
-    } catch (error) {
-      return this.manejarError(res, error);
-    }
+    res.status(200).json(this.colaboracionService.listarPorColaborador(req.params.id));
   };
 }

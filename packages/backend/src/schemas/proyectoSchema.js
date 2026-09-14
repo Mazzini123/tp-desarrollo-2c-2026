@@ -40,6 +40,8 @@ export const anotarColaboradorSchema = z
   .object({ colaboradorId: z.string().min(1) })
   .strict();
 
-export const cambiarEstadoProyectoSchema = z
-  .object({ estado: z.literal("finalizar") })
-  .strict();
+// `cambiarEstadoProyectoSchema` se borro (correccion E1). Exigia un body
+// { estado: "finalizar" } — un verbo disfrazado de campo, que ademas no
+// coincidia con el enum del dominio (PROYECTO_ESTADO.FINALIZADO).
+// La accion ahora se expresa en la ruta: POST /proyectos/:id/finalizacion,
+// que no necesita body y por lo tanto no necesita schema.

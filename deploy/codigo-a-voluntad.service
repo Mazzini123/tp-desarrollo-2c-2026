@@ -1,0 +1,41 @@
+# Corrección F3: hasta ahora el backend corría con un `node index.js` suelto en
+# una sesión SSH. Si el proceso moría o la VM se reiniciaba, la API quedaba
+# caída sin que nadie se enterara. Con este unit, systemd lo levanta en el boot
+# y lo reinicia solo.
+#
+# No hace falta Docker — el profesor ya aclaró que no es un requisito.
+#
+# Instalación en la VM de Oracle Cloud:
+#
+#   sudo cp deploy/codigo-a-voluntad.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now codigo-a-voluntad
+#
+# Operación:
+#
+#   systemctl status codigo-a-voluntad          # estado
+#   journalctl -u codigo-a-voluntad -f          # logs en vivo
+#   sudo systemctl restart codigo-a-voluntad    # después de un git pull
+#
+# Ajustar WorkingDirectory y User si el repo no está en /home/ubuntu.
+
+[Unit]
+Description=Codigo a Voluntad - backend (TP DDS UTN FRBA)
+Documentation=https://github.com/Mazzini123/tp-desarrollo-2c-2026
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/tp-desarrollo-2c-2026
+EnvironmentFile=/home/ubuntu/tp-desarrollo-2c-2026/packages/backend/.env
+ExecStart=/usr/bin/npm run start:backend
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=codigo-a-voluntad
+
+[Install]
+WantedBy=multi-user.target

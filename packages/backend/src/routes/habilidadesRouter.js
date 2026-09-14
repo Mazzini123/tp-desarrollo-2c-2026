@@ -1,10 +1,13 @@
 import { Router } from "express";
-import { HabilidadController } from "../controllers/HabilidadController.js";
+import { validarBody, validarQuery } from "../middlewares/validar.js";
+import { paginacionSchema } from "../schemas/paginacionSchema.js";
+import { crearHabilidadSchema } from "../schemas/habilidadSchema.js";
 
-const router = Router();
-const habilidadController = new HabilidadController();
+export function crearHabilidadesRouter(habilidadController) {
+  const router = Router();
 
-router.post("/", habilidadController.crear);
-router.get("/", habilidadController.listar);
+  router.post("/", validarBody(crearHabilidadSchema), habilidadController.crear);
+  router.get("/", validarQuery(paginacionSchema), habilidadController.listar);
 
-export default router;
+  return router;
+}

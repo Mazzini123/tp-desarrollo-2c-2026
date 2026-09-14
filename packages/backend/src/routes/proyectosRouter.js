@@ -1,20 +1,36 @@
 import { Router } from "express";
-import { ProyectoController } from "../controllers/ProyectoController.js";
+import { validarBody, validarQuery } from "../middlewares/validar.js";
+import { paginacionSchema } from "../schemas/paginacionSchema.js";
+import {
+  actualizarProyectoSchema,
+  agregarHabilidadSchema,
+  anotarColaboradorSchema,
+} from "../schemas/proyectoSchema.js";
 
-const router = Router();
-const proyectoController = new ProyectoController();
+export function crearProyectosRouter(proyectoController) {
+  const router = Router();
 
-router.get("/", proyectoController.listar);
-router.get("/:id", proyectoController.obtenerPorId);
-router.put("/:id", proyectoController.actualizar);
-router.patch("/:id", proyectoController.cambiarEstado);
-router.post("/:id/habilidades", proyectoController.agregarHabilidad);
-router.delete("/:id/habilidades/:codigoHabilidad", proyectoController.quitarHabilidad);
+  router.get("/", validarQuery(paginacionSchema), proyectoController.listar);
+  router.get("/:id", proyectoController.obtenerPorId);
+  router.put("/:id", validarBody(actualizarProyectoSchema), proyectoController.actualizar);
 
-router.post(
-  "/:id/colaboraciones",
-  proyectoController.anotarColaborador,
-);
-router.get("/:id/colaboraciones", proyectoController.listarColaboraciones);
+  // Correccion E1: se crea la finalizacion del proyecto como sub-recurso,
+  // en vez de PATCH /:id con { estado: "finalizar" }.
+  router.post("/:id/finalizacion", proyectoController.finalizar);
 
-export default router;
+  router.post(
+    "/:id/habilidades",
+    validarBody(agregarHabilidadSchema),
+    proyectoController.agregarHabilidad,
+  );
+  router.delete("/:id/habilidades/:codigoHabilidad", proyectoController.quitarHabilidad);
+
+  router.post(
+    "/:id/colaboraciones",
+    validarBody(anotarColaboradorSchema),
+    proyectoController.anotarColaborador,
+  );
+  router.get("/:id/colaboraciones", proyectoController.listarColaboraciones);
+
+  return router;
+}
