@@ -44,10 +44,12 @@ class Proyecto {
   -titulo: string
   -descripcion: string
   -colaboraciones: Array<Colaboracion>
-  -habilidadesNecesarias: Array<Habilidad>
-  -modalidadColaboracion: MODALIDAD_COLABORACION
+  -perfiles: Array<Perfil>
   -estado: PROYECTO_ESTADO
-  -compromisoEsperado: Compromiso
+  -porcentajeConcrecion: number
+  -logros: Array<Logro>
+  -urlSistema: string
+  -urlRepositorio: string
 
   +finalizarProyecto(): void
   +estaAbierto(): boolean
@@ -70,6 +72,13 @@ enum MODALIDAD_COLABORACION {
   EXISTE_POSIBILIDAD_DE_CONTRATACION
 }
 
+class Logro {
+  -titulo: string
+  -descripcion: string
+  -fecha: Date
+
+}
+
 class Compromiso {
   -cantidadHoras: number
   -periodo: PERIODO_COMPROMISO
@@ -82,11 +91,21 @@ enum PERIODO_COMPROMISO {
 }
 
 Proyecto --> PROYECTO_ESTADO
-Proyecto --> Compromiso
-Proyecto --> MODALIDAD_COLABORACION
+Perfil --> Compromiso
+Perfil--> MODALIDAD_COLABORACION
+Proyecto -->"*" Perfil
+Proyecto --> "0..*" Logro
 Compromiso --> PERIODO_COMPROMISO
 
 ' ───────────────────────── Habilidad y Colaboración ─────────────────────────
+
+class Perfil {
+  -descripcion: string
+  -habilidadesRequeridas: Array<Habilidad>
+  -habilidadesOpcionales: Array<Habilidad>
+  -compromiso: Compromiso
+  -modalidadColaboracion: MODALIDAD_COLABORACION
+}
 
 class Habilidad {
   -titulo: string
@@ -100,6 +119,7 @@ class Habilidad {
 class Colaboracion {
   -fecha: Date
   -colaborador: Colaborador
+  -esPublica: boolean
 }
 
 class Colaborador {
@@ -110,6 +130,8 @@ class Colaborador {
   -habilidades: Array<Habilidad>
   -pronombres: Set<string>
   -presentacion: string
+  -recibeMensajeriaInterna: boolean
+  -mediosDeContacto: Array<MedioDeContacto>
 
   +agregarPronombre(pronombre: string): void
   +quitarPronombre(pronombre: string): void
@@ -118,9 +140,36 @@ class Colaborador {
   +quitarHabilidad(habilidad: Habilidad): void
 }
 
-Proyecto --> "*" Habilidad
+Perfil --> "*" Habilidad
 Proyecto --> "*" Colaboracion
 Colaboracion --> Colaborador
 Colaborador --> "*" Habilidad
+Colaborador --> "0..*" MedioDeContacto
+
+class MedioDeContacto {
+    -tipo: TIPOS_MEDIOS_CONTACTO
+    -valor: string
+}
+
+enum TIPOS_MEDIOS_CONTACTO {
+    SMS
+    EMAIL
+    WHATSAPP
+}
+
+MedioDeContacto --> TIPOS_MEDIOS_CONTACTO
+
+class NotificacionInterna {
+  -destinatario: Usuario
+  -contenido: string
+  -fecha: Date
+  -esLeida: boolean
+}
+
+class Usuario {
+
+}
+
+NotificacionInterna --> Usuario
 
 @enduml

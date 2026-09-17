@@ -7,13 +7,6 @@ import {
 } from "../schemas/colectivoSchema.js";
 import { crearProyectoSchema } from "../schemas/proyectoSchema.js";
 
-/**
- * Correccion B1: el router ya no construye el controller, lo recibe.
- * Correccion A2: cada ruta declara que valida antes de delegar.
- *
- * El efecto secundario es que este archivo se lee como el contrato del
- * recurso: metodo, ruta, validacion y quien atiende, en una linea.
- */
 export function crearColectivosRouter(colectivoController) {
   const router = Router();
 

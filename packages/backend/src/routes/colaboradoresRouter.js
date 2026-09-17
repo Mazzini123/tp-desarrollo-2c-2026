@@ -20,7 +20,6 @@ export function crearColaboradoresRouter(colaboradorController) {
     colaboradorController.actualizar,
   );
 
-  // Correccion C1: las operaciones de a uno, que son las que tiran 409.
   router.post(
     "/:id/pronombres",
     validarBody(agregarPronombreSchema),
