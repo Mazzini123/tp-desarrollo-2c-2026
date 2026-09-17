@@ -67,10 +67,6 @@ export class ColaboradorService {
     return this.colaboradorRepository.guardar(colaborador);
   }
 
-  /**
-   * Agregar de a uno. El ConflictError por duplicado lo tira el dominio
-   * (Colaborador.agregarPronombre) y llega al cliente como 409.
-   */
   agregarPronombre(id, pronombre) {
     const colaborador = this.buscarPorId(id);
     colaborador.agregarPronombre(pronombre);
@@ -106,7 +102,7 @@ export class ColaboradorService {
     if (!nombreFantasia && !cuentaGit && !tieneNombreYApellido) {
       throw new DomainError(
         "El colaborador debe tener al menos un dato de identificación: " +
-          "nombreFantasia, cuentaGit, o (nombre + apellido)",
+        "nombreFantasia, cuentaGit, o (nombre + apellido)",
       );
     }
   }

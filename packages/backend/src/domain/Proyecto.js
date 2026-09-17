@@ -1,25 +1,25 @@
 import { randomUUID } from "node:crypto";
 import { PROYECTO_ESTADO } from "./enums/PROYECTO_ESTADO.js";
-import { MODALIDAD_COLABORACION } from "./enums/MODALIDAD_COLABORACION.js";
 
 export class Proyecto {
   constructor({
     id = randomUUID(),
     titulo,
     descripcion,
-    modalidadColaboracion = MODALIDAD_COLABORACION.GRATUITA,
-    compromisoEsperado,
-    habilidadesNecesarias = [],
+    urlSistema,
+    urlRepositorio,
     estado = PROYECTO_ESTADO.ABIERTO,
   }) {
     this.id = id;
     this.titulo = titulo;
     this.descripcion = descripcion;
-    this.compromisoEsperado = compromisoEsperado;
-    this.modalidadColaboracion = modalidadColaboracion;
     this.estado = estado;
+    this.porcentajeConcrecion = 0;
     this.colaboraciones = [];
-    this.habilidadesNecesarias = habilidadesNecesarias;
+    this.logros = [];
+    this.perfiles = [];
+    this.urlSistema = urlSistema;
+    this.urlRepositorio = urlRepositorio;
   }
 
   estaAbierto() {
@@ -31,20 +31,23 @@ export class Proyecto {
   }
 
   cumpleAlgunaHabilidadRequerida(colaborador) {
-    return this.habilidadesNecesarias.some((h) => colaborador.tieneHabilidad(h));
+    return this.perfiles.some(perfil => perfil.cumpleAlgunaHabilidadRequerida(colaborador));
   }
 
-  agregarHabilidadRequerida(habilidad) {
-    if (this.habilidadesNecesarias.some((h) => h.equals(habilidad))) {
-      return;
-    }
-    this.habilidadesNecesarias.push(habilidad);
+  agregarLogro(logro) {
+    this.logros.push(logro);
   }
 
-  quitarHabilidadRequerida(habilidad) {
-    this.habilidadesNecesarias = this.habilidadesNecesarias.filter(
-      (h) => !h.equals(habilidad),
-    );
+  quitarLogro(logro) {
+    this.logros = this.logros.filter((l) => l !== logro);
+  }
+
+  agregarPerfil(perfil) {
+    this.perfiles.push(perfil);
+  }
+
+  quitarPerfil(perfil) {
+    this.perfiles = this.perfiles.filter((p) => p !== perfil);
   }
 
   yaColaboraron(colaborador) {

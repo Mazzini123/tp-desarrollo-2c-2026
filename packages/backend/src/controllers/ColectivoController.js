@@ -1,16 +1,12 @@
 import { BaseController } from "./BaseController.js";
 
 export class ColectivoController extends BaseController {
-  // Correccion B1: sin defaults. Si no le pasan los services, no arranca.
-  // Quien decide las implementaciones concretas es `composicion.js`.
   constructor({ colectivoService, proyectoService }) {
     super();
     this.colectivoService = colectivoService;
     this.proyectoService = proyectoService;
   }
 
-  // Sin try/catch y sin safeParse: el body ya viene validado por el middleware
-  // del router, y cualquier excepcion la traduce el manejador de errores.
   crear = (req, res) => {
     res.status(201).json(this.colectivoService.crear(req.body));
   };

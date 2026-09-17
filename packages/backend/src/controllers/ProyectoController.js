@@ -20,12 +20,6 @@ export class ProyectoController extends BaseController {
     res.status(200).json(this.proyectoService.actualizar(req.params.id, req.body));
   };
 
-  /**
-   * Correccion E1: era PATCH /proyectos/:id con body { estado: "finalizar" }.
-   * Ahora es POST /proyectos/:id/finalizacion: se crea la finalizacion del
-   * proyecto. Sin body, porque no hay nada que elegir — es una accion, no la
-   * edicion de un campo.
-   */
   finalizar = (req, res) => {
     res.status(200).json(this.proyectoService.finalizar(req.params.id));
   };
@@ -51,9 +45,6 @@ export class ProyectoController extends BaseController {
       proyectoId: req.params.id,
       colaboradorId: req.body.colaboradorId,
     });
-    // Correccion A4: sin `serializar`. res.json() ya lleva el objeto a JSON;
-    // el unico motivo por el que existia esa funcion era convertir el Set de
-    // pronombres, y ese Set ya no esta (correccion C1).
     res.status(201).json(colaboracion);
   };
 

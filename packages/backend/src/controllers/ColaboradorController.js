@@ -24,12 +24,6 @@ export class ColaboradorController extends BaseController {
     res.status(200).json(this.colaboradorService.actualizar(req.params.id, req.body));
   };
 
-  /**
-   * Correccion C1. El profesor razono sobre "la operacion de agregar un
-   * pronombre" y ese endpoint no existia: los pronombres solo se podian
-   * reemplazar en bloque con PUT. Estos dos exponen los metodos de dominio y
-   * son los que devuelven el 409 por duplicado.
-   */
   agregarPronombre = (req, res) => {
     const colaborador = this.colaboradorService.agregarPronombre(
       req.params.id,

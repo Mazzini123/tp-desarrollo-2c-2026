@@ -1,16 +1,3 @@
-/**
- * Especificacion OpenAPI 3.0 de la API. Se sirve con swagger-ui-express en
- * GET /docs y como JSON en GET /openapi.json.
- *
- * Correcciones E2 y E3 del coloquio. E3 es la que manda sobre el contenido:
- * "si respetan la semantica de REST, lo mas probable es que no haga falta que
- * aclaren que es lo que hace. Si dicen POST colectivos, es crear colectivo".
- *
- * Por eso el `summary` de cada operacion es telegrafico y el esfuerzo esta
- * puesto en lo que NO se deduce de la ruta: que valida, que reglas de negocio
- * aplica, y por que tira 409 en vez de 400.
- */
-
 const PROBLEMA = {
   type: "object",
   properties: {
@@ -33,7 +20,6 @@ const META_PAGINACION = {
   },
 };
 
-/** Respuestas de error reutilizables, con el porque de cada codigo. */
 const errores = {
   400: {
     description:

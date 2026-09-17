@@ -14,8 +14,6 @@ export function crearProyectosRouter(proyectoController) {
   router.get("/:id", proyectoController.obtenerPorId);
   router.put("/:id", validarBody(actualizarProyectoSchema), proyectoController.actualizar);
 
-  // Correccion E1: se crea la finalizacion del proyecto como sub-recurso,
-  // en vez de PATCH /:id con { estado: "finalizar" }.
   router.post("/:id/finalizacion", proyectoController.finalizar);
 
   router.post(
