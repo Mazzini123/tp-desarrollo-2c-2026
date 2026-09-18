@@ -3,5 +3,4 @@ export class MedioDeContacto {
         this.tipo = tipo;
         this.valor = valor;
     }
-
 }

@@ -1,5 +1,8 @@
+import { randomUUID } from "node:crypto";
+
 export class Perfil {
-    constructor({ descripcion, compromiso, modalidadColaboracion }) {
+    constructor({ id = randomUUID(), descripcion, compromiso, modalidadColaboracion }) {
+        this.id = id;
         this.habilidadesRequeridas = [];
         this.habilidadesOpcionales = [];
         this.descripcion = descripcion;
@@ -20,15 +23,15 @@ export class Perfil {
     }
 
     quitarHabilidad(lista, habilidad) {
-        lista = lista.filter(item => item != habilidad);
+        return lista.filter((item) => !item.equals(habilidad));
     }
 
     quitarHabilidadOpcional(habilidad) {
-        this.quitarHabilidad(this.habilidadesOpcionales, habilidad);
+        this.habilidadesOpcionales = this.quitarHabilidad(this.habilidadesOpcionales, habilidad);
     }
 
     quitarHabilidadRequerida(habilidad) {
-        this.quitarHabilidad(this.habilidadesRequeridas, habilidad);
+        this.habilidadesRequeridas = this.quitarHabilidad(this.habilidadesRequeridas, habilidad);
     }
 
     cumpleAlgunaHabilidad(lista, colaborador) {
