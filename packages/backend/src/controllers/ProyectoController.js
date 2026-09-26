@@ -24,22 +24,6 @@ export class ProyectoController extends BaseController {
     res.status(200).json(this.proyectoService.finalizar(req.params.id));
   };
 
-  agregarHabilidad = (req, res) => {
-    const proyecto = this.proyectoService.agregarHabilidadRequerida(
-      req.params.id,
-      req.body.codigoHabilidad,
-    );
-    res.status(200).json(proyecto);
-  };
-
-  quitarHabilidad = (req, res) => {
-    const proyecto = this.proyectoService.quitarHabilidadRequerida(
-      req.params.id,
-      req.params.codigoHabilidad,
-    );
-    res.status(200).json(proyecto);
-  };
-
   anotarColaborador = (req, res) => {
     const colaboracion = this.colaboracionService.registrar({
       proyectoId: req.params.id,

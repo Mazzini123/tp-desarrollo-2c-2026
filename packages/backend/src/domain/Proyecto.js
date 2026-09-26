@@ -30,8 +30,8 @@ export class Proyecto {
     this.estado = PROYECTO_ESTADO.FINALIZADO;
   }
 
-  cumpleAlgunaHabilidadRequerida(colaborador) {
-    return this.perfiles.some(perfil => perfil.cumpleAlgunaHabilidadRequerida(colaborador));
+  cumpleAlgunPerfil(colaborador) {
+    return this.perfiles.some((perfil) => perfil.cumpleHabilidadesRequeridas(colaborador));
   }
 
   agregarLogro(logro) {
@@ -47,7 +47,7 @@ export class Proyecto {
   }
 
   quitarPerfil(perfil) {
-    this.perfiles = this.perfiles.filter((p) => p !== perfil);
+    this.perfiles = this.perfiles.filter((existente) => existente.id !== perfil.id);
   }
 
   yaColaboraron(colaborador) {

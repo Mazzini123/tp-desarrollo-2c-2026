@@ -51,12 +51,14 @@ class Proyecto {
   -urlSistema: string
   -urlRepositorio: string
 
-  +finalizarProyecto(): void
   +estaAbierto(): boolean
-  +yaColaboraron(colaborador): boolean
-  +cumpleAlgunaHabilidadRequerida(persona: Colaborador): boolean
-  +agregarHabilidadRequerida(habilidad: Habilidad): void
-  +quitarHabilidadRequerida(habilidad: Habilidad): void
+  +finalizarProyecto(): void
+  +cumpleAlgunaHabilidadRequerida(colaborador: Colaborador): boolean
+  +agregarLogro(logro: Logro): void
+  +quitarLogro(logro: Logro): void
+  +agregarPerfil(perfil: Perfil): void
+  +quitarPerfil(perfil: Perfil): void
+  +yaColaboraron(colaborador: Colaborador): boolean
   +agregarColaboracion(colaboracion: Colaboracion): void
   +quitarColaboracion(colaboracion: Colaboracion): void
 }
@@ -105,6 +107,13 @@ class Perfil {
   -habilidadesOpcionales: Array<Habilidad>
   -compromiso: Compromiso
   -modalidadColaboracion: MODALIDAD_COLABORACION
+
+  +agregarHabilidadRequerida(habilidad: Habilidad): void
+  +quitarHabilidadRequerida(habilidad: Habilidad): void
+  +agregarHabilidadOpcional(habilidad: Habilidad): void
+  +quitarHabilidadOpcional(habilidad: Habilidad): void
+  +cumpleAlgunaHabilidadRequerida(colaborador: Colaborador): boolean
+  +cumpleAlgunaHabilidadOpcional(colaborador: Colaborador): boolean
 }
 
 class Habilidad {

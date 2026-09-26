@@ -5,8 +5,8 @@ import {
   crearColaboradorSchema,
   actualizarColaboradorSchema,
   agregarPronombreSchema,
+  agregarHabilidadColaboradorSchema,
 } from "../schemas/colaboradorSchema.js";
-import { agregarHabilidadSchema } from "../schemas/proyectoSchema.js";
 
 export function crearColaboradoresRouter(colaboradorController) {
   const router = Router();
@@ -14,8 +14,7 @@ export function crearColaboradoresRouter(colaboradorController) {
   router.post("/", validarBody(crearColaboradorSchema), colaboradorController.crear);
   router.get("/", validarQuery(paginacionSchema), colaboradorController.listar);
   router.get("/:id", colaboradorController.obtenerPorId);
-  router.put(
-    "/:id",
+  router.put("/:id",
     validarBody(actualizarColaboradorSchema),
     colaboradorController.actualizar,
   );
@@ -29,7 +28,7 @@ export function crearColaboradoresRouter(colaboradorController) {
 
   router.post(
     "/:id/habilidades",
-    validarBody(agregarHabilidadSchema),
+    validarBody(agregarHabilidadColaboradorSchema),
     colaboradorController.agregarHabilidad,
   );
   router.delete("/:id/habilidades/:codigoHabilidad", colaboradorController.quitarHabilidad);

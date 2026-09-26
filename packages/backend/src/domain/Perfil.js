@@ -1,45 +1,59 @@
+import { randomUUID } from "node:crypto";
+
 export class Perfil {
-    constructor({ descripcion, compromiso, modalidadColaboracion }) {
-        this.habilidadesRequeridas = [];
-        this.habilidadesOpcionales = [];
-        this.descripcion = descripcion;
-        this.compromiso = compromiso;
-        this.modalidadColaboracion = modalidadColaboracion;
-    }
+  constructor({ id = randomUUID(), descripcion, compromiso, modalidadColaboracion }) {
+    this.id = id;
+    this.habilidadesRequeridas = [];
+    this.habilidadesOpcionales = [];
+    this.descripcion = descripcion;
+    this.compromiso = compromiso;
+    this.modalidadColaboracion = modalidadColaboracion;
+  }
 
-    agregarHabilidad(lista, habilidad) {
-        lista.push(habilidad);
-    }
+  tieneHabilidad(lista, habilidad) {
+    return lista.some((item) => item.equals(habilidad));
+  }
 
-    agregarHabilidadOpcional(habilidad) {
-        this.agregarHabilidad(this.habilidadesOpcionales, habilidad);
-    }
+  tieneHabilidadRequerida(habilidad) {
+    return this.tieneHabilidad(this.habilidadesRequeridas, habilidad);
+  }
 
-    agregarHabilidadRequerida(habilidad) {
-        this.agregarHabilidad(this.habilidadesRequeridas, habilidad);
-    }
+  tieneHabilidadOpcional(habilidad) {
+    return this.tieneHabilidad(this.habilidadesOpcionales, habilidad);
+  }
 
-    quitarHabilidad(lista, habilidad) {
-        lista = lista.filter(item => item != habilidad);
-    }
+  agregarHabilidadRequerida(habilidad) {
+    this.habilidadesRequeridas.push(habilidad);
+  }
 
-    quitarHabilidadOpcional(habilidad) {
-        this.quitarHabilidad(this.habilidadesOpcionales, habilidad);
-    }
+  agregarHabilidadOpcional(habilidad) {
+    this.habilidadesOpcionales.push(habilidad);
+  }
 
-    quitarHabilidadRequerida(habilidad) {
-        this.quitarHabilidad(this.habilidadesRequeridas, habilidad);
-    }
+  quitarHabilidadOpcional(habilidad) {
+    this.habilidadesOpcionales = this.habilidadesOpcionales.filter(
+      (item) => !item.equals(habilidad),
+    );
+  }
 
-    cumpleAlgunaHabilidad(lista, colaborador) {
-        return lista.some((h) => colaborador.tieneHabilidad(h));
-    }
+  quitarHabilidadRequerida(habilidad) {
+    this.habilidadesRequeridas = this.habilidadesRequeridas.filter(
+      (item) => !item.equals(habilidad),
+    );
+  }
 
-    cumpleAlgunaHabilidadRequerida(colaborador) {
-        return this.cumpleAlgunaHabilidad(this.habilidadesRequeridas, colaborador);
-    }
+  cumpleHabilidadesRequeridas(colaborador) {
+    return (
+      this.habilidadesRequeridas.length > 0 &&
+      this.habilidadesRequeridas.every((habilidad) =>
+        colaborador.tieneHabilidad(habilidad),
+      )
+    );
+  }
 
-    cumpleAlgunaHabilidadOpcional(colaborador) {
-        return this.cumpleAlgunaHabilidad(this.habilidadesOpcionales, colaborador);
-    }
+  cumpleAlgunaHabilidadOpcional(colaborador) {
+    return this.habilidadesOpcionales.some((habilidad) =>
+      colaborador.tieneHabilidad(habilidad),
+    );
+  }
 }

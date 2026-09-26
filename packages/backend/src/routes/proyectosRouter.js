@@ -3,25 +3,56 @@ import { validarBody, validarQuery } from "../middlewares/validar.js";
 import { paginacionSchema } from "../schemas/paginacionSchema.js";
 import {
   actualizarProyectoSchema,
-  agregarHabilidadSchema,
   anotarColaboradorSchema,
 } from "../schemas/proyectoSchema.js";
+import {
+  actualizarPerfilSchema,
+  agregarHabilidadPerfilSchema,
+  crearPerfilSchema,
+} from "../schemas/perfilSchema.js";
 
-export function crearProyectosRouter(proyectoController) {
+export function crearProyectosRouter(proyectoController, perfilController) {
   const router = Router();
 
   router.get("/", validarQuery(paginacionSchema), proyectoController.listar);
   router.get("/:id", proyectoController.obtenerPorId);
-  router.put("/:id", validarBody(actualizarProyectoSchema), proyectoController.actualizar);
+  router.put(
+    "/:id",
+    validarBody(actualizarProyectoSchema),
+    proyectoController.actualizar,
+  );
 
   router.post("/:id/finalizacion", proyectoController.finalizar);
 
-  router.post(
-    "/:id/habilidades",
-    validarBody(agregarHabilidadSchema),
-    proyectoController.agregarHabilidad,
+  router.post("/:id/perfiles", validarBody(crearPerfilSchema), perfilController.crear);
+  router.get("/:id/perfiles", perfilController.listar);
+  router.get("/:id/perfiles/:perfilId", perfilController.obtenerPorId);
+  router.put(
+    "/:id/perfiles/:perfilId",
+    validarBody(actualizarPerfilSchema),
+    perfilController.actualizar,
   );
-  router.delete("/:id/habilidades/:codigoHabilidad", proyectoController.quitarHabilidad);
+  router.delete("/:id/perfiles/:perfilId", perfilController.eliminar);
+
+  router.post(
+    "/:id/perfiles/:perfilId/habilidades-requeridas",
+    validarBody(agregarHabilidadPerfilSchema),
+    perfilController.agregarHabilidadRequerida,
+  );
+  router.delete(
+    "/:id/perfiles/:perfilId/habilidades-requeridas/:codigoHabilidad",
+    perfilController.quitarHabilidadRequerida,
+  );
+
+  router.post(
+    "/:id/perfiles/:perfilId/habilidades-opcionales",
+    validarBody(agregarHabilidadPerfilSchema),
+    perfilController.agregarHabilidadOpcional,
+  );
+  router.delete(
+    "/:id/perfiles/:perfilId/habilidades-opcionales/:codigoHabilidad",
+    perfilController.quitarHabilidadOpcional,
+  );
 
   router.post(
     "/:id/colaboraciones",

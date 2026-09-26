@@ -10,7 +10,10 @@ export function crearRouter(controllers) {
 
   router.use("/health", crearHealthRouter());
   router.use("/colectivos", crearColectivosRouter(controllers.colectivo));
-  router.use("/proyectos", crearProyectosRouter(controllers.proyecto));
+  router.use(
+    "/proyectos",
+    crearProyectosRouter(controllers.proyecto, controllers.perfil),
+  );
   router.use("/habilidades", crearHabilidadesRouter(controllers.habilidad));
   router.use("/colaboradores", crearColaboradoresRouter(controllers.colaborador));
 

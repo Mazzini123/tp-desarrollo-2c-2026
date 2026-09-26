@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { ConflictError } from "../errors/ConflictError.js";
 
 export class Colaborador {
   constructor({
@@ -36,9 +35,6 @@ export class Colaborador {
   }
 
   agregarPronombre(pronombre) {
-    if (this.tienePronombre(pronombre)) {
-      throw new ConflictError(`El colaborador ya tiene el pronombre "${pronombre}"`);
-    }
     this.pronombres.push(pronombre);
   }
 

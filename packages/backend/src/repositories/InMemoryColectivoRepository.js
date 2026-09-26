@@ -11,6 +11,23 @@ export class InMemoryColectivoRepository extends InMemoryRepository {
     return null;
   }
 
+  buscarPerfil(proyectoId, perfilId) {
+    const proyectoConColectivo = this.buscarProyecto(proyectoId);
+
+    if (!proyectoConColectivo) {
+      return null;
+    }
+
+    const { colectivo, proyecto } = proyectoConColectivo;
+    const perfil = proyecto.perfiles.find((p) => p.id === perfilId) ?? null;
+
+    if (!perfil) {
+      return null;
+    }
+
+    return { colectivo, proyecto, perfil };
+  }
+
   listarProyectos() {
     return this.listar().flatMap((colectivo) => colectivo.proyectos);
   }

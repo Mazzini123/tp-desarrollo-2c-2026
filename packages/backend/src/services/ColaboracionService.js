@@ -1,5 +1,4 @@
 import { Colaboracion } from "../domain/Colaboracion.js";
-import { Colaborador } from "../domain/Colaborador.js";
 import { DomainError } from "../errors/DomainError.js";
 import { ConflictError } from "../errors/ConflictError.js";
 
@@ -11,22 +10,15 @@ export class ColaboracionService {
   }
 
   registrar({ proyectoId, colaboradorId }) {
-    const { colectivo, proyecto } =
-      this.proyectoService.buscarProyectoConColectivo(proyectoId);
+    const { colectivo, proyecto } = this.proyectoService.buscarProyectoConColectivo(proyectoId);
     const colaborador = this.colaboradorService.buscarPorId(colaboradorId);
-
-    if (!(colaborador instanceof Colaborador)) {
-      throw new DomainError("Se esperaba una instancia de Colaborador");
-    }
 
     if (!proyecto.estaAbierto()) {
       throw new ConflictError("No se puede anotar a un proyecto que ya está finalizado");
     }
 
-    if (!proyecto.cumpleAlgunaHabilidadRequerida(colaborador)) {
-      throw new DomainError(
-        "El colaborador debe tener al menos una de las habilidades que necesita el proyecto",
-      );
+    if (!proyecto.cumpleAlgunPerfil(colaborador)) {
+      throw new DomainError("El colaborador debe cumplir todas las habilidades requeridas de al menos un perfil");
     }
 
     if (this.yaEstaAnotado(colaborador, proyecto)) {
