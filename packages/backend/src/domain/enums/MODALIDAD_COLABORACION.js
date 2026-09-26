@@ -6,5 +6,4 @@ export const MODALIDAD_COLABORACION = Object.freeze({
   EXISTE_POSIBILIDAD_DE_CONTRATACION: "EXISTE_POSIBILIDAD_DE_CONTRATACION",
 });
 
-export const esModalidadColaboracionValida = (valor) =>
-  esValorDeEnum(MODALIDAD_COLABORACION, valor);
+export const esModalidadColaboracionValida = (valor) => esValorDeEnum(MODALIDAD_COLABORACION, valor);

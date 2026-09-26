@@ -1,7 +1,7 @@
 import { Colaborador } from "../domain/Colaborador.js";
-import { Habilidad } from "../domain/Habilidad.js";
 import { DomainError } from "../errors/DomainError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
+import { ConflictError } from "../errors/ConflictError.js";
 import { armarPaginado } from "../utils/paginacion.js";
 
 export class ColaboradorService {
@@ -21,15 +21,12 @@ export class ColaboradorService {
       presentacion,
     });
 
-    // Alta: la intencion es "dejame esta lista", asi que se deduplica en
-    // silencio en vez de tirar 409 por un duplicado del propio payload.
     if (pronombres) {
       colaborador.reemplazarPronombres(pronombres);
     }
 
     if (codigosHabilidades && codigosHabilidades.length > 0) {
       this.habilidadService.resolverPorCodigos(codigosHabilidades).forEach((h) => {
-        this.validarInstanciaHabilidad(h);
         colaborador.agregarHabilidad(h);
       });
     }
@@ -47,9 +44,11 @@ export class ColaboradorService {
 
   buscarPorId(id) {
     const colaborador = this.colaboradorRepository.buscarPorId(id);
+
     if (!colaborador) {
       throw new NotFoundError(`No existe un colaborador con id "${id}"`);
     }
+
     return colaborador;
   }
 
@@ -69,6 +68,11 @@ export class ColaboradorService {
 
   agregarPronombre(id, pronombre) {
     const colaborador = this.buscarPorId(id);
+    
+    if (colaborador.tienePronombre(pronombre)) {
+      throw new ConflictError(`El colaborador ya tiene el pronombre "${pronombre}"`);
+    }
+
     colaborador.agregarPronombre(pronombre);
     return this.colaboradorRepository.guardar(colaborador);
   }
@@ -83,7 +87,6 @@ export class ColaboradorService {
     const colaborador = this.buscarPorId(id);
     const [habilidad] = this.habilidadService.resolverPorCodigos([codigoHabilidad]);
 
-    this.validarInstanciaHabilidad(habilidad);
     colaborador.agregarHabilidad(habilidad);
     return this.colaboradorRepository.guardar(colaborador);
   }
@@ -104,12 +107,6 @@ export class ColaboradorService {
         "El colaborador debe tener al menos un dato de identificación: " +
         "nombreFantasia, cuentaGit, o (nombre + apellido)",
       );
-    }
-  }
-
-  validarInstanciaHabilidad(habilidad) {
-    if (!(habilidad instanceof Habilidad)) {
-      throw new DomainError("Se esperaba una instancia de Habilidad");
     }
   }
 }
