@@ -10,7 +10,7 @@ export class ColaboradorService {
     this.habilidadService = habilidadService;
   }
 
-  crear({ nombreFantasia, nombre, apellido, cuentaGit, pronombres, presentacion, codigosHabilidades }) {
+  async crear({ nombreFantasia, nombre, apellido, cuentaGit, pronombres, presentacion, codigosHabilidades }) {
     this.validarIdentificacion({ nombreFantasia, nombre, apellido, cuentaGit });
 
     const colaborador = new Colaborador({
@@ -26,24 +26,24 @@ export class ColaboradorService {
     }
 
     if (codigosHabilidades && codigosHabilidades.length > 0) {
-      this.habilidadService.resolverPorCodigos(codigosHabilidades).forEach((h) => {
-        colaborador.agregarHabilidad(h);
-      });
+      // await ANTES del forEach: resolverPorCodigos ahora devuelve una promesa
+      const habilidades = await this.habilidadService.resolverPorCodigos(codigosHabilidades);
+      habilidades.forEach((h) => colaborador.agregarHabilidad(h));
     }
 
     return this.colaboradorRepository.guardar(colaborador);
   }
 
-  listar({ numeroPagina = 1, limitePorPagina = 10 } = {}) {
+  async listar({ numeroPagina = 1, limitePorPagina = 10 } = {}) {
     return armarPaginado(
-      this.colaboradorRepository.listarPaginado(numeroPagina, limitePorPagina),
+      await this.colaboradorRepository.listarPaginado(numeroPagina, limitePorPagina),
       numeroPagina,
       limitePorPagina,
     );
   }
 
-  buscarPorId(id) {
-    const colaborador = this.colaboradorRepository.buscarPorId(id);
+  async buscarPorId(id) {
+    const colaborador = await this.colaboradorRepository.buscarPorId(id);
 
     if (!colaborador) {
       throw new NotFoundError(`No existe un colaborador con id "${id}"`);
@@ -52,8 +52,8 @@ export class ColaboradorService {
     return colaborador;
   }
 
-  actualizar(id, { pronombres, presentacion }) {
-    const colaborador = this.buscarPorId(id);
+  async actualizar(id, { pronombres, presentacion }) {
+    const colaborador = await this.buscarPorId(id);
 
     if (pronombres !== undefined) {
       colaborador.reemplazarPronombres(pronombres);
@@ -66,9 +66,9 @@ export class ColaboradorService {
     return this.colaboradorRepository.guardar(colaborador);
   }
 
-  agregarPronombre(id, pronombre) {
-    const colaborador = this.buscarPorId(id);
-    
+  async agregarPronombre(id, pronombre) {
+    const colaborador = await this.buscarPorId(id);
+
     if (colaborador.tienePronombre(pronombre)) {
       throw new ConflictError(`El colaborador ya tiene el pronombre "${pronombre}"`);
     }
@@ -77,23 +77,23 @@ export class ColaboradorService {
     return this.colaboradorRepository.guardar(colaborador);
   }
 
-  quitarPronombre(id, pronombre) {
-    const colaborador = this.buscarPorId(id);
+  async quitarPronombre(id, pronombre) {
+    const colaborador = await this.buscarPorId(id);
     colaborador.quitarPronombre(pronombre);
     return this.colaboradorRepository.guardar(colaborador);
   }
 
-  agregarHabilidad(id, codigoHabilidad) {
-    const colaborador = this.buscarPorId(id);
-    const [habilidad] = this.habilidadService.resolverPorCodigos([codigoHabilidad]);
+  async agregarHabilidad(id, codigoHabilidad) {
+    const colaborador = await this.buscarPorId(id);
+    const [habilidad] = await this.habilidadService.resolverPorCodigos([codigoHabilidad]);
 
     colaborador.agregarHabilidad(habilidad);
     return this.colaboradorRepository.guardar(colaborador);
   }
 
-  quitarHabilidad(id, codigoHabilidad) {
-    const colaborador = this.buscarPorId(id);
-    const [habilidad] = this.habilidadService.resolverPorCodigos([codigoHabilidad]);
+  async quitarHabilidad(id, codigoHabilidad) {
+    const colaborador = await this.buscarPorId(id);
+    const [habilidad] = await this.habilidadService.resolverPorCodigos([codigoHabilidad]);
 
     colaborador.quitarHabilidad(habilidad);
     return this.colaboradorRepository.guardar(colaborador);
