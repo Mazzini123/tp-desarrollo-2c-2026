@@ -34,7 +34,8 @@ El backend sigue una arquitectura de capas:
 |---|---|
 | `src/domain` | Entidades, value objects y reglas de negocio |
 | `src/services` | Casos de uso, orquestación entre dominio y persistencia |
-| `src/repositories` | Acceso a datos (en memoria en la 1ra entrega, MongoDB en la 2da) |
+| `src/repositories` | Acceso a datos: MongoDB en la app, en memoria para los tests |
+| `src/models` | Schemas de Mongoose: la forma en que se **guarda** cada documento |
 | `src/controllers` | Traducción HTTP ↔ servicios |
 | `src/routes` | Definición de endpoints y middlewares por ruta |
 | `src/middlewares` | Validación de la entrada, 404 y manejo de errores |
@@ -48,6 +49,24 @@ por MongoDB en la segunda entrega tocando solo la capa de repositories.
 
 Ningún controller ni service importa del contenedor: las dependencias entran
 únicamente por constructor y se arman en `composicion.js`.
+
+### Persistencia (MongoDB)
+
+Las entidades de dominio siguen siendo clases con métodos. Cada repositorio
+Mongo traduce en los dos sentidos: `aDocumento()` arma lo que se guarda y
+`aDominio()` reconstruye la clase al leer. Los services no saben que existe
+Mongo.
+
+| Colección | Qué guarda | Referencias |
+|---|---|---|
+| `habilidads` | El catálogo. `_id` es el código (`desarrollo_node`) | — |
+| `colaboradors` | Colaboradores | `codigosHabilidades` |
+| `colectivos` | El colectivo **con sus proyectos, perfiles y colaboraciones embebidos** | `codigosHabilidades*` en perfiles, `colaboradorId` en colaboraciones |
+
+Colectivo es el agregado raíz: todo lo que le pertenece viaja dentro de su
+documento y se guarda entero. Habilidades y colaboradores son compartidos, así
+que se guardan por referencia y se rehidratan al leer. (Los nombres de colección
+en inglés "mal pluralizados" los pone Mongoose automáticamente.)
 
 ### Manejo de errores
 
@@ -87,23 +106,55 @@ El resultado de la operación lo dice el código HTTP, no un campo del body.
 
 ## Puesta en marcha
 
+### Con Docker (recomendado)
+
+Levanta la API y MongoDB juntos. Solo hace falta Docker Desktop.
+
+```bash
+docker compose up -d --build     # construye la imagen y levanta api + mongo
+docker compose logs -f api       # ver los logs de la api (Ctrl+C para salir)
+```
+
+Verificación: `curl http://localhost:8000/health`
+
+| Comando | Qué hace |
+|---|---|
+| `docker compose up -d --build` | Levanta todo. **Usar `--build` después de cada cambio de código** |
+| `docker compose ps` | Estado de los contenedores |
+| `docker compose logs -f api` | Logs de la api en vivo |
+| `docker compose restart api` | Reinicia solo la api |
+| `docker compose down` | Baja los contenedores. **Los datos se conservan** |
+| `docker compose down -v` | Baja todo **y borra la base** (el volumen `mongo-data`) |
+| `docker exec -it cav-mongo mongosh codigo-a-voluntad` | Consola de Mongo |
+
+> **Ojo con el `--build`.** El `Dockerfile` copia el código **adentro de la
+> imagen** al construirla. Si editás un archivo y hacés solo `docker compose up`
+> o `restart`, el contenedor sigue corriendo el código viejo.
+
+En desarrollo, Mongo publica el puerto 27017 para poder conectarse con Compass
+(`mongodb://localhost:27017`).
+
+### Sin Docker
+
+Necesitás un MongoDB corriendo en `localhost:27017` (instalado, o solo el de
+Docker con `docker compose up -d mongo`).
+
 ```bash
 npm install                                        # instala todos los workspaces
 cp packages/backend/.env.example packages/backend/.env
 npm run dev:backend                                # con recarga automática
 ```
 
-Verificación: `curl http://localhost:8000/health`
-
-El puerto sale de `SERVER_PORT` (default 8000) y el backend escucha en `0.0.0.0`.
-Al arrancar carga el catálogo de habilidades semilla.
+El `.env` tiene que tener `MONGO_URI`; si falta, el backend no arranca. El puerto
+sale de `SERVER_PORT` (default 8000) y el backend escucha en `0.0.0.0`. Al
+arrancar carga el catálogo de habilidades semilla si la colección está vacía.
 
 ## Scripts
 
 | Comando | Qué hace |
 |---|---|
 | `npm run dev:backend` | Backend con recarga automática (`node --watch`) |
-| `npm run start:backend` | Backend sin recarga (es el que usa el deploy) |
+| `npm run start:backend` | Backend sin recarga (es el que corre dentro del contenedor) |
 | `npm test` | Tests unitarios de dominio y servicios (Jest) |
 | `npm run lint` | ESLint sobre todo el repo |
 | `npm run format` | Prettier sobre todo el repo |
@@ -112,7 +163,9 @@ Al arrancar carga el catálogo de habilidades semilla.
 ## Tests
 
 Jest sobre la capa de dominio y la de servicios, sin HTTP y sin base de datos:
-los services se arman con los repositorios en memoria.
+los services se arman con los repositorios en memoria
+(`componerApp({ repositorios: crearRepositoriosEnMemoria() })`, ver
+`tests/fixtures.js`). No hace falta tener Mongo ni Docker levantados.
 
 ```bash
 npm test                                     # todo
@@ -124,8 +177,9 @@ son el doble de test que hace posible correr estos tests sin levantar una base.
 
 ## Despliegue
 
-VM en Oracle Cloud, región San Pablo (la más cercana), Ubuntu con Node instalado
-y el repositorio clonado.
+VM en Oracle Cloud, región San Pablo (la más cercana): Ubuntu 20.04, 1 GB de
+RAM + 2 GB de swap, con Docker y Docker Compose instalados. La API y MongoDB
+corren en contenedores con `docker-compose.prod.yml`.
 
 ```
 http://147.15.102.156:8000/health
@@ -136,9 +190,71 @@ La IP es de Oracle y puede cambiar si se recrea la instancia; conviene
 reservarla desde la consola. Para verificar la actual, desde la VM:
 `curl -s ifconfig.me`.
 
-El proceso lo administra systemd, no se levanta a mano: ver
-`deploy/codigo-a-voluntad.service` para la instalación y los comandos de
-operación (estado, logs, restart después de un `git pull`).
+### Qué cambia respecto de desarrollo
+
+`docker-compose.prod.yml` es un archivo aparte, no un agregado al de desarrollo:
+
+- **Mongo no publica ningún puerto.** La API le habla por la red interna de
+  Compose. Un puerto publicado por Docker se saltea el firewall de Ubuntu, así
+  que la única forma segura es no publicarlo.
+- **Mongo tiene usuario y contraseña**, que se leen del archivo `.env` de la raíz
+  del repo (no se commitea; la plantilla es `.env.prod.example`).
+- La cache de Mongo está limitada a 256 MB y la de Node a 256 MB, para que
+  entren en 1 GB.
+- La API espera a que Mongo esté sano (healthcheck) antes de arrancar.
+- `restart: unless-stopped`: Docker levanta los contenedores solo después de un
+  reinicio de la VM. Reemplaza al unit de systemd de la primera entrega.
+
+### Primer despliegue
+
+Desde la VM, por SSH:
+
+```bash
+# 1. Apagar el backend viejo de systemd (si no, ocupa el puerto 8000)
+sudo systemctl disable --now codigo-a-voluntad
+
+# 2. Traer el código
+cd ~/tp-desarrollo-2c-2026
+git pull
+
+# 3. Credenciales de Mongo (una sola vez)
+cp .env.prod.example .env
+openssl rand -hex 24          # copiar la salida como MONGO_PASSWORD
+nano .env
+chmod 600 .env
+
+# 4. Levantar
+docker compose -f docker-compose.prod.yml up -d --build
+
+# 5. Verificar
+docker compose -f docker-compose.prod.yml ps     # mongo tiene que decir (healthy)
+curl http://localhost:8000/health
+```
+
+El usuario de Mongo se crea **solo la primera vez**, cuando el volumen está
+vacío. Si después cambiás la contraseña en `.env`, Mongo sigue con la vieja y la
+API no se puede conectar. En ese caso, hay que borrar el volumen (y con él los
+datos) con `docker compose -f docker-compose.prod.yml down -v`, o cambiar la
+contraseña desde `mongosh`.
+
+### Actualizar después de un cambio
+
+```bash
+cd ~/tp-desarrollo-2c-2026
+git pull
+docker compose -f docker-compose.prod.yml up -d --build
+docker image prune -f        # borra las imágenes viejas (el disco es chico)
+```
+
+### Operación
+
+| Comando | Qué hace |
+|---|---|
+| `docker compose -f docker-compose.prod.yml ps` | Estado |
+| `docker compose -f docker-compose.prod.yml logs -f api` | Logs de la api |
+| `docker compose -f docker-compose.prod.yml restart api` | Reiniciar la api |
+| `docker stats --no-stream` | Consumo de memoria de cada contenedor |
+| `docker exec -it cav-mongo mongosh -u <usuario> -p --authenticationDatabase admin codigo-a-voluntad` | Consola de Mongo (pide la contraseña) |
 
 ## Git Flow
 
