@@ -13,7 +13,7 @@ await conectarBaseDeDatos();
 
 const { controllers, services } = componerApp();
 
-cargarHabilidadesIniciales(services.habilidadService);
+await cargarHabilidadesIniciales(services.habilidadService);
 
 const app = crearApp(controllers);
 

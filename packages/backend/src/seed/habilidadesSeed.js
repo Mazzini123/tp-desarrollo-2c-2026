@@ -6,10 +6,13 @@ const HABILIDADES_INICIALES = [
   { titulo: "Modelado de Datos", descripcion: "Bases de datos relacionales y documentales" },
 ];
 
-export function cargarHabilidadesIniciales(habilidadService) {
-  if (habilidadService.listarTodas().length > 0) return;
+export async function cargarHabilidadesIniciales(habilidadService) {
+  const existentes = await habilidadService.listarTodas();
+  if (existentes.length > 0) return;
 
-  HABILIDADES_INICIALES.forEach((datos) =>
-    habilidadService.crear({ ...datos, usuario: "seed" }),
-  );
+  // for...of en vez de forEach: forEach NO espera a las promesas,
+  // dispararia las 5 cargas a la vez y seguiria de largo.
+  for (const datos of HABILIDADES_INICIALES) {
+    await habilidadService.crear({ ...datos, usuario: "seed" });
+  }
 }

@@ -1,6 +1,7 @@
 import { InMemoryRepository } from "./repositories/InMemoryRepository.js";
 import { InMemoryColectivoRepository } from "./repositories/InMemoryColectivoRepository.js";
 import { InMemoryHabilidadRepository } from "./repositories/InMemoryHabilidadRepository.js";
+import { MongoHabilidadRepository } from "./repositories/MongoHabilidadRepository.js";
 
 import { ColectivoService } from "./services/ColectivoService.js";
 import { ProyectoService } from "./services/ProyectoService.js";
@@ -18,7 +19,7 @@ import { ColaboradorController } from "./controllers/ColaboradorController.js";
 export function componerApp() {
   const colectivoRepository = new InMemoryColectivoRepository();
   const colaboradorRepository = new InMemoryRepository();
-  const habilidadRepository = new InMemoryHabilidadRepository();
+  const habilidadRepository = new MongoHabilidadRepository();
 
   const habilidadService = new HabilidadService({ habilidadRepository });
 
