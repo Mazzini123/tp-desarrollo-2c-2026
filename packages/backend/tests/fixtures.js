@@ -1,4 +1,4 @@
-import { componerApp } from "../src/composicion.js";
+import { componerApp, crearRepositoriosEnMemoria } from "../src/composicion.js";
 import { cargarHabilidadesIniciales } from "../src/seed/habilidadesSeed.js";
 
 /**
@@ -10,10 +10,13 @@ import { cargarHabilidadesIniciales } from "../src/seed/habilidadesSeed.js";
  * de esta condicion: "la de memoria despues se va a borrar, a menos que la
  * necesiten para un test unitario". La necesitamos: sin ella, estos tests
  * requeririan una base levantada.
+ *
+ * Es async porque el seed lo es: sin el await, el test arrancaria con el
+ * catalogo todavia vacio.
  */
-export function armarServices() {
-  const { services } = componerApp();
-  cargarHabilidadesIniciales(services.habilidadService);
+export async function armarServices() {
+  const { services } = componerApp({ repositorios: crearRepositoriosEnMemoria() });
+  await cargarHabilidadesIniciales(services.habilidadService);
   return services;
 }
 
@@ -23,6 +26,15 @@ export const CODIGOS = {
   cypress: "testing_e2e_con_cypress",
 };
 
+export function datosDePerfil({ requeridas = [CODIGOS.node], opcionales = [] } = {}) {
+  return {
+    descripcion: "Perfil de prueba",
+    compromiso: { cantidadHoras: 5, periodo: "HS_MENSUALES" },
+    codigosHabilidadesRequeridas: requeridas,
+    codigosHabilidadesOpcionales: opcionales,
+  };
+}
+
 export function crearColectivoDePrueba(colectivoService) {
   return colectivoService.crear({
     nombre: "Fundacion Ejemplo",
@@ -31,17 +43,16 @@ export function crearColectivoDePrueba(colectivoService) {
   });
 }
 
-export function crearProyectoDePrueba(
+export async function crearProyectoDePrueba(
   { colectivoService, proyectoService },
   { habilidades = [CODIGOS.node], titulo = "Sitio institucional" } = {},
 ) {
-  const colectivo = crearColectivoDePrueba(colectivoService);
-  const proyecto = proyectoService.crear({
+  const colectivo = await crearColectivoDePrueba(colectivoService);
+  const proyecto = await proyectoService.crear({
     colectivoId: colectivo.id,
     titulo,
     descripcion: "Proyecto de prueba",
-    compromisoEsperado: { cantidadHoras: 5, periodo: "HS_MENSUALES" },
-    habilidadesNecesarias: habilidades,
+    perfiles: [datosDePerfil({ requeridas: habilidades })],
   });
   return { colectivo, proyecto };
 }
