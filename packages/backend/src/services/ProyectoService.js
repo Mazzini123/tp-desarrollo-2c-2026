@@ -11,37 +11,40 @@ export class ProyectoService {
     this.perfilService = perfilService;
   }
 
-  crear({ colectivoId, titulo, descripcion, perfiles }) {
+  async crear({ colectivoId, titulo, descripcion, perfiles }) {
     if (!Array.isArray(perfiles) || perfiles.length === 0) {
       throw new DomainError("El proyecto debe tener al menos un perfil");
     }
 
-    const colectivo = this.colectivoService.buscarPorId(colectivoId);
-    const perfilesConstruidos = perfiles.map((datos) => this.perfilService.construirPerfil(datos));
+    const colectivo = await this.colectivoService.buscarPorId(colectivoId);
+    // construirPerfil es async (resuelve habilidades): Promise.all espera a todos.
+    const perfilesConstruidos = await Promise.all(
+      perfiles.map((datos) => this.perfilService.construirPerfil(datos)),
+    );
     const proyecto = new Proyecto({ titulo, descripcion });
 
     perfilesConstruidos.forEach((perfil) => proyecto.agregarPerfil(perfil));
     colectivo.agregarProyecto(proyecto);
-    this.colectivoRepository.guardar(colectivo);
+    await this.colectivoRepository.guardar(colectivo);
 
     return proyecto;
   }
 
-  listar({ numeroPagina = 1, limitePorPagina = 10 } = {}) {
+  async listar({ numeroPagina = 1, limitePorPagina = 10 } = {}) {
     return armarPaginado(
-      this.colectivoRepository.listarProyectosPaginado(numeroPagina, limitePorPagina),
+      await this.colectivoRepository.listarProyectosPaginado(numeroPagina, limitePorPagina),
       numeroPagina,
       limitePorPagina,
     );
   }
 
-  listarPorColectivo(colectivoId) {
-    return this.colectivoService.buscarPorId(colectivoId).proyectos;
+  async listarPorColectivo(colectivoId) {
+    return (await this.colectivoService.buscarPorId(colectivoId)).proyectos;
   }
 
-  buscarProyectoConColectivo(proyectoId) {
-    const resultado = this.colectivoRepository.buscarProyecto(proyectoId);
-    
+  async buscarProyectoConColectivo(proyectoId) {
+    const resultado = await this.colectivoRepository.buscarProyecto(proyectoId);
+
     if (!resultado) {
       throw new NotFoundError(`No existe un proyecto con id "${proyectoId}"`);
     }
@@ -49,8 +52,8 @@ export class ProyectoService {
     return resultado;
   }
 
-  buscarPorId(proyectoId) {
-    return this.buscarProyectoConColectivo(proyectoId).proyecto;
+  async buscarPorId(proyectoId) {
+    return (await this.buscarProyectoConColectivo(proyectoId)).proyecto;
   }
 
   verificarAbierto(proyecto, accion) {
@@ -59,8 +62,8 @@ export class ProyectoService {
     }
   }
 
-  actualizar(proyectoId, { titulo, descripcion }) {
-    const { colectivo, proyecto } = this.buscarProyectoConColectivo(proyectoId);
+  async actualizar(proyectoId, { titulo, descripcion }) {
+    const { colectivo, proyecto } = await this.buscarProyectoConColectivo(proyectoId);
     this.verificarAbierto(proyecto, "modificar");
 
     if (titulo !== undefined) {
@@ -71,16 +74,16 @@ export class ProyectoService {
       proyecto.descripcion = descripcion;
     }
 
-    this.colectivoRepository.guardar(colectivo);
+    await this.colectivoRepository.guardar(colectivo);
     return proyecto;
   }
 
-  finalizar(proyectoId) {
-    const { colectivo, proyecto } = this.buscarProyectoConColectivo(proyectoId);
+  async finalizar(proyectoId) {
+    const { colectivo, proyecto } = await this.buscarProyectoConColectivo(proyectoId);
     this.verificarAbierto(proyecto, "finalizar");
 
     proyecto.finalizarProyecto();
-    this.colectivoRepository.guardar(colectivo);
+    await this.colectivoRepository.guardar(colectivo);
     return proyecto;
   }
 }

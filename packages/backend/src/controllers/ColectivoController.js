@@ -7,32 +7,32 @@ export class ColectivoController extends BaseController {
     this.proyectoService = proyectoService;
   }
 
-  crear = (req, res) => {
-    res.status(201).json(this.colectivoService.crear(req.body));
+  crear = async (req, res) => {
+    res.status(201).json(await this.colectivoService.crear(req.body));
   };
 
-  listar = (req, res) => {
+  listar = async (req, res) => {
     const paginacion = this.aPaginacionDeDominio(req.paginacion);
-    this.responderPaginado(res, this.colectivoService.listar(paginacion));
+    this.responderPaginado(res, await this.colectivoService.listar(paginacion));
   };
 
-  obtenerPorId = (req, res) => {
-    res.status(200).json(this.colectivoService.buscarPorId(req.params.id));
+  obtenerPorId = async (req, res) => {
+    res.status(200).json(await this.colectivoService.buscarPorId(req.params.id));
   };
 
-  actualizar = (req, res) => {
-    res.status(200).json(this.colectivoService.actualizar(req.params.id, req.body));
+  actualizar = async (req, res) => {
+    res.status(200).json(await this.colectivoService.actualizar(req.params.id, req.body));
   };
 
-  crearProyecto = (req, res) => {
-    const proyecto = this.proyectoService.crear({
+  crearProyecto = async (req, res) => {
+    const proyecto = await this.proyectoService.crear({
       ...req.body,
       colectivoId: req.params.id,
     });
     res.status(201).json(proyecto);
   };
 
-  listarProyectos = (req, res) => {
-    res.status(200).json(this.proyectoService.listarPorColectivo(req.params.id));
+  listarProyectos = async (req, res) => {
+    res.status(200).json(await this.proyectoService.listarPorColectivo(req.params.id));
   };
 }

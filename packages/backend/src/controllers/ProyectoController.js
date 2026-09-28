@@ -7,32 +7,32 @@ export class ProyectoController extends BaseController {
     this.colaboracionService = colaboracionService;
   }
 
-  listar = (req, res) => {
+  listar = async (req, res) => {
     const paginacion = this.aPaginacionDeDominio(req.paginacion);
-    this.responderPaginado(res, this.proyectoService.listar(paginacion));
+    this.responderPaginado(res, await this.proyectoService.listar(paginacion));
   };
 
-  obtenerPorId = (req, res) => {
-    res.status(200).json(this.proyectoService.buscarPorId(req.params.id));
+  obtenerPorId = async (req, res) => {
+    res.status(200).json(await this.proyectoService.buscarPorId(req.params.id));
   };
 
-  actualizar = (req, res) => {
-    res.status(200).json(this.proyectoService.actualizar(req.params.id, req.body));
+  actualizar = async (req, res) => {
+    res.status(200).json(await this.proyectoService.actualizar(req.params.id, req.body));
   };
 
-  finalizar = (req, res) => {
-    res.status(200).json(this.proyectoService.finalizar(req.params.id));
+  finalizar = async (req, res) => {
+    res.status(200).json(await this.proyectoService.finalizar(req.params.id));
   };
 
-  anotarColaborador = (req, res) => {
-    const colaboracion = this.colaboracionService.registrar({
+  anotarColaborador = async (req, res) => {
+    const colaboracion = await this.colaboracionService.registrar({
       proyectoId: req.params.id,
       colaboradorId: req.body.colaboradorId,
     });
     res.status(201).json(colaboracion);
   };
 
-  listarColaboraciones = (req, res) => {
-    res.status(200).json(this.colaboracionService.listarPorProyecto(req.params.id));
+  listarColaboraciones = async (req, res) => {
+    res.status(200).json(await this.colaboracionService.listarPorProyecto(req.params.id));
   };
 }

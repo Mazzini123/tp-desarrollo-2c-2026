@@ -3,24 +3,24 @@ export class PerfilController {
     this.perfilService = perfilService;
   }
 
-  crear = (req, res) => {
-    res.status(201).json(this.perfilService.crear(req.params.id, req.body));
+  crear = async (req, res) => {
+    res.status(201).json(await this.perfilService.crear(req.params.id, req.body));
   };
 
-  listar = (req, res) => {
-    res.status(200).json(this.perfilService.listar(req.params.id));
+  listar = async (req, res) => {
+    res.status(200).json(await this.perfilService.listar(req.params.id));
   };
 
-  obtenerPorId = (req, res) => {
+  obtenerPorId = async (req, res) => {
     res
       .status(200)
-      .json(this.perfilService.buscarPorId(req.params.id, req.params.perfilId));
+      .json(await this.perfilService.buscarPorId(req.params.id, req.params.perfilId));
   };
 
-  actualizar = (req, res) => {
+  actualizar = async (req, res) => {
     res.status(200)
       .json(
-        this.perfilService.actualizar(
+        await this.perfilService.actualizar(
           req.params.id,
           req.params.perfilId,
           req.body,
@@ -28,13 +28,13 @@ export class PerfilController {
       );
   };
 
-  eliminar = (req, res) => {
-    this.perfilService.eliminar(req.params.id, req.params.perfilId);
+  eliminar = async (req, res) => {
+    await this.perfilService.eliminar(req.params.id, req.params.perfilId);
     res.status(204).send();
   };
 
-  agregarHabilidadRequerida = (req, res) => {
-    const perfil = this.perfilService.agregarHabilidadRequerida(
+  agregarHabilidadRequerida = async (req, res) => {
+    const perfil = await this.perfilService.agregarHabilidadRequerida(
       req.params.id,
       req.params.perfilId,
       req.body.codigoHabilidad,
@@ -42,8 +42,8 @@ export class PerfilController {
     res.status(200).json(perfil);
   };
 
-  quitarHabilidadRequerida = (req, res) => {
-    const perfil = this.perfilService.quitarHabilidadRequerida(
+  quitarHabilidadRequerida = async (req, res) => {
+    const perfil = await this.perfilService.quitarHabilidadRequerida(
       req.params.id,
       req.params.perfilId,
       req.params.codigoHabilidad,
@@ -51,8 +51,8 @@ export class PerfilController {
     res.status(200).json(perfil);
   };
 
-  agregarHabilidadOpcional = (req, res) => {
-    const perfil = this.perfilService.agregarHabilidadOpcional(
+  agregarHabilidadOpcional = async (req, res) => {
+    const perfil = await this.perfilService.agregarHabilidadOpcional(
       req.params.id,
       req.params.perfilId,
       req.body.codigoHabilidad,
@@ -60,8 +60,8 @@ export class PerfilController {
     res.status(200).json(perfil);
   };
 
-  quitarHabilidadOpcional = (req, res) => {
-    const perfil = this.perfilService.quitarHabilidadOpcional(
+  quitarHabilidadOpcional = async (req, res) => {
+    const perfil = await this.perfilService.quitarHabilidadOpcional(
       req.params.id,
       req.params.perfilId,
       req.params.codigoHabilidad,

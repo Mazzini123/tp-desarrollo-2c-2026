@@ -56,7 +56,7 @@ export class ColaboradorController extends BaseController {
     res.status(200).json(colaborador);
   };
 
-  listarColaboraciones = (req, res) => {
-    res.status(200).json(this.colaboracionService.listarPorColaborador(req.params.id));
+  listarColaboraciones = async (req, res) => {
+    res.status(200).json(await this.colaboracionService.listarPorColaborador(req.params.id));
   };
 }
