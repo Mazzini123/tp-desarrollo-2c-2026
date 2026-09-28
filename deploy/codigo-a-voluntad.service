@@ -1,3 +1,8 @@
+# REEMPLAZADO en la 2da entrega por docker-compose.prod.yml (ver README,
+# seccion Despliegue). Los contenedores tienen restart: unless-stopped, que
+# cumple el mismo rol. No instalar este unit junto con Docker: los dos
+# quieren el puerto 8000. Se conserva como referencia de la correccion F3.
+#
 # Corrección F3: hasta ahora el backend corría con un `node index.js` suelto en
 # una sesión SSH. Si el proceso moría o la VM se reiniciaba, la API quedaba
 # caída sin que nadie se enterara. Con este unit, systemd lo levanta en el boot

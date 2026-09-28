@@ -1,0 +1,57 @@
+# Compose para la VM de Oracle Cloud. Se usa con:
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Diferencias con docker-compose.yml (el de desarrollo):
+#
+# - mongo NO publica puertos. La api le habla por la red interna de compose
+#   (host "mongo"), asi que no hace falta exponerlo. Ojo: un puerto publicado
+#   por Docker se saltea el firewall de Ubuntu, por eso no alcanza con "no
+#   abrirlo" en Oracle: directamente no se publica.
+# - mongo tiene usuario y contraseña, que salen del archivo .env de la raiz
+#   (ver .env.prod.example). Si falta alguna, compose se niega a arrancar.
+# - Limites de memoria pensados para una VM de 1 GB.
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: cav-mongo
+    restart: unless-stopped
+    # Por defecto WiredTiger usa ~50% de la RAM como cache. En 1 GB eso deja
+    # a la api sin aire: lo bajamos a 256 MB.
+    command: ["--wiredTigerCacheSizeGB", "0.25"]
+    environment:
+      # Solo tienen efecto la PRIMERA vez, con el volumen vacio: ahi mongo
+      # crea el usuario root. Cambiarlos despues no cambia la contraseña.
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:?Falta MONGO_USER en .env}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?Falta MONGO_PASSWORD en .env}
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      # ping no requiere autenticacion: solo confirma que mongo ya acepta conexiones.
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  api:
+    build: .
+    container_name: cav-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      SERVER_PORT: 8000
+      # authSource=admin: el usuario root se crea en la base "admin", no en
+      # codigo-a-voluntad, asi que hay que decirle a mongo donde buscarlo.
+      MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongo:27017/codigo-a-voluntad?authSource=admin
+      NODE_OPTIONS: --max-old-space-size=256
+    depends_on:
+      mongo:
+        # Espera a que el healthcheck de mongo de OK, no solo a que el
+        # contenedor exista. Si no, la api podria arrancar antes que la base.
+        condition: service_healthy
+
+volumes:
+  mongo-data:
