@@ -6,6 +6,11 @@ import { Compromiso } from "../domain/Compromiso.js";
 import { Colaboracion } from "../domain/Colaboracion.js";
 import { Logro } from "../domain/Logro.js";
 import { Ubicacion } from "../domain/Ubicacion.js";
+import { RedSocial } from "../domain/RedSocial.js";
+import { Valoracion } from "../domain/Valoracion.js";
+import { MedioDeContacto } from "../domain/MedioDeContacto.js";
+import { COLABORACION_ESTADO } from "../domain/enums/COLABORACION_ESTADO.js";
+import { MODO_ACEPTACION } from "../domain/enums/MODO_ACEPTACION.js";
 
 // Orden estable para paginar: primero por fecha de alta, y el _id desempata.
 const ORDEN = { createdAt: 1, _id: 1 };
@@ -34,7 +39,22 @@ function colaboracionADocumento(colaboracion) {
     colaboradorId: colaboracion.colaborador.id,
     esPublica: colaboracion.esPublica,
     fecha: colaboracion.fecha,
+    estado: colaboracion.estado,
+    fechaResolucion: colaboracion.fechaResolucion,
+    fechaFin: colaboracion.fechaFin,
+    valoracionDelColectivo: valoracionADocumento(colaboracion.valoracionDelColectivo),
+    valoracionDelColaborador: valoracionADocumento(colaboracion.valoracionDelColaborador),
   };
+}
+
+function valoracionADocumento(valoracion) {
+  return valoracion
+    ? { puntaje: valoracion.puntaje, comentario: valoracion.comentario, fecha: valoracion.fecha }
+    : null;
+}
+
+function valoracionADominio(documento) {
+  return documento ? new Valoracion(documento) : null;
 }
 
 function proyectoADocumento(proyecto) {
@@ -53,6 +73,13 @@ function proyectoADocumento(proyecto) {
       descripcion: logro.descripcion,
       fecha: logro.fecha,
     })),
+    etiquetas: proyecto.etiquetas,
+    modoAceptacion: proyecto.modoAceptacion,
+    limiteVacantes: proyecto.limiteVacantes,
+    fechaCreacion: proyecto.fechaCreacion,
+    fechaFinalizacion: proyecto.fechaFinalizacion,
+    fechaCierre: proyecto.fechaCierre,
+    visualizaciones: proyecto.visualizaciones,
   };
 }
 
@@ -66,6 +93,11 @@ function aDocumento(colectivo) {
       ? { tipoUbicacion: colectivo.ubicacion.tipoUbicacion, nombre: colectivo.ubicacion.nombre }
       : null,
     proyectos: colectivo.proyectos.map(proyectoADocumento),
+    redesSociales: colectivo.redesSociales.map(({ nombre, url }) => ({ nombre, url })),
+    etiquetas: colectivo.etiquetas,
+    mediosDeContacto: colectivo.mediosDeContacto.map(({ tipo, valor }) => ({ tipo, valor })),
+    fechaAlta: colectivo.fechaAlta,
+    fechaBaja: colectivo.fechaBaja,
   };
 }
 
@@ -140,6 +172,13 @@ export class MongoColectivoRepository {
       colaborador,
       esPublica: documento.esPublica,
       fecha: documento.fecha,
+      // Las colaboraciones guardadas antes de que existieran las postulaciones
+      // no tienen estado: en ese entonces anotarse era quedar adentro.
+      estado: documento.estado ?? COLABORACION_ESTADO.ACEPTADA,
+      fechaResolucion: documento.fechaResolucion ?? null,
+      fechaFin: documento.fechaFin ?? null,
+      valoracionDelColectivo: valoracionADominio(documento.valoracionDelColectivo),
+      valoracionDelColaborador: valoracionADominio(documento.valoracionDelColaborador),
     });
   }
 
@@ -151,10 +190,19 @@ export class MongoColectivoRepository {
       urlSistema: documento.urlSistema,
       urlRepositorio: documento.urlRepositorio,
       estado: documento.estado,
+      // Los proyectos guardados antes del requerimiento 8 funcionaban asi.
+      modoAceptacion: documento.modoAceptacion ?? MODO_ACEPTACION.TODO_SUMA,
+      limiteVacantes: documento.limiteVacantes ?? null,
+      // Los proyectos anteriores a esta entrega no tienen fecha de alta.
+      fechaCreacion: documento.fechaCreacion ?? null,
+      fechaFinalizacion: documento.fechaFinalizacion ?? null,
+      fechaCierre: documento.fechaCierre ?? null,
     });
 
     proyecto.porcentajeConcrecion = documento.porcentajeConcrecion ?? 0;
     proyecto.logros = (documento.logros ?? []).map((logro) => new Logro(logro));
+    proyecto.etiquetas = documento.etiquetas ?? [];
+    proyecto.visualizaciones = documento.visualizaciones ?? 0;
 
     const [perfiles, colaboraciones] = await Promise.all([
       Promise.all((documento.perfiles ?? []).map((p) => this.perfilADominio(p, cache))),
@@ -178,7 +226,16 @@ export class MongoColectivoRepository {
       descripcion: documento.descripcion,
       tipoColectivo: documento.tipoColectivo,
       ubicacion: documento.ubicacion ? new Ubicacion(documento.ubicacion) : null,
+      // Los colectivos anteriores a esta entrega no tienen fechaAlta: se usa la
+      // que Mongoose guarda sola (timestamps).
+      fechaAlta: documento.fechaAlta ?? documento.createdAt ?? null,
+      fechaBaja: documento.fechaBaja ?? null,
     });
+    colectivo.mediosDeContacto = (documento.mediosDeContacto ?? []).map(
+      (medio) => new MedioDeContacto(medio),
+    );
+    colectivo.redesSociales = (documento.redesSociales ?? []).map((red) => new RedSocial(red));
+    colectivo.etiquetas = documento.etiquetas ?? [];
 
     colectivo.proyectos = await Promise.all(
       (documento.proyectos ?? []).map((p) => this.proyectoADominio(p, cache)),
@@ -217,12 +274,14 @@ export class MongoColectivoRepository {
     return this.aDominioVarios(documentos);
   }
 
-  async listarPaginado(numeroPagina, limitePorPagina) {
+  async listarPaginado(numeroPagina, limitePorPagina, { etiqueta } = {}) {
     const salto = (numeroPagina - 1) * limitePorPagina;
+    // Sobre un array, { etiquetas: "x" } matchea si "x" es uno de sus elementos.
+    const filtro = etiqueta ? { etiquetas: etiqueta } : {};
 
     const [documentos, total] = await Promise.all([
-      ColectivoModel.find().sort(ORDEN).skip(salto).limit(limitePorPagina).lean(),
-      ColectivoModel.countDocuments(),
+      ColectivoModel.find(filtro).sort(ORDEN).skip(salto).limit(limitePorPagina).lean(),
+      ColectivoModel.countDocuments(filtro),
     ]);
 
     return { items: await this.aDominioVarios(documentos), total };
@@ -243,6 +302,17 @@ export class MongoColectivoRepository {
     return { colectivo, proyecto };
   }
 
+  // Suma una visualizacion sin leer ni reescribir el colectivo: $inc lo hace
+  // la base, y "proyectos.$" apunta al proyecto que matcheo el filtro.
+  async registrarVisualizacion(proyectoId) {
+    await ColectivoModel.updateOne(
+      { "proyectos._id": proyectoId },
+      { $inc: { "proyectos.$.visualizaciones": 1 } },
+      // Sin esto, Mongoose agregaria updatedAt y tocaria el colectivo entero.
+      { timestamps: false },
+    );
+  }
+
   async buscarPerfil(proyectoId, perfilId) {
     const proyectoConColectivo = await this.buscarProyecto(proyectoId);
 
@@ -260,13 +330,38 @@ export class MongoColectivoRepository {
     return { colectivo, proyecto, perfil };
   }
 
+  // Preselecciona los colectivos que PUEDEN tener un proyecto vencido: alguno
+  // abierto y alguno con fecha de cierre pasada (no necesariamente el mismo).
+  // La condicion exacta la decide el dominio (Proyecto.cierreVencido) en el
+  // service; traer de mas solo cuesta un poco, nunca cierra algo que no toca.
+  async buscarConCierreVencido(ahora) {
+    const documentos = await ColectivoModel.find({
+      "proyectos.estado": "ABIERTO",
+      "proyectos.fechaCierre": { $lte: ahora },
+    }).lean();
+    return this.aDominioVarios(documentos);
+  }
+
+  // Los colectivos en los que la persona tiene alguna colaboracion.
+  async buscarColectivosDeColaborador(colaboradorId) {
+    const documentos = await ColectivoModel.find({
+      "proyectos.colaboraciones.colaboradorId": colaboradorId,
+    })
+      .sort(ORDEN)
+      .lean();
+    return this.aDominioVarios(documentos);
+  }
+
   async listarProyectos() {
     const colectivos = await this.listar();
     return colectivos.flatMap((colectivo) => colectivo.proyectos);
   }
 
-  async listarProyectosPaginado(numeroPagina, limitePorPagina) {
+  async listarProyectosPaginado(numeroPagina, limitePorPagina, { etiqueta } = {}) {
     const salto = (numeroPagina - 1) * limitePorPagina;
+    // Despues del $unwind cada documento es un proyecto: se filtra por las
+    // etiquetas del proyecto, no por las del colectivo.
+    const filtroPorEtiqueta = etiqueta ? [{ $match: { "proyectos.etiquetas": etiqueta } }] : [];
 
     // Los proyectos estan embebidos, asi que no se pueden paginar con un find.
     // $unwind "abre" cada colectivo en un documento por proyecto, y $facet
@@ -274,6 +369,7 @@ export class MongoColectivoRepository {
     const [resultado] = await ColectivoModel.aggregate([
       { $sort: ORDEN },
       { $unwind: "$proyectos" },
+      ...filtroPorEtiqueta,
       {
         $facet: {
           items: [{ $skip: salto }, { $limit: limitePorPagina }],

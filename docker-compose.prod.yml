@@ -47,6 +47,9 @@ services:
       # codigo-a-voluntad, asi que hay que decirle a mongo donde buscarlo.
       MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongo:27017/codigo-a-voluntad?authSource=admin
       NODE_OPTIONS: --max-old-space-size=256
+      # Opcionales: sin SMTP_URL los emails se simulan (ver .env.prod.example).
+      SMTP_URL: ${SMTP_URL:-}
+      SMTP_REMITENTE: ${SMTP_REMITENTE:-}
     depends_on:
       mongo:
         # Espera a que el healthcheck de mongo de OK, no solo a que el

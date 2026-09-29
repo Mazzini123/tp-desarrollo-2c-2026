@@ -1,6 +1,7 @@
 import { ColaboradorModel } from "../models/ColaboradorModel.js";
 import { Colaborador } from "../domain/Colaborador.js";
 import { MedioDeContacto } from "../domain/MedioDeContacto.js";
+import { RedSocial } from "../domain/RedSocial.js";
 
 function aDocumento(colaborador) {
   return {
@@ -16,6 +17,7 @@ function aDocumento(colaborador) {
       tipo: medio.tipo,
       valor: medio.valor,
     })),
+    redesSociales: colaborador.redesSociales.map(({ nombre, url }) => ({ nombre, url })),
     // Solo los codigos: las habilidades viven en su propia coleccion.
     codigosHabilidades: colaborador.habilidades.map((habilidad) => habilidad.codigo),
   };
@@ -49,6 +51,8 @@ export class MongoColaboradorRepository {
       (medio) => new MedioDeContacto(medio),
     );
 
+    colaborador.redesSociales = (documento.redesSociales ?? []).map((red) => new RedSocial(red));
+
     const habilidades = await Promise.all(
       (documento.codigosHabilidades ?? []).map((codigo) =>
         this.habilidadRepository.buscarPorId(codigo),
@@ -78,6 +82,15 @@ export class MongoColaboradorRepository {
 
   async listar() {
     const documentos = await ColaboradorModel.find().lean();
+    return Promise.all(documentos.map((doc) => this.aDominio(doc)));
+  }
+
+  // Las que tienen TODAS las habilidades pedidas: $all compara contra el
+  // array de codigos guardado, sin traer a memoria a las que no califican.
+  async buscarPorHabilidades(codigos) {
+    const documentos = await ColaboradorModel.find({ codigosHabilidades: { $all: codigos } })
+      .sort({ _id: 1 })
+      .lean();
     return Promise.all(documentos.map((doc) => this.aDominio(doc)));
   }
 

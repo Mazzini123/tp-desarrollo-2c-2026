@@ -10,11 +10,19 @@ import {
   agregarHabilidadPerfilSchema,
   crearPerfilSchema,
 } from "../schemas/perfilSchema.js";
+import { invitacionSchema } from "../schemas/reclutamientoSchema.js";
+import { listadoConEtiquetaSchema } from "../schemas/comunesSchema.js";
+import { valoracionSchema } from "../schemas/valoracionSchema.js";
 
-export function crearProyectosRouter(proyectoController, perfilController) {
+export function crearProyectosRouter(
+  proyectoController,
+  perfilController,
+  reclutamientoController,
+  postulacionController,
+) {
   const router = Router();
 
-  router.get("/", validarQuery(paginacionSchema), proyectoController.listar);
+  router.get("/", validarQuery(listadoConEtiquetaSchema), proyectoController.listar);
   router.get("/:id", proyectoController.obtenerPorId);
   router.put(
     "/:id",
@@ -54,12 +62,42 @@ export function crearProyectosRouter(proyectoController, perfilController) {
     perfilController.quitarHabilidadOpcional,
   );
 
+  // Busqueda de potenciales colaboradoras para un perfil, e invitacion.
+  router.get(
+    "/:id/perfiles/:perfilId/colaboradoras-potenciales",
+    validarQuery(paginacionSchema),
+    reclutamientoController.buscarColaboradoras,
+  );
+  router.post(
+    "/:id/perfiles/:perfilId/invitaciones",
+    validarBody(invitacionSchema),
+    reclutamientoController.invitar,
+  );
+
   router.post(
     "/:id/colaboraciones",
     validarBody(anotarColaboradorSchema),
     proyectoController.anotarColaborador,
   );
   router.get("/:id/colaboraciones", proyectoController.listarColaboraciones);
+
+  // Resolucion manual de una postulacion (req. adicional 8).
+  router.post(
+    "/:id/colaboraciones/:colaboracionId/aceptacion",
+    postulacionController.aceptar,
+  );
+  router.post("/:id/colaboraciones/:colaboracionId/rechazo", postulacionController.rechazar);
+
+  // Fin de una colaboracion y valoraciones mutuas (req. adicional 39).
+  router.post(
+    "/:id/colaboraciones/:colaboracionId/finalizacion",
+    postulacionController.finalizar,
+  );
+  router.post(
+    "/:id/colaboraciones/:colaboracionId/valoraciones",
+    validarBody(valoracionSchema),
+    postulacionController.valorar,
+  );
 
   return router;
 }

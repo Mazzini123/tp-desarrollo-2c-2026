@@ -9,11 +9,12 @@ export class ProyectoController extends BaseController {
 
   listar = async (req, res) => {
     const paginacion = this.aPaginacionDeDominio(req.paginacion);
-    this.responderPaginado(res, await this.proyectoService.listar(paginacion));
+    const { etiqueta } = req.paginacion;
+    this.responderPaginado(res, await this.proyectoService.listar({ ...paginacion, etiqueta }));
   };
 
   obtenerPorId = async (req, res) => {
-    res.status(200).json(await this.proyectoService.buscarPorId(req.params.id));
+    res.status(200).json(await this.proyectoService.verDetalle(req.params.id));
   };
 
   actualizar = async (req, res) => {
@@ -28,6 +29,7 @@ export class ProyectoController extends BaseController {
     const colaboracion = await this.colaboracionService.registrar({
       proyectoId: req.params.id,
       colaboradorId: req.body.colaboradorId,
+      esPublica: req.body.esPublica,
     });
     res.status(201).json(colaboracion);
   };

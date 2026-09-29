@@ -1,10 +1,11 @@
 import { BaseController } from "./BaseController.js";
 
 export class ColectivoController extends BaseController {
-  constructor({ colectivoService, proyectoService }) {
+  constructor({ colectivoService, proyectoService, colaboracionService }) {
     super();
     this.colectivoService = colectivoService;
     this.proyectoService = proyectoService;
+    this.colaboracionService = colaboracionService;
   }
 
   crear = async (req, res) => {
@@ -13,7 +14,8 @@ export class ColectivoController extends BaseController {
 
   listar = async (req, res) => {
     const paginacion = this.aPaginacionDeDominio(req.paginacion);
-    this.responderPaginado(res, await this.colectivoService.listar(paginacion));
+    const { etiqueta } = req.paginacion;
+    this.responderPaginado(res, await this.colectivoService.listar({ ...paginacion, etiqueta }));
   };
 
   obtenerPorId = async (req, res) => {
@@ -22,6 +24,10 @@ export class ColectivoController extends BaseController {
 
   actualizar = async (req, res) => {
     res.status(200).json(await this.colectivoService.actualizar(req.params.id, req.body));
+  };
+
+  darDeBaja = async (req, res) => {
+    res.status(200).json(await this.colectivoService.darDeBaja(req.params.id));
   };
 
   crearProyecto = async (req, res) => {
@@ -34,5 +40,15 @@ export class ColectivoController extends BaseController {
 
   listarProyectos = async (req, res) => {
     res.status(200).json(await this.proyectoService.listarPorColectivo(req.params.id));
+  };
+
+  timeline = async (req, res) => {
+    res.status(200).json(await this.colectivoService.timeline(req.params.id));
+  };
+
+  listarValoraciones = async (req, res) => {
+    res
+      .status(200)
+      .json(await this.colaboracionService.listarValoracionesDeColectivo(req.params.id));
   };
 }

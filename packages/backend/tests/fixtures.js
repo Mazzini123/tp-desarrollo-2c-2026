@@ -1,4 +1,8 @@
-import { componerApp, crearRepositoriosEnMemoria } from "../src/composicion.js";
+import {
+  componerApp,
+  crearRepositoriosEnMemoria,
+  crearCanalesEnMemoria,
+} from "../src/composicion.js";
 import { cargarHabilidadesIniciales } from "../src/seed/habilidadesSeed.js";
 
 /**
@@ -15,9 +19,15 @@ import { cargarHabilidadesIniciales } from "../src/seed/habilidadesSeed.js";
  * catalogo todavia vacio.
  */
 export async function armarServices() {
-  const { services } = componerApp({ repositorios: crearRepositoriosEnMemoria() });
+  const canales = crearCanalesEnMemoria();
+  const { services } = componerApp({
+    repositorios: crearRepositoriosEnMemoria(),
+    canales,
+  });
   await cargarHabilidadesIniciales(services.habilidadService);
-  return services;
+  // Los canales viajan con los services para que un test pueda revisar que
+  // se envio (services.canales.EMAIL.enviados).
+  return { ...services, canales };
 }
 
 export const CODIGOS = {

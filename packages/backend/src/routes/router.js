@@ -4,18 +4,31 @@ import { crearColectivosRouter } from "./colectivosRouter.js";
 import { crearProyectosRouter } from "./proyectosRouter.js";
 import { crearHabilidadesRouter } from "./habilidadesRouter.js";
 import { crearColaboradoresRouter } from "./colaboradoresRouter.js";
+import { crearEstadisticasRouter } from "./estadisticasRouter.js";
 
 export function crearRouter(controllers) {
   const router = Router();
 
   router.use("/health", crearHealthRouter());
-  router.use("/colectivos", crearColectivosRouter(controllers.colectivo));
+  router.use(
+    "/colectivos",
+    crearColectivosRouter(controllers.colectivo, controllers.estadistica),
+  );
+  router.use("/estadisticas", crearEstadisticasRouter(controllers.estadistica));
   router.use(
     "/proyectos",
-    crearProyectosRouter(controllers.proyecto, controllers.perfil),
+    crearProyectosRouter(
+      controllers.proyecto,
+      controllers.perfil,
+      controllers.reclutamiento,
+      controllers.postulacion,
+    ),
   );
   router.use("/habilidades", crearHabilidadesRouter(controllers.habilidad));
-  router.use("/colaboradores", crearColaboradoresRouter(controllers.colaborador));
+  router.use(
+    "/colaboradores",
+    crearColaboradoresRouter(controllers.colaborador, controllers.notificacion),
+  );
 
   return router;
 }

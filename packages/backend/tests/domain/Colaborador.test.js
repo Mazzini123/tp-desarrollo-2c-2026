@@ -1,5 +1,6 @@
 import { Colaborador } from "../../src/domain/Colaborador.js";
 import { Habilidad } from "../../src/domain/Habilidad.js";
+import { MedioDeContacto } from "../../src/domain/MedioDeContacto.js";
 
 // Correccion C1: los pronombres son una lista y la unicidad la garantiza la
 // logica del dominio, no el tipo del atributo.
@@ -64,5 +65,26 @@ describe("Colaborador · habilidades", () => {
     const colaborador = new Colaborador({ cuentaGit: "octocat" });
     colaborador.agregarHabilidad(node);
     expect(colaborador.tieneHabilidad(new Habilidad({ titulo: "desarrollo node" }))).toBe(true);
+  });
+});
+
+describe("Colaborador · medios de contacto", () => {
+  test("se comparan por tipo y valor, no por identidad", () => {
+    const colaborador = new Colaborador({ cuentaGit: "octocat" });
+    colaborador.agregarMedioDeContacto(new MedioDeContacto({ tipo: "EMAIL", valor: "a@b.com" }));
+
+    const igual = new MedioDeContacto({ tipo: "EMAIL", valor: "a@b.com" });
+    expect(colaborador.tieneMedioDeContacto(igual)).toBe(true);
+
+    colaborador.quitarMedioDeContacto(igual);
+    expect(colaborador.mediosDeContacto).toEqual([]);
+  });
+
+  test("al serializar a JSON no aparecen, pero siguen en el objeto", () => {
+    const colaborador = new Colaborador({ cuentaGit: "octocat" });
+    colaborador.agregarMedioDeContacto(new MedioDeContacto({ tipo: "SMS", valor: "1155551234" }));
+
+    expect(JSON.parse(JSON.stringify(colaborador))).not.toHaveProperty("mediosDeContacto");
+    expect(colaborador.mediosDeContacto).toHaveLength(1);
   });
 });

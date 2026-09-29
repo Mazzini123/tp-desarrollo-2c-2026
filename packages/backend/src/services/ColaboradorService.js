@@ -1,16 +1,31 @@
 import { Colaborador } from "../domain/Colaborador.js";
+import { MedioDeContacto } from "../domain/MedioDeContacto.js";
+import { construirRedesSociales } from "../domain/RedSocial.js";
+import { esTipoMedioContactoValido } from "../domain/enums/TIPOS_MEDIOS_CONTACTO.js";
 import { DomainError } from "../errors/DomainError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
 import { ConflictError } from "../errors/ConflictError.js";
 import { armarPaginado } from "../utils/paginacion.js";
 
 export class ColaboradorService {
-  constructor({ colaboradorRepository, habilidadService }) {
+  constructor({ colaboradorRepository, habilidadService, avisoAutomaticoService }) {
     this.colaboradorRepository = colaboradorRepository;
     this.habilidadService = habilidadService;
+    this.avisoAutomaticoService = avisoAutomaticoService;
   }
 
-  async crear({ nombreFantasia, nombre, apellido, cuentaGit, pronombres, presentacion, codigosHabilidades }) {
+  async crear({
+    nombreFantasia,
+    nombre,
+    apellido,
+    cuentaGit,
+    pronombres,
+    presentacion,
+    codigosHabilidades,
+    recibeMensajeriaInterna = true,
+    mediosDeContacto = [],
+    redesSociales = [],
+  }) {
     this.validarIdentificacion({ nombreFantasia, nombre, apellido, cuentaGit });
 
     const colaborador = new Colaborador({
@@ -19,6 +34,17 @@ export class ColaboradorService {
       apellido,
       cuentaGit,
       presentacion,
+      recibeMensajeriaInterna,
+    });
+
+    colaborador.redesSociales = construirRedesSociales(redesSociales);
+
+    mediosDeContacto.forEach((datos) => {
+      const medio = this.construirMedioDeContacto(datos);
+      // En el alta un repetido se ignora, igual que los pronombres del payload.
+      if (!colaborador.tieneMedioDeContacto(medio)) {
+        colaborador.agregarMedioDeContacto(medio);
+      }
     });
 
     if (pronombres) {
@@ -31,7 +57,9 @@ export class ColaboradorService {
       habilidades.forEach((h) => colaborador.agregarHabilidad(h));
     }
 
-    return this.colaboradorRepository.guardar(colaborador);
+    await this.colaboradorRepository.guardar(colaborador);
+    await avisarSinFallar(() => this.avisoAutomaticoService.avisarPorColaboradorNuevo(colaborador));
+    return colaborador;
   }
 
   async listar({ numeroPagina = 1, limitePorPagina = 10 } = {}) {
@@ -52,8 +80,16 @@ export class ColaboradorService {
     return colaborador;
   }
 
-  async actualizar(id, { pronombres, presentacion }) {
+  async actualizar(id, { pronombres, presentacion, recibeMensajeriaInterna, redesSociales }) {
     const colaborador = await this.buscarPorId(id);
+
+    if (redesSociales !== undefined) {
+      colaborador.redesSociales = construirRedesSociales(redesSociales);
+    }
+
+    if (recibeMensajeriaInterna !== undefined) {
+      colaborador.recibeMensajeriaInterna = recibeMensajeriaInterna;
+    }
 
     if (pronombres !== undefined) {
       colaborador.reemplazarPronombres(pronombres);
@@ -99,6 +135,43 @@ export class ColaboradorService {
     return this.colaboradorRepository.guardar(colaborador);
   }
 
+  // Los medios de contacto se registran pero no se muestran (ver
+  // Colaborador.toJSON): por eso el alta devuelve solo el medio cargado.
+  async agregarMedioDeContacto(id, datos) {
+    const colaborador = await this.buscarPorId(id);
+    const medio = this.construirMedioDeContacto(datos);
+
+    if (colaborador.tieneMedioDeContacto(medio)) {
+      throw new ConflictError(`El colaborador ya tiene registrado ese medio de contacto`);
+    }
+
+    colaborador.agregarMedioDeContacto(medio);
+    await this.colaboradorRepository.guardar(colaborador);
+    return medio;
+  }
+
+  async quitarMedioDeContacto(id, datos) {
+    const colaborador = await this.buscarPorId(id);
+    const medio = this.construirMedioDeContacto(datos);
+
+    if (!colaborador.tieneMedioDeContacto(medio)) {
+      throw new NotFoundError("El colaborador no tiene registrado ese medio de contacto");
+    }
+
+    colaborador.quitarMedioDeContacto(medio);
+    await this.colaboradorRepository.guardar(colaborador);
+  }
+
+  construirMedioDeContacto({ tipo, valor }) {
+    if (!esTipoMedioContactoValido(tipo)) {
+      throw new DomainError(`Tipo de medio de contacto invalido: ${tipo}`);
+    }
+    if (typeof valor !== "string" || valor.trim().length === 0) {
+      throw new DomainError("El valor del medio de contacto es obligatorio");
+    }
+    return new MedioDeContacto({ tipo, valor: valor.trim() });
+  }
+
   validarIdentificacion({ nombreFantasia, nombre, apellido, cuentaGit }) {
     const tieneNombreYApellido = Boolean(nombre) && Boolean(apellido);
 
@@ -108,5 +181,15 @@ export class ColaboradorService {
         "nombreFantasia, cuentaGit, o (nombre + apellido)",
       );
     }
+  }
+}
+
+// Los avisos automaticos son un efecto secundario del alta: si fallan, el
+// alta igual quedo hecha.
+async function avisarSinFallar(avisar) {
+  try {
+    await avisar();
+  } catch (error) {
+    console.error("No se pudieron enviar los avisos automaticos:", error.message);
   }
 }

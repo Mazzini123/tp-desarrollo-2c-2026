@@ -109,3 +109,51 @@ describe("ColaboradorService · habilidades", () => {
     expect(final.habilidades.map((h) => h.codigo)).toEqual([CODIGOS.react]);
   });
 });
+
+describe("ColaboradorService · medios de contacto", () => {
+  let colaboradorService;
+  let colaborador;
+
+  beforeEach(async () => {
+    colaboradorService = (await armarServices()).colaboradorService;
+    colaborador = await colaboradorService.crear({
+      cuentaGit: "ada",
+      mediosDeContacto: [
+        { tipo: "EMAIL", valor: "ada@mail.com" },
+        { tipo: "EMAIL", valor: "ada@mail.com" },
+      ],
+    });
+  });
+
+  test("el alta registra los medios y descarta los repetidos", () => {
+    expect(colaborador.mediosDeContacto).toHaveLength(1);
+  });
+
+  test("agregar uno repetido tira ConflictError", async () => {
+    await expect(
+      colaboradorService.agregarMedioDeContacto(colaborador.id, {
+        tipo: "EMAIL",
+        valor: "ada@mail.com",
+      }),
+    ).rejects.toThrow(ConflictError);
+  });
+
+  test("quitar uno que no esta tira NotFoundError", async () => {
+    await expect(
+      colaboradorService.quitarMedioDeContacto(colaborador.id, { tipo: "SMS", valor: "123" }),
+    ).rejects.toThrow(NotFoundError);
+  });
+
+  test("un tipo que no existe tira DomainError", async () => {
+    await expect(
+      colaboradorService.agregarMedioDeContacto(colaborador.id, { tipo: "FAX", valor: "1" }),
+    ).rejects.toThrow(DomainError);
+  });
+
+  test("el PUT permite dejar de recibir mensajeria interna", async () => {
+    const actualizado = await colaboradorService.actualizar(colaborador.id, {
+      recibeMensajeriaInterna: false,
+    });
+    expect(actualizado.recibeMensajeriaInterna).toBe(false);
+  });
+});

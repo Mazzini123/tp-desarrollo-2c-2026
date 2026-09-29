@@ -1,12 +1,5 @@
 import mongoose from "mongoose";
-
-const medioDeContactoSchema = new mongoose.Schema(
-  {
-    tipo: { type: String, required: true },
-    valor: { type: String, required: true },
-  },
-  { _id: false }, // sin id propio: es parte del colaborador, no una entidad aparte
-);
+import { medioDeContactoSchema, redSocialSchema } from "./subesquemas.js";
 
 const colaboradorSchema = new mongoose.Schema(
   {
@@ -19,10 +12,14 @@ const colaboradorSchema = new mongoose.Schema(
     pronombres: { type: [String], default: [] },
     recibeMensajeriaInterna: { type: Boolean, default: true },
     mediosDeContacto: { type: [medioDeContactoSchema], default: [] },
+    redesSociales: { type: [redSocialSchema], default: [] },
     // Referencia al catalogo: guardamos solo los codigos.
     codigosHabilidades: { type: [String], default: [] },
   },
   { versionKey: false },
 );
+
+// Para la busqueda de colaboradoras por habilidades.
+colaboradorSchema.index({ codigosHabilidades: 1 });
 
 export const ColaboradorModel = mongoose.model("Colaborador", colaboradorSchema);
