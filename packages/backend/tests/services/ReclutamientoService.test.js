@@ -120,7 +120,11 @@ describe("ReclutamientoService · invitar", () => {
     expect(notificacion.tipo).toBe("INVITACION");
     expect(notificacion.referencias).toMatchObject({ proyectoId: proyecto.id, perfilId: perfil.id });
     expect(notificacion.contenido).toContain("Nos encantaria contar con vos");
-    expect(services.canales.EMAIL.enviados).toHaveLength(1);
+    // El aviso automatico del alta (req. 9) y la invitacion.
+    expect(services.canales.EMAIL.enviados.map((m) => m.asunto)).toEqual([
+      expect.stringContaining("coinciden con tus habilidades"),
+      expect.stringContaining("te invita"),
+    ]);
   });
 
   test("si no acepta ser contactada tira ConflictError", async () => {

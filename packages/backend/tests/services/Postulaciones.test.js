@@ -90,7 +90,7 @@ describe("Postulaciones", () => {
       await postular(proyecto);
 
       const bandeja = await services.notificacionService.listar(primera.colaborador.id);
-      expect(bandeja.items.map((n) => n.tipo)).toEqual(["POSTULACION_ACEPTADA"]);
+      expect(bandeja.items.map((n) => n.tipo)).toContain("POSTULACION_ACEPTADA");
     });
   });
 
@@ -127,7 +127,7 @@ describe("Postulaciones", () => {
       expect(rechazada.estado).toBe("RECHAZADA");
       expect(rechazada.fechaResolucion).toBeInstanceOf(Date);
       const bandeja = await services.notificacionService.listar(a.colaborador.id);
-      expect(bandeja.items[0].tipo).toBe("POSTULACION_RECHAZADA");
+      expect(bandeja.items.map((n) => n.tipo)).toContain("POSTULACION_RECHAZADA");
     });
 
     test("no se puede resolver dos veces la misma postulacion", async () => {

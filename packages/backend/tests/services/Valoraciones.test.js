@@ -48,7 +48,7 @@ describe("Valoraciones mutuas", () => {
     expect(colaboracion.estado).toBe("FINALIZADA");
     expect(colaboracion.fechaFin).toBeInstanceOf(Date);
     const bandeja = await services.notificacionService.listar(ada.id);
-    expect(bandeja.items[0].tipo).toBe("COLABORACION_FINALIZADA");
+    expect(bandeja.items.map((n) => n.tipo)).toContain("COLABORACION_FINALIZADA");
   });
 
   test("cada parte valora una vez y se ve en el historial de la otra", async () => {

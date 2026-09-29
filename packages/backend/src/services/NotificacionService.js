@@ -3,9 +3,12 @@ import { NotFoundError } from "../errors/NotFoundError.js";
 import { armarPaginado } from "../utils/paginacion.js";
 
 export class NotificacionService {
-  constructor({ notificacionRepository, colaboradorService, canales }) {
+  // Usa el repositorio de colaboradores y no ColaboradorService: el alta de
+  // un colaborador dispara avisos (req. adicional 9), asi que
+  // ColaboradorService depende de este service y no al reves.
+  constructor({ notificacionRepository, colaboradorRepository, canales }) {
     this.notificacionRepository = notificacionRepository;
-    this.colaboradorService = colaboradorService;
+    this.colaboradorRepository = colaboradorRepository;
     // Un canal por tipo de medio de contacto: { EMAIL, WHATSAPP, SMS }.
     this.canales = canales;
   }
@@ -58,7 +61,9 @@ export class NotificacionService {
   }
 
   async listar(colaboradorId, { numeroPagina = 1, limitePorPagina = 10 } = {}) {
-    await this.colaboradorService.buscarPorId(colaboradorId);
+    if (!(await this.colaboradorRepository.buscarPorId(colaboradorId))) {
+      throw new NotFoundError(`No existe un colaborador con id "${colaboradorId}"`);
+    }
 
     return armarPaginado(
       await this.notificacionRepository.listarPorDestinatarioPaginado(

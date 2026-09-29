@@ -13,11 +13,18 @@ import {
 } from "./reglasDePostulacion.js";
 
 export class ProyectoService {
-  constructor({ colectivoRepository, colectivoService, perfilService, notificacionService }) {
+  constructor({
+    colectivoRepository,
+    colectivoService,
+    perfilService,
+    notificacionService,
+    avisoAutomaticoService,
+  }) {
     this.colectivoRepository = colectivoRepository;
     this.colectivoService = colectivoService;
     this.perfilService = perfilService;
     this.notificacionService = notificacionService;
+    this.avisoAutomaticoService = avisoAutomaticoService;
   }
 
   async crear({
@@ -58,6 +65,13 @@ export class ProyectoService {
     perfilesConstruidos.forEach((perfil) => proyecto.agregarPerfil(perfil));
     colectivo.agregarProyecto(proyecto);
     await this.colectivoRepository.guardar(colectivo);
+
+    // Req. adicional 9. Si los avisos fallan, el proyecto igual quedo creado.
+    try {
+      await this.avisoAutomaticoService.avisarPorProyectoNuevo(proyecto);
+    } catch (error) {
+      console.error("No se pudieron enviar los avisos automaticos:", error.message);
+    }
 
     return proyecto;
   }

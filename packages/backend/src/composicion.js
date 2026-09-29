@@ -21,6 +21,7 @@ import { ColaboradorService } from "./services/ColaboradorService.js";
 import { ColaboracionService } from "./services/ColaboracionService.js";
 import { NotificacionService } from "./services/NotificacionService.js";
 import { ReclutamientoService } from "./services/ReclutamientoService.js";
+import { AvisoAutomaticoService } from "./services/AvisoAutomaticoService.js";
 
 import { ColectivoController } from "./controllers/ColectivoController.js";
 import { ProyectoController } from "./controllers/ProyectoController.js";
@@ -98,15 +99,22 @@ export function componerApp({
     habilidadService,
   });
 
+  const notificacionService = new NotificacionService({
+    notificacionRepository,
+    colaboradorRepository,
+    canales,
+  });
+
+  const avisoAutomaticoService = new AvisoAutomaticoService({
+    colaboradorRepository,
+    colectivoRepository,
+    notificacionService,
+  });
+
   const colaboradorService = new ColaboradorService({
     colaboradorRepository,
     habilidadService,
-  });
-
-  const notificacionService = new NotificacionService({
-    notificacionRepository,
-    colaboradorService,
-    canales,
+    avisoAutomaticoService,
   });
 
   const colectivoService = new ColectivoService({ colectivoRepository, notificacionService });
@@ -116,6 +124,7 @@ export function componerApp({
     colectivoService,
     perfilService,
     notificacionService,
+    avisoAutomaticoService,
   });
 
   const reclutamientoService = new ReclutamientoService({
@@ -153,6 +162,7 @@ export function componerApp({
     colaboracionService,
     notificacionService,
     reclutamientoService,
+    avisoAutomaticoService,
   };
 
   return { controllers, services };

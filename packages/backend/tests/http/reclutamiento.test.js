@@ -29,9 +29,11 @@ describe("HTTP · busqueda de colaboradoras e invitacion", () => {
       .send({ colaboradorId: ada.body.id })
       .expect(201);
 
+    // En la bandeja estan la invitacion y el aviso automatico del alta
+    // (req. adicional 9: al darse de alta, le avisan que hay un proyecto).
     const bandeja = await api.get(`/colaboradores/${ada.body.id}/notificaciones`).expect(200);
-    expect(bandeja.body.data).toHaveLength(1);
-    expect(bandeja.body.data[0]).toMatchObject({ tipo: "INVITACION", esLeida: false });
+    expect(bandeja.body.data.map((n) => n.tipo)).toEqual(["INVITACION", "PROYECTOS_COMPATIBLES"]);
+    expect(bandeja.body.data[0].esLeida).toBe(false);
 
     const leida = await api
       .post(`/colaboradores/${ada.body.id}/notificaciones/${bandeja.body.data[0].id}/lectura`)

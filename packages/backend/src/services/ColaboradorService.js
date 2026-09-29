@@ -8,9 +8,10 @@ import { ConflictError } from "../errors/ConflictError.js";
 import { armarPaginado } from "../utils/paginacion.js";
 
 export class ColaboradorService {
-  constructor({ colaboradorRepository, habilidadService }) {
+  constructor({ colaboradorRepository, habilidadService, avisoAutomaticoService }) {
     this.colaboradorRepository = colaboradorRepository;
     this.habilidadService = habilidadService;
+    this.avisoAutomaticoService = avisoAutomaticoService;
   }
 
   async crear({
@@ -56,7 +57,9 @@ export class ColaboradorService {
       habilidades.forEach((h) => colaborador.agregarHabilidad(h));
     }
 
-    return this.colaboradorRepository.guardar(colaborador);
+    await this.colaboradorRepository.guardar(colaborador);
+    await avisarSinFallar(() => this.avisoAutomaticoService.avisarPorColaboradorNuevo(colaborador));
+    return colaborador;
   }
 
   async listar({ numeroPagina = 1, limitePorPagina = 10 } = {}) {
@@ -178,5 +181,15 @@ export class ColaboradorService {
         "nombreFantasia, cuentaGit, o (nombre + apellido)",
       );
     }
+  }
+}
+
+// Los avisos automaticos son un efecto secundario del alta: si fallan, el
+// alta igual quedo hecha.
+async function avisarSinFallar(avisar) {
+  try {
+    await avisar();
+  } catch (error) {
+    console.error("No se pudieron enviar los avisos automaticos:", error.message);
   }
 }
