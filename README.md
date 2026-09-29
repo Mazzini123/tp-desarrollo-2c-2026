@@ -203,18 +203,28 @@ reservarla desde la consola. Para verificar la actual, desde la VM:
   entren en 1 GB.
 - La API espera a que Mongo esté sano (healthcheck) antes de arrancar.
 - `restart: unless-stopped`: Docker levanta los contenedores solo después de un
-  reinicio de la VM. Reemplaza al unit de systemd de la primera entrega.
+  reinicio de la VM. Reemplaza a PM2, que es lo que mantenía viva la API en la
+  primera entrega.
 
 ### Primer despliegue
 
 Desde la VM, por SSH:
 
 ```bash
-# 1. Apagar el backend viejo de systemd (si no, ocupa el puerto 8000)
-sudo systemctl disable --now codigo-a-voluntad
+# 1. Apagar el backend viejo (si no, ocupa el puerto 8000).
+#    En la VM de Oracle corre con PM2, bajo el nombre "backend-cav":
+pm2 list                      # confirmar el nombre
+pm2 stop backend-cav
+pm2 delete backend-cav
+pm2 save                      # guarda la lista vacia: asi no revive al reiniciar la VM
+#    (Si en otra VM se hubiera instalado el unit de systemd de deploy/, en su
+#    lugar: sudo systemctl disable --now codigo-a-voluntad)
 
-# 2. Traer el código
+# 2. Traer el código. La VM está parada en la rama main: primero hay que
+#    mergear develop en main con un PR (como el #16 de la primera entrega),
+#    si no, el pull no trae nada de Docker.
 cd ~/tp-desarrollo-2c-2026
+git status                    # tiene que decir "On branch main" y estar limpio
 git pull
 
 # 3. Credenciales de Mongo (una sola vez)
