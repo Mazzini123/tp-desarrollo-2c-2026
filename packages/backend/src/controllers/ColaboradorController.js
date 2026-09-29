@@ -1,4 +1,5 @@
 import { BaseController } from "./BaseController.js";
+import { medioDeContactoSchema } from "../schemas/medioDeContactoSchema.js";
 
 export class ColaboradorController extends BaseController {
   constructor({ colaboradorService, colaboracionService }) {
@@ -54,6 +55,23 @@ export class ColaboradorController extends BaseController {
       req.params.codigoHabilidad,
     );
     res.status(200).json(colaborador);
+  };
+
+  agregarMedioDeContacto = async (req, res) => {
+    res
+      .status(201)
+      .json(await this.colaboradorService.agregarMedioDeContacto(req.params.id, req.body));
+  };
+
+  quitarMedioDeContacto = async (req, res) => {
+    // El medio viaja en la ruta: se normaliza con el mismo schema que el alta
+    // para que "Ana@Mail.com" encuentre al "ana@mail.com" guardado.
+    const medio = medioDeContactoSchema.parse({
+      tipo: req.params.tipo,
+      valor: req.params.valor,
+    });
+    await this.colaboradorService.quitarMedioDeContacto(req.params.id, medio);
+    res.status(204).send();
   };
 
   listarColaboraciones = async (req, res) => {

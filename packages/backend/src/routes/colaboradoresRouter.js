@@ -7,6 +7,7 @@ import {
   agregarPronombreSchema,
   agregarHabilidadColaboradorSchema,
 } from "../schemas/colaboradorSchema.js";
+import { medioDeContactoSchema } from "../schemas/medioDeContactoSchema.js";
 
 export function crearColaboradoresRouter(colaboradorController) {
   const router = Router();
@@ -32,6 +33,17 @@ export function crearColaboradoresRouter(colaboradorController) {
     colaboradorController.agregarHabilidad,
   );
   router.delete("/:id/habilidades/:codigoHabilidad", colaboradorController.quitarHabilidad);
+
+  // Solo alta y baja: los medios de contacto no se muestran por la API.
+  router.post(
+    "/:id/medios-de-contacto",
+    validarBody(medioDeContactoSchema),
+    colaboradorController.agregarMedioDeContacto,
+  );
+  router.delete(
+    "/:id/medios-de-contacto/:tipo/:valor",
+    colaboradorController.quitarMedioDeContacto,
+  );
 
   router.get("/:id/colaboraciones", colaboradorController.listarColaboraciones);
 

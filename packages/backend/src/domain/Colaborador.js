@@ -26,12 +26,18 @@ export class Colaborador {
     return this.pronombres.includes(pronombre);
   }
 
+  tieneMedioDeContacto(medioDeContacto) {
+    return this.mediosDeContacto.some((mc) => mc.equals(medioDeContacto));
+  }
+
   agregarMedioDeContacto(medioDeContacto) {
     this.mediosDeContacto.push(medioDeContacto);
   }
 
+  // Compara por tipo y valor, no por identidad: el medio que llega por HTTP
+  // es un objeto nuevo, distinto del que esta guardado en la lista.
   quitarMedioDeContacto(medioDeContacto) {
-    this.mediosDeContacto = this.mediosDeContacto.filter((mc) => mc !== medioDeContacto);
+    this.mediosDeContacto = this.mediosDeContacto.filter((mc) => !mc.equals(medioDeContacto));
   }
 
   agregarPronombre(pronombre) {
@@ -59,5 +65,15 @@ export class Colaborador {
 
   quitarHabilidad(habilidad) {
     this.habilidades = this.habilidades.filter((h) => !h.equals(habilidad));
+  }
+
+  // Lo que se ve de la persona hacia afuera. JSON.stringify (y por lo tanto
+  // res.json) llama a toJSON() si existe, asi que ningun endpoint puede
+  // filtrar los medios de contacto por olvido: "no se muestran de forma
+  // publica en la plataforma, pero quedan registrados internamente".
+  toJSON() {
+    const publico = { ...this };
+    delete publico.mediosDeContacto;
+    return publico;
   }
 }

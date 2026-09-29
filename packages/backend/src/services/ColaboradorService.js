@@ -1,4 +1,6 @@
 import { Colaborador } from "../domain/Colaborador.js";
+import { MedioDeContacto } from "../domain/MedioDeContacto.js";
+import { esTipoMedioContactoValido } from "../domain/enums/TIPOS_MEDIOS_CONTACTO.js";
 import { DomainError } from "../errors/DomainError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
 import { ConflictError } from "../errors/ConflictError.js";
@@ -10,7 +12,17 @@ export class ColaboradorService {
     this.habilidadService = habilidadService;
   }
 
-  async crear({ nombreFantasia, nombre, apellido, cuentaGit, pronombres, presentacion, codigosHabilidades }) {
+  async crear({
+    nombreFantasia,
+    nombre,
+    apellido,
+    cuentaGit,
+    pronombres,
+    presentacion,
+    codigosHabilidades,
+    recibeMensajeriaInterna = true,
+    mediosDeContacto = [],
+  }) {
     this.validarIdentificacion({ nombreFantasia, nombre, apellido, cuentaGit });
 
     const colaborador = new Colaborador({
@@ -19,6 +31,15 @@ export class ColaboradorService {
       apellido,
       cuentaGit,
       presentacion,
+      recibeMensajeriaInterna,
+    });
+
+    mediosDeContacto.forEach((datos) => {
+      const medio = this.construirMedioDeContacto(datos);
+      // En el alta un repetido se ignora, igual que los pronombres del payload.
+      if (!colaborador.tieneMedioDeContacto(medio)) {
+        colaborador.agregarMedioDeContacto(medio);
+      }
     });
 
     if (pronombres) {
@@ -52,8 +73,12 @@ export class ColaboradorService {
     return colaborador;
   }
 
-  async actualizar(id, { pronombres, presentacion }) {
+  async actualizar(id, { pronombres, presentacion, recibeMensajeriaInterna }) {
     const colaborador = await this.buscarPorId(id);
+
+    if (recibeMensajeriaInterna !== undefined) {
+      colaborador.recibeMensajeriaInterna = recibeMensajeriaInterna;
+    }
 
     if (pronombres !== undefined) {
       colaborador.reemplazarPronombres(pronombres);
@@ -97,6 +122,43 @@ export class ColaboradorService {
 
     colaborador.quitarHabilidad(habilidad);
     return this.colaboradorRepository.guardar(colaborador);
+  }
+
+  // Los medios de contacto se registran pero no se muestran (ver
+  // Colaborador.toJSON): por eso el alta devuelve solo el medio cargado.
+  async agregarMedioDeContacto(id, datos) {
+    const colaborador = await this.buscarPorId(id);
+    const medio = this.construirMedioDeContacto(datos);
+
+    if (colaborador.tieneMedioDeContacto(medio)) {
+      throw new ConflictError(`El colaborador ya tiene registrado ese medio de contacto`);
+    }
+
+    colaborador.agregarMedioDeContacto(medio);
+    await this.colaboradorRepository.guardar(colaborador);
+    return medio;
+  }
+
+  async quitarMedioDeContacto(id, datos) {
+    const colaborador = await this.buscarPorId(id);
+    const medio = this.construirMedioDeContacto(datos);
+
+    if (!colaborador.tieneMedioDeContacto(medio)) {
+      throw new NotFoundError("El colaborador no tiene registrado ese medio de contacto");
+    }
+
+    colaborador.quitarMedioDeContacto(medio);
+    await this.colaboradorRepository.guardar(colaborador);
+  }
+
+  construirMedioDeContacto({ tipo, valor }) {
+    if (!esTipoMedioContactoValido(tipo)) {
+      throw new DomainError(`Tipo de medio de contacto invalido: ${tipo}`);
+    }
+    if (typeof valor !== "string" || valor.trim().length === 0) {
+      throw new DomainError("El valor del medio de contacto es obligatorio");
+    }
+    return new MedioDeContacto({ tipo, valor: valor.trim() });
   }
 
   validarIdentificacion({ nombreFantasia, nombre, apellido, cuentaGit }) {
