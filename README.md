@@ -38,7 +38,9 @@ El backend sigue una arquitectura de capas:
 | `src/models` | Schemas de Mongoose: la forma en que se **guarda** cada documento |
 | `src/controllers` | Traducción HTTP ↔ servicios |
 | `src/routes` | Definición de endpoints y middlewares por ruta |
-| `src/middlewares` | Validación de la entrada, 404 y manejo de errores |
+| `src/middlewares` | Validación, sanitización, límite de solicitudes, 404 y manejo de errores |
+| `src/canales` | Adaptadores de salida hacia servicios externos: email (nodemailer), WhatsApp y SMS |
+| `src/jobs` | Tareas periódicas: el cierre automático de proyectos |
 | `src/schemas` | Schemas de Zod: la forma de lo que entra por HTTP |
 | `src/composicion.js` | Raíz de composición: el único lugar que elige implementaciones |
 
@@ -62,11 +64,89 @@ Mongo.
 | `habilidads` | El catálogo. `_id` es el código (`desarrollo_node`) | — |
 | `colaboradors` | Colaboradores | `codigosHabilidades` |
 | `colectivos` | El colectivo **con sus proyectos, perfiles y colaboraciones embebidos** | `codigosHabilidades*` en perfiles, `colaboradorId` en colaboraciones |
+| `notificaciones` | Los mensajes internos de cada persona | `destinatarioId` |
 
 Colectivo es el agregado raíz: todo lo que le pertenece viaja dentro de su
 documento y se guarda entero. Habilidades y colaboradores son compartidos, así
 que se guardan por referencia y se rehidratan al leer. (Los nombres de colección
 en inglés "mal pluralizados" los pone Mongoose automáticamente.)
+
+Las notificaciones van en su propia colección y no embebidas en el colaborador:
+crecen sin límite y se consultan paginadas, dos cosas que un array embebido hace
+mal.
+
+## Segunda entrega: qué hace la API
+
+La documentación completa de cada ruta está en Swagger (`/docs`). Este es el
+mapa, con el requerimiento del enunciado que resuelve cada cosa.
+
+### Requerimientos mínimos
+
+| Funcionalidad | Rutas |
+|---|---|
+| Perfiles (CRUD) | `/proyectos/:id/perfiles...` |
+| Medios de contacto: se registran pero **nunca se muestran** | `POST /colaboradores/:id/medios-de-contacto`, `DELETE .../medios-de-contacto/:tipo/:valor` |
+| Contribuciones anónimas | `esPublica: false` en `POST /proyectos/:id/colaboraciones` |
+| Búsqueda de colaboradoras según un perfil | `GET /proyectos/:id/perfiles/:perfilId/colaboradoras-potenciales` |
+| Contactarlas (mensaje interno) | `POST /proyectos/:id/perfiles/:perfilId/invitaciones` |
+| Notificaciones internas, replicadas por email/WhatsApp/SMS | `GET /colaboradores/:id/notificaciones`, `POST .../notificaciones/:notificacionId/lectura` |
+
+### Requerimientos adicionales
+
+| # | Requerimiento | Cómo |
+|---|---|---|
+| 8 | Aceptación y rechazo automático de postulaciones | `modoAceptacion` y `limiteVacantes` en el proyecto; `POST .../colaboraciones/:colaboracionId/aceptacion` y `/rechazo` |
+| 9 | Notificaciones automáticas | Al crear un proyecto se avisa a las personas compatibles; al crear una persona, se le avisa qué proyectos le sirven |
+| 10 | Cierre automático de proyectos | `fechaCierre` en el proyecto; `src/jobs/cierreAutomatico.js` revisa cada minuto |
+| 11 | Sanitización | `src/middlewares/sanitizar.js`: saca todo el HTML de los textos que entran |
+| 14 | Límite de solicitudes | `src/middlewares/limiteDeTasa.js`: 300 cada 15 min por IP; 30 por minuto en búsquedas y estadísticas |
+| 16, 30 | Estadísticas globales / API pública | `GET /estadisticas`, con el Aggregation Framework |
+| 17 | Estadísticas por organización | `GET /colectivos/:id/estadisticas`; `GET /proyectos/:id` suma visualizaciones |
+| 19 | Línea de tiempo | `GET /colectivos/:id/timeline` |
+| 23 | Eliminación de colectivos | `POST /colectivos/:id/baja` |
+| 27 | Redes sociales | `redesSociales` en colectivos y colaboradores |
+| 34 | Etiquetas | `etiquetas` en colectivos y proyectos; filtro `?etiqueta=` en los listados |
+| 38 | Markdown (backend) | Las descripciones lo guardan intacto; el renderizado es del frontend (3ra entrega) |
+| 39 | Valoraciones mutuas | `POST .../colaboraciones/:colaboracionId/finalizacion` y `/valoraciones`; `GET /colaboradores/:id/valoraciones`, `GET /colectivos/:id/valoraciones` |
+
+Los adicionales 13, 18, 21, 29 y 35 quedan para la tercera entrega: todos
+necesitan saber quién está usando la plataforma (un equipo administrativo, o la
+organización dueña del proyecto), y los usuarios llegan con la autenticación.
+
+### Ciclo de una postulación
+
+```
+                ┌──────────▶ ACEPTADA ──────────▶ FINALIZADA ──▶ se pueden valorar
+  se postula ──▶ PENDIENTE
+                └──────────▶ RECHAZADA
+```
+
+| Modo | Límite | Qué pasa |
+|---|---|---|
+| `TODO_SUMA` (por defecto) | no se permite | Se acepta en el momento |
+| `HASTA_LLENAR_VACANTES` | obligatorio | Espera hasta juntar tantas como vacantes; ahí se aceptan todas y se cierra |
+| `REVISION_MANUAL` | opcional | Nada automático |
+
+Cerrar un proyecto (a mano, por fecha o porque el colectivo se dio de baja)
+siempre tiene las mismas consecuencias: se rechazan las postulaciones pendientes
+y terminan las colaboraciones en curso.
+
+### Variables de entorno
+
+| Variable | Obligatoria | Qué hace |
+|---|---|---|
+| `MONGO_URI` | sí | Conexión a MongoDB |
+| `SERVER_PORT` | no (8000) | Puerto de la API |
+| `SMTP_URL` | no | Servidor SMTP para mandar las notificaciones por email. Sin esto se simulan (quedan en el log) |
+| `SMTP_REMITENTE` | no | El "De:" de esos emails |
+| `LIMITE_SOLICITUDES_GENERAL` | no (300) | Solicitudes por IP cada 15 minutos |
+| `LIMITE_SOLICITUDES_BUSQUEDAS` | no (30) | Solicitudes por IP por minuto en búsquedas y estadísticas |
+| `CIERRE_AUTOMATICO_INTERVALO_MS` | no (60000) | Cada cuánto se buscan proyectos con la fecha de cierre vencida |
+
+WhatsApp y SMS se simulan siempre: requieren un proveedor pago y el enunciado
+pide privilegiar herramientas económicas. Enchufar uno real es escribir otra
+clase con un método `enviar()` en `src/canales/` y cambiar una línea en
+`composicion.js`.
 
 ### Manejo de errores
 
@@ -162,10 +242,23 @@ arrancar carga el catálogo de habilidades semilla si la colección está vacía
 
 ## Tests
 
-Jest sobre la capa de dominio y la de servicios, sin HTTP y sin base de datos:
-los services se arman con los repositorios en memoria
+Jest sobre la capa de dominio y la de servicios, sin base de datos: los
+services se arman con los repositorios en memoria
 (`componerApp({ repositorios: crearRepositoriosEnMemoria() })`, ver
 `tests/fixtures.js`). No hace falta tener Mongo ni Docker levantados.
+
+Además, `tests/http/` levanta la app Express entera (rutas, validación,
+sanitización, límite de solicitudes) sobre esos mismos repositorios y le hace
+pedidos con supertest, sin abrir un puerto. Prueban lo que los tests de services
+no ven: que una ruta exista, que Zod rechace lo que tiene que rechazar y que la
+respuesta no muestre lo que no debe (medios de contacto, autores anónimos).
+
+| Carpeta | Qué prueba |
+|---|---|
+| `tests/domain` | Entidades |
+| `tests/services` | Casos de uso, con repositorios en memoria |
+| `tests/http` | Rutas y middlewares, con supertest |
+| `tests/middlewares` | La sanitización de textos |
 
 ```bash
 npm test                                     # todo
@@ -174,6 +267,19 @@ npm test --workspace=backend -- --watch      # en watch
 
 Por eso las implementaciones en memoria **no se borran** cuando llegue MongoDB:
 son el doble de test que hace posible correr estos tests sin levantar una base.
+
+### Probar las estadísticas contra Mongo
+
+Los pipelines del Aggregation Framework (`src/repositories/pipelinesDeEstadisticas.js`)
+solo corren en Mongo: el repositorio en memoria calcula lo mismo en JavaScript
+para los tests del service. Para verlos andar de verdad, con Docker levantado:
+
+```bash
+docker compose up -d --build
+# cargar algunos datos (colectivos, proyectos, postulaciones) y después:
+curl http://localhost:8000/estadisticas
+curl http://localhost:8000/colectivos/<id>/estadisticas
+```
 
 ## Despliegue
 
