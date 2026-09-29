@@ -12,6 +12,7 @@ import {
 } from "../schemas/perfilSchema.js";
 import { invitacionSchema } from "../schemas/reclutamientoSchema.js";
 import { listadoConEtiquetaSchema } from "../schemas/comunesSchema.js";
+import { valoracionSchema } from "../schemas/valoracionSchema.js";
 
 export function crearProyectosRouter(
   proyectoController,
@@ -86,6 +87,17 @@ export function crearProyectosRouter(
     postulacionController.aceptar,
   );
   router.post("/:id/colaboraciones/:colaboracionId/rechazo", postulacionController.rechazar);
+
+  // Fin de una colaboracion y valoraciones mutuas (req. adicional 39).
+  router.post(
+    "/:id/colaboraciones/:colaboracionId/finalizacion",
+    postulacionController.finalizar,
+  );
+  router.post(
+    "/:id/colaboraciones/:colaboracionId/valoraciones",
+    validarBody(valoracionSchema),
+    postulacionController.valorar,
+  );
 
   return router;
 }

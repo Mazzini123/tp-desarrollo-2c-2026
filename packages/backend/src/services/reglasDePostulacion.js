@@ -47,9 +47,16 @@ export function aplicarModoDeAceptacion(proyecto, fecha) {
 // consecuencias que uno manual, se rechazan todas las postulaciones
 // existentes y ya no se pueden crear ni aceptar nuevas postulaciones". Por eso
 // el cierre manual (finalizar) y el automatico pasan los dos por aca.
+//
+// Ademas, las colaboraciones que estaban en curso terminan con el proyecto: a
+// partir de ahi las dos partes pueden valorarse (requerimiento adicional 39).
 export function cerrarProyecto(proyecto, fecha) {
   proyecto.finalizarProyecto(fecha);
-  return { aceptadas: [], rechazadas: rechazarPendientes(proyecto, fecha) };
+
+  const finalizadas = proyecto.colaboraciones.filter((c) => c.estaAceptada());
+  finalizadas.forEach((c) => c.finalizar(fecha));
+
+  return { aceptadas: [], rechazadas: rechazarPendientes(proyecto, fecha), finalizadas };
 }
 
 export function rechazarPendientes(proyecto, fecha) {
@@ -84,18 +91,28 @@ export function validarModoDeAceptacion(modoAceptacion, limiteVacantes, aceptada
 
 // Le avisa a cada persona como se resolvio su postulacion. Nunca hace fallar
 // la operacion que la resolvio: un aviso que no sale no deshace la aceptacion.
-export async function notificarResoluciones(notificacionService, proyecto, { aceptadas, rechazadas }) {
+export async function notificarResoluciones(
+  notificacionService,
+  proyecto,
+  { aceptadas = [], rechazadas = [], finalizadas = [] },
+) {
+  const titulo = `"${proyecto.titulo}"`;
   const avisos = [
-    ...aceptadas.map((c) => [c, TIPO_NOTIFICACION.POSTULACION_ACEPTADA, "aceptada"]),
-    ...rechazadas.map((c) => [c, TIPO_NOTIFICACION.POSTULACION_RECHAZADA, "rechazada"]),
+    ...aceptadas.map((c) => [c, TIPO_NOTIFICACION.POSTULACION_ACEPTADA, `Tu postulacion a ${titulo} fue aceptada`]),
+    ...rechazadas.map((c) => [c, TIPO_NOTIFICACION.POSTULACION_RECHAZADA, `Tu postulacion a ${titulo} fue rechazada`]),
+    ...finalizadas.map((c) => [
+      c,
+      TIPO_NOTIFICACION.COLABORACION_FINALIZADA,
+      `Tu colaboracion en ${titulo} finalizo: ya podes valorar al colectivo`,
+    ]),
   ];
 
-  for (const [colaboracion, tipo, resultado] of avisos) {
+  for (const [colaboracion, tipo, asunto] of avisos) {
     try {
       await notificacionService.notificar(colaboracion.colaborador, {
         tipo,
-        asunto: `Tu postulacion a "${proyecto.titulo}" fue ${resultado}`,
-        contenido: `Tu postulacion al proyecto "${proyecto.titulo}" fue ${resultado}.`,
+        asunto,
+        contenido: `${asunto}.`,
         referencias: { proyectoId: proyecto.id, colaboracionId: colaboracion.id },
       });
     } catch (error) {

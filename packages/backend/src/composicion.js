@@ -126,13 +126,14 @@ export function componerApp({
 
   const colaboracionService = new ColaboracionService({
     colectivoRepository,
+    colectivoService,
     proyectoService,
     colaboradorService,
     notificacionService,
   });
 
   const controllers = {
-    colectivo: new ColectivoController({ colectivoService, proyectoService }),
+    colectivo: new ColectivoController({ colectivoService, proyectoService, colaboracionService }),
     proyecto: new ProyectoController({ proyectoService, colaboracionService }),
     perfil: new PerfilController({ perfilService }),
     habilidad: new HabilidadController({ habilidadService }),

@@ -2,11 +2,20 @@ import { Colaboracion } from "../domain/Colaboracion.js";
 import { DomainError } from "../errors/DomainError.js";
 import { ConflictError } from "../errors/ConflictError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
+import { Valoracion } from "../domain/Valoracion.js";
+import { AUTOR_VALORACION } from "../domain/enums/AUTOR_VALORACION.js";
 import { aplicarModoDeAceptacion, notificarResoluciones } from "./reglasDePostulacion.js";
 
 export class ColaboracionService {
-  constructor({ colectivoRepository, proyectoService, colaboradorService, notificacionService }) {
+  constructor({
+    colectivoRepository,
+    colectivoService,
+    proyectoService,
+    colaboradorService,
+    notificacionService,
+  }) {
     this.colectivoRepository = colectivoRepository;
+    this.colectivoService = colectivoService;
     this.proyectoService = proyectoService;
     this.colaboradorService = colaboradorService;
     this.notificacionService = notificacionService;
@@ -123,6 +132,99 @@ export class ColaboracionService {
     return colaboracion;
   }
 
+  // La persona deja el proyecto (o termina su parte) antes de que el proyecto
+  // se cierre. Desde ahi, las dos partes pueden valorarse.
+  async finalizar(proyectoId, colaboracionId, ahora = new Date()) {
+    const { colectivo, proyecto, colaboracion } = await this.buscarColaboracion(
+      proyectoId,
+      colaboracionId,
+    );
+
+    if (!colaboracion.estaAceptada()) {
+      throw new ConflictError(
+        `Solo se puede finalizar una colaboracion aceptada (esta esta ${colaboracion.estado})`,
+      );
+    }
+
+    colaboracion.finalizar(ahora);
+    await this.colectivoRepository.guardar(colectivo);
+    await notificarResoluciones(this.notificacionService, proyecto, {
+      finalizadas: [colaboracion],
+    });
+
+    return colaboracion;
+  }
+
+  // Requerimiento adicional 39: "Al finalizar una colaboracion, tanto el
+  // colectivo como la colaboradora pueden calificarse mutuamente (puntaje +
+  // comentario breve)". Cada parte, una sola vez.
+  async valorar(proyectoId, colaboracionId, { autor, puntaje, comentario }, ahora = new Date()) {
+    const { colectivo, colaboracion } = await this.buscarColaboracion(proyectoId, colaboracionId);
+
+    if (!colaboracion.estaFinalizada()) {
+      throw new ConflictError("Solo se puede valorar una colaboracion finalizada");
+    }
+
+    if (!Number.isInteger(puntaje) || puntaje < 1 || puntaje > 5) {
+      throw new DomainError("El puntaje tiene que ser un entero de 1 a 5");
+    }
+
+    const campo =
+      autor === AUTOR_VALORACION.COLECTIVO ? "valoracionDelColectivo" : "valoracionDelColaborador";
+
+    if (colaboracion[campo] !== null) {
+      throw new ConflictError("Esa parte ya valoro esta colaboracion");
+    }
+
+    colaboracion[campo] = new Valoracion({ puntaje, comentario, fecha: ahora });
+    await this.colectivoRepository.guardar(colectivo);
+
+    return colaboracion[campo];
+  }
+
+  // "...visible en el historial publico de ambos".
+  // Lo que los colectivos opinaron de la persona. Las colaboraciones anonimas
+  // no aparecen: mostrarlas diria justamente quien las hizo.
+  async listarValoracionesDeColaborador(colaboradorId) {
+    await this.colaboradorService.buscarPorId(colaboradorId);
+    const colectivos = await this.colectivoRepository.buscarColectivosDeColaborador(colaboradorId);
+
+    const valoraciones = colectivos.flatMap((colectivo) =>
+      colectivo.proyectos.flatMap((proyecto) =>
+        proyecto.colaboraciones
+          .filter(
+            (c) =>
+              c.colaborador.id === colaboradorId && c.esPublica && c.valoracionDelColectivo,
+          )
+          .map((c) => ({
+            colectivo: { id: colectivo.id, nombre: colectivo.nombre },
+            proyecto: { id: proyecto.id, titulo: proyecto.titulo },
+            ...c.valoracionDelColectivo,
+          })),
+      ),
+    );
+
+    return resumirValoraciones(valoraciones);
+  }
+
+  // Lo que las personas opinaron del colectivo. Si la colaboracion fue
+  // anonima, la opinion aparece sin autor.
+  async listarValoracionesDeColectivo(colectivoId) {
+    const colectivo = await this.colectivoService.buscarPorId(colectivoId);
+
+    const valoraciones = colectivo.proyectos.flatMap((proyecto) =>
+      proyecto.colaboraciones
+        .filter((c) => c.valoracionDelColaborador)
+        .map((c) => ({
+          proyecto: { id: proyecto.id, titulo: proyecto.titulo },
+          autor: c.esPublica ? c.colaborador : null,
+          ...c.valoracionDelColaborador,
+        })),
+    );
+
+    return resumirValoraciones(valoraciones);
+  }
+
   verificarPendiente(proyecto, colaboracion, accion) {
     if (!proyecto.estaAbierto()) {
       throw new ConflictError(`No se puede ${accion} una postulacion de un proyecto finalizado`);
@@ -142,7 +244,9 @@ export class ColaboracionService {
   // aparecen, porque listarlas aca diria justamente quien las hizo.
   async listarPorColaborador(colaboradorId) {
     const colaborador = await this.colaboradorService.buscarPorId(colaboradorId);
-    const proyectos = await this.colectivoRepository.listarProyectos();
+    // Solo los colectivos donde participo, no toda la base.
+    const colectivos = await this.colectivoRepository.buscarColectivosDeColaborador(colaboradorId);
+    const proyectos = colectivos.flatMap((colectivo) => colectivo.proyectos);
 
     return proyectos.flatMap((proyecto) =>
       proyecto.colaboraciones
@@ -150,4 +254,16 @@ export class ColaboracionService {
         .map((c) => ({ proyectoId: proyecto.id, colaboracion: c })),
     );
   }
+}
+
+function resumirValoraciones(valoraciones) {
+  const cantidad = valoraciones.length;
+  const suma = valoraciones.reduce((total, v) => total + v.puntaje, 0);
+
+  return {
+    cantidad,
+    // Un decimal; null si todavia no hay ninguna.
+    promedio: cantidad === 0 ? null : Math.round((suma / cantidad) * 10) / 10,
+    valoraciones: valoraciones.sort((a, b) => b.fecha - a.fecha),
+  };
 }

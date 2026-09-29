@@ -46,6 +46,7 @@ export function crearColaboradoresRouter(colaboradorController, notificacionCont
   );
 
   router.get("/:id/colaboraciones", colaboradorController.listarColaboraciones);
+  router.get("/:id/valoraciones", colaboradorController.listarValoraciones);
 
   // La bandeja de mensajes internos de la persona.
   router.get(

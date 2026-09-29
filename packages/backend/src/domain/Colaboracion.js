@@ -11,6 +11,9 @@ export class Colaboracion {
     fecha = new Date(),
     estado = COLABORACION_ESTADO.PENDIENTE,
     fechaResolucion = null,
+    fechaFin = null,
+    valoracionDelColectivo = null,
+    valoracionDelColaborador = null,
   }) {
     this.id = id;
     this.colaborador = colaborador;
@@ -19,6 +22,11 @@ export class Colaboracion {
     this.estado = estado;
     // Cuando se acepto o se rechazo.
     this.fechaResolucion = fechaResolucion;
+    this.fechaFin = fechaFin;
+    // Requerimiento adicional 39: lo que el colectivo opina de la persona, y
+    // lo que la persona opina del colectivo.
+    this.valoracionDelColectivo = valoracionDelColectivo;
+    this.valoracionDelColaborador = valoracionDelColaborador;
   }
 
   estaPendiente() {
@@ -37,6 +45,15 @@ export class Colaboracion {
   rechazar(fecha) {
     this.estado = COLABORACION_ESTADO.RECHAZADA;
     this.fechaResolucion = fecha;
+  }
+
+  estaFinalizada() {
+    return this.estado === COLABORACION_ESTADO.FINALIZADA;
+  }
+
+  finalizar(fecha) {
+    this.estado = COLABORACION_ESTADO.FINALIZADA;
+    this.fechaFin = fecha;
   }
 
   // Contribucion anonima: "figurara efectivamente en la plataforma como de

@@ -39,6 +39,12 @@ export class InMemoryColectivoRepository extends InMemoryRepository {
     return this.listar().filter((c) => c.proyectos.some((p) => p.cierreVencido(ahora)));
   }
 
+  buscarColectivosDeColaborador(colaboradorId) {
+    return this.listar().filter((colectivo) =>
+      colectivo.proyectos.some((p) => p.colaboraciones.some((c) => c.colaborador.id === colaboradorId)),
+    );
+  }
+
   listarProyectos() {
     return this.listar().flatMap((colectivo) => colectivo.proyectos);
   }

@@ -1,10 +1,11 @@
 import { BaseController } from "./BaseController.js";
 
 export class ColectivoController extends BaseController {
-  constructor({ colectivoService, proyectoService }) {
+  constructor({ colectivoService, proyectoService, colaboracionService }) {
     super();
     this.colectivoService = colectivoService;
     this.proyectoService = proyectoService;
+    this.colaboracionService = colaboracionService;
   }
 
   crear = async (req, res) => {
@@ -35,5 +36,11 @@ export class ColectivoController extends BaseController {
 
   listarProyectos = async (req, res) => {
     res.status(200).json(await this.proyectoService.listarPorColectivo(req.params.id));
+  };
+
+  listarValoraciones = async (req, res) => {
+    res
+      .status(200)
+      .json(await this.colaboracionService.listarValoracionesDeColectivo(req.params.id));
   };
 }

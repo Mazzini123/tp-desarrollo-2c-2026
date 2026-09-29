@@ -21,6 +21,7 @@ export function crearColectivosRouter(colectivoController) {
     colectivoController.crearProyecto,
   );
   router.get("/:id/proyectos", colectivoController.listarProyectos);
+  router.get("/:id/valoraciones", colectivoController.listarValoraciones);
 
   return router;
 }

@@ -7,6 +7,7 @@ import { Colaboracion } from "../domain/Colaboracion.js";
 import { Logro } from "../domain/Logro.js";
 import { Ubicacion } from "../domain/Ubicacion.js";
 import { RedSocial } from "../domain/RedSocial.js";
+import { Valoracion } from "../domain/Valoracion.js";
 import { COLABORACION_ESTADO } from "../domain/enums/COLABORACION_ESTADO.js";
 import { MODO_ACEPTACION } from "../domain/enums/MODO_ACEPTACION.js";
 
@@ -39,7 +40,20 @@ function colaboracionADocumento(colaboracion) {
     fecha: colaboracion.fecha,
     estado: colaboracion.estado,
     fechaResolucion: colaboracion.fechaResolucion,
+    fechaFin: colaboracion.fechaFin,
+    valoracionDelColectivo: valoracionADocumento(colaboracion.valoracionDelColectivo),
+    valoracionDelColaborador: valoracionADocumento(colaboracion.valoracionDelColaborador),
   };
+}
+
+function valoracionADocumento(valoracion) {
+  return valoracion
+    ? { puntaje: valoracion.puntaje, comentario: valoracion.comentario, fecha: valoracion.fecha }
+    : null;
+}
+
+function valoracionADominio(documento) {
+  return documento ? new Valoracion(documento) : null;
 }
 
 function proyectoADocumento(proyecto) {
@@ -157,6 +171,9 @@ export class MongoColectivoRepository {
       // no tienen estado: en ese entonces anotarse era quedar adentro.
       estado: documento.estado ?? COLABORACION_ESTADO.ACEPTADA,
       fechaResolucion: documento.fechaResolucion ?? null,
+      fechaFin: documento.fechaFin ?? null,
+      valoracionDelColectivo: valoracionADominio(documento.valoracionDelColectivo),
+      valoracionDelColaborador: valoracionADominio(documento.valoracionDelColaborador),
     });
   }
 
@@ -298,6 +315,16 @@ export class MongoColectivoRepository {
       "proyectos.estado": "ABIERTO",
       "proyectos.fechaCierre": { $lte: ahora },
     }).lean();
+    return this.aDominioVarios(documentos);
+  }
+
+  // Los colectivos en los que la persona tiene alguna colaboracion.
+  async buscarColectivosDeColaborador(colaboradorId) {
+    const documentos = await ColectivoModel.find({
+      "proyectos.colaboraciones.colaboradorId": colaboradorId,
+    })
+      .sort(ORDEN)
+      .lean();
     return this.aDominioVarios(documentos);
   }
 
