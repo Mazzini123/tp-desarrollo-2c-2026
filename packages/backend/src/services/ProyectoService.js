@@ -3,6 +3,7 @@ import { DomainError } from "../errors/DomainError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
 import { ConflictError } from "../errors/ConflictError.js";
 import { armarPaginado } from "../utils/paginacion.js";
+import { normalizarEtiquetas } from "../domain/etiquetas.js";
 
 export class ProyectoService {
   constructor({ colectivoRepository, colectivoService, perfilService }) {
@@ -11,7 +12,7 @@ export class ProyectoService {
     this.perfilService = perfilService;
   }
 
-  async crear({ colectivoId, titulo, descripcion, perfiles }) {
+  async crear({ colectivoId, titulo, descripcion, perfiles, etiquetas = [] }) {
     if (!Array.isArray(perfiles) || perfiles.length === 0) {
       throw new DomainError("El proyecto debe tener al menos un perfil");
     }
@@ -22,6 +23,7 @@ export class ProyectoService {
       perfiles.map((datos) => this.perfilService.construirPerfil(datos)),
     );
     const proyecto = new Proyecto({ titulo, descripcion });
+    proyecto.etiquetas = normalizarEtiquetas(etiquetas);
 
     perfilesConstruidos.forEach((perfil) => proyecto.agregarPerfil(perfil));
     colectivo.agregarProyecto(proyecto);
@@ -30,9 +32,11 @@ export class ProyectoService {
     return proyecto;
   }
 
-  async listar({ numeroPagina = 1, limitePorPagina = 10 } = {}) {
+  async listar({ numeroPagina = 1, limitePorPagina = 10, etiqueta } = {}) {
     return armarPaginado(
-      await this.colectivoRepository.listarProyectosPaginado(numeroPagina, limitePorPagina),
+      await this.colectivoRepository.listarProyectosPaginado(numeroPagina, limitePorPagina, {
+        etiqueta,
+      }),
       numeroPagina,
       limitePorPagina,
     );
@@ -62,7 +66,7 @@ export class ProyectoService {
     }
   }
 
-  async actualizar(proyectoId, { titulo, descripcion }) {
+  async actualizar(proyectoId, { titulo, descripcion, etiquetas }) {
     const { colectivo, proyecto } = await this.buscarProyectoConColectivo(proyectoId);
     this.verificarAbierto(proyecto, "modificar");
 
@@ -72,6 +76,10 @@ export class ProyectoService {
 
     if (descripcion !== undefined) {
       proyecto.descripcion = descripcion;
+    }
+
+    if (etiquetas !== undefined) {
+      proyecto.etiquetas = normalizarEtiquetas(etiquetas);
     }
 
     await this.colectivoRepository.guardar(colectivo);

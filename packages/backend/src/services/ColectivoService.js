@@ -6,13 +6,15 @@ import { esTipoColectivoValido } from "../domain/enums/TIPO_COLECTIVO.js";
 import { TIPO_UBICACION, esTipoUbicacionValido } from "../domain/enums/TIPO_UBICACION.js";
 import { tieneContenido } from "../utils/validaciones.js";
 import { armarPaginado } from "../utils/paginacion.js";
+import { construirRedesSociales } from "../domain/RedSocial.js";
+import { normalizarEtiquetas } from "../domain/etiquetas.js";
 
 export class ColectivoService {
   constructor({ colectivoRepository }) {
     this.colectivoRepository = colectivoRepository;
   }
 
-  async crear({ nombre, descripcion, tipoColectivo, ubicacion }) {
+  async crear({ nombre, descripcion, tipoColectivo, ubicacion, redesSociales = [], etiquetas = [] }) {
     this.validarNombre(nombre);
     this.validarDescripcion(descripcion);
     this.validarTipoColectivo(tipoColectivo);
@@ -23,13 +25,15 @@ export class ColectivoService {
       tipoColectivo,
       ubicacion: this.construirUbicacion(ubicacion),
     });
+    colectivo.redesSociales = construirRedesSociales(redesSociales);
+    colectivo.etiquetas = normalizarEtiquetas(etiquetas);
 
     return this.colectivoRepository.guardar(colectivo);
   }
 
-  async listar({ numeroPagina = 1, limitePorPagina = 10 } = {}) {
+  async listar({ numeroPagina = 1, limitePorPagina = 10, etiqueta } = {}) {
     return armarPaginado(
-      await this.colectivoRepository.listarPaginado(numeroPagina, limitePorPagina),
+      await this.colectivoRepository.listarPaginado(numeroPagina, limitePorPagina, { etiqueta }),
       numeroPagina,
       limitePorPagina,
     );
@@ -43,7 +47,7 @@ export class ColectivoService {
     return colectivo;
   }
 
-  async actualizar(id, { nombre, descripcion, ubicacion }) {
+  async actualizar(id, { nombre, descripcion, ubicacion, redesSociales, etiquetas }) {
     const colectivo = await this.buscarPorId(id);
 
     if (nombre !== undefined) {
@@ -58,6 +62,14 @@ export class ColectivoService {
 
     if (ubicacion !== undefined) {
       colectivo.ubicacion = this.construirUbicacion(ubicacion);
+    }
+
+    if (redesSociales !== undefined) {
+      colectivo.redesSociales = construirRedesSociales(redesSociales);
+    }
+
+    if (etiquetas !== undefined) {
+      colectivo.etiquetas = normalizarEtiquetas(etiquetas);
     }
 
     return this.colectivoRepository.guardar(colectivo);

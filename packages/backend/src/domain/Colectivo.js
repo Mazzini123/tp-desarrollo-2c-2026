@@ -8,6 +8,8 @@ export class Colectivo {
     this.tipoColectivo = tipoColectivo;
     this.ubicacion = ubicacion;
     this.proyectos = [];
+    this.redesSociales = [];
+    this.etiquetas = [];
   }
 
   agregarProyecto(proyecto) {

@@ -1,12 +1,14 @@
 import { z } from "zod";
 import { crearPerfilSchema } from "./perfilSchema.js";
 import { tieneAlgunCampoDefinido } from "../utils/validaciones.js";
+import { etiquetasSchema } from "./comunesSchema.js";
 
 export const crearProyectoSchema = z
   .object({
     titulo: z.string().trim().min(1),
     descripcion: z.string().trim().min(1),
     perfiles: z.array(crearPerfilSchema).min(1),
+    etiquetas: etiquetasSchema.default([]),
   })
   .strict();
 
@@ -14,6 +16,7 @@ export const actualizarProyectoSchema = z
   .object({
     titulo: z.string().trim().min(1).optional(),
     descripcion: z.string().trim().min(1).optional(),
+    etiquetas: etiquetasSchema.optional(),
   })
   .strict()
   .refine(tieneAlgunCampoDefinido, {

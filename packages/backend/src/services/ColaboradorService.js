@@ -1,5 +1,6 @@
 import { Colaborador } from "../domain/Colaborador.js";
 import { MedioDeContacto } from "../domain/MedioDeContacto.js";
+import { construirRedesSociales } from "../domain/RedSocial.js";
 import { esTipoMedioContactoValido } from "../domain/enums/TIPOS_MEDIOS_CONTACTO.js";
 import { DomainError } from "../errors/DomainError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
@@ -22,6 +23,7 @@ export class ColaboradorService {
     codigosHabilidades,
     recibeMensajeriaInterna = true,
     mediosDeContacto = [],
+    redesSociales = [],
   }) {
     this.validarIdentificacion({ nombreFantasia, nombre, apellido, cuentaGit });
 
@@ -33,6 +35,8 @@ export class ColaboradorService {
       presentacion,
       recibeMensajeriaInterna,
     });
+
+    colaborador.redesSociales = construirRedesSociales(redesSociales);
 
     mediosDeContacto.forEach((datos) => {
       const medio = this.construirMedioDeContacto(datos);
@@ -73,8 +77,12 @@ export class ColaboradorService {
     return colaborador;
   }
 
-  async actualizar(id, { pronombres, presentacion, recibeMensajeriaInterna }) {
+  async actualizar(id, { pronombres, presentacion, recibeMensajeriaInterna, redesSociales }) {
     const colaborador = await this.buscarPorId(id);
+
+    if (redesSociales !== undefined) {
+      colaborador.redesSociales = construirRedesSociales(redesSociales);
+    }
 
     if (recibeMensajeriaInterna !== undefined) {
       colaborador.recibeMensajeriaInterna = recibeMensajeriaInterna;

@@ -9,7 +9,8 @@ export class ProyectoController extends BaseController {
 
   listar = async (req, res) => {
     const paginacion = this.aPaginacionDeDominio(req.paginacion);
-    this.responderPaginado(res, await this.proyectoService.listar(paginacion));
+    const { etiqueta } = req.paginacion;
+    this.responderPaginado(res, await this.proyectoService.listar({ ...paginacion, etiqueta }));
   };
 
   obtenerPorId = async (req, res) => {

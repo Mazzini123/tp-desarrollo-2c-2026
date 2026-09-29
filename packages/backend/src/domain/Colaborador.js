@@ -20,6 +20,7 @@ export class Colaborador {
     this.habilidades = [];
     this.recibeMensajeriaInterna = recibeMensajeriaInterna;
     this.mediosDeContacto = [];
+    this.redesSociales = [];
   }
 
   tienePronombre(pronombre) {

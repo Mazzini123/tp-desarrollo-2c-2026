@@ -6,6 +6,7 @@ import { Compromiso } from "../domain/Compromiso.js";
 import { Colaboracion } from "../domain/Colaboracion.js";
 import { Logro } from "../domain/Logro.js";
 import { Ubicacion } from "../domain/Ubicacion.js";
+import { RedSocial } from "../domain/RedSocial.js";
 
 // Orden estable para paginar: primero por fecha de alta, y el _id desempata.
 const ORDEN = { createdAt: 1, _id: 1 };
@@ -53,6 +54,7 @@ function proyectoADocumento(proyecto) {
       descripcion: logro.descripcion,
       fecha: logro.fecha,
     })),
+    etiquetas: proyecto.etiquetas,
   };
 }
 
@@ -66,6 +68,8 @@ function aDocumento(colectivo) {
       ? { tipoUbicacion: colectivo.ubicacion.tipoUbicacion, nombre: colectivo.ubicacion.nombre }
       : null,
     proyectos: colectivo.proyectos.map(proyectoADocumento),
+    redesSociales: colectivo.redesSociales.map(({ nombre, url }) => ({ nombre, url })),
+    etiquetas: colectivo.etiquetas,
   };
 }
 
@@ -155,6 +159,7 @@ export class MongoColectivoRepository {
 
     proyecto.porcentajeConcrecion = documento.porcentajeConcrecion ?? 0;
     proyecto.logros = (documento.logros ?? []).map((logro) => new Logro(logro));
+    proyecto.etiquetas = documento.etiquetas ?? [];
 
     const [perfiles, colaboraciones] = await Promise.all([
       Promise.all((documento.perfiles ?? []).map((p) => this.perfilADominio(p, cache))),
@@ -179,6 +184,8 @@ export class MongoColectivoRepository {
       tipoColectivo: documento.tipoColectivo,
       ubicacion: documento.ubicacion ? new Ubicacion(documento.ubicacion) : null,
     });
+    colectivo.redesSociales = (documento.redesSociales ?? []).map((red) => new RedSocial(red));
+    colectivo.etiquetas = documento.etiquetas ?? [];
 
     colectivo.proyectos = await Promise.all(
       (documento.proyectos ?? []).map((p) => this.proyectoADominio(p, cache)),
@@ -217,12 +224,14 @@ export class MongoColectivoRepository {
     return this.aDominioVarios(documentos);
   }
 
-  async listarPaginado(numeroPagina, limitePorPagina) {
+  async listarPaginado(numeroPagina, limitePorPagina, { etiqueta } = {}) {
     const salto = (numeroPagina - 1) * limitePorPagina;
+    // Sobre un array, { etiquetas: "x" } matchea si "x" es uno de sus elementos.
+    const filtro = etiqueta ? { etiquetas: etiqueta } : {};
 
     const [documentos, total] = await Promise.all([
-      ColectivoModel.find().sort(ORDEN).skip(salto).limit(limitePorPagina).lean(),
-      ColectivoModel.countDocuments(),
+      ColectivoModel.find(filtro).sort(ORDEN).skip(salto).limit(limitePorPagina).lean(),
+      ColectivoModel.countDocuments(filtro),
     ]);
 
     return { items: await this.aDominioVarios(documentos), total };
@@ -265,8 +274,11 @@ export class MongoColectivoRepository {
     return colectivos.flatMap((colectivo) => colectivo.proyectos);
   }
 
-  async listarProyectosPaginado(numeroPagina, limitePorPagina) {
+  async listarProyectosPaginado(numeroPagina, limitePorPagina, { etiqueta } = {}) {
     const salto = (numeroPagina - 1) * limitePorPagina;
+    // Despues del $unwind cada documento es un proyecto: se filtra por las
+    // etiquetas del proyecto, no por las del colectivo.
+    const filtroPorEtiqueta = etiqueta ? [{ $match: { "proyectos.etiquetas": etiqueta } }] : [];
 
     // Los proyectos estan embebidos, asi que no se pueden paginar con un find.
     // $unwind "abre" cada colectivo en un documento por proyecto, y $facet
@@ -274,6 +286,7 @@ export class MongoColectivoRepository {
     const [resultado] = await ColectivoModel.aggregate([
       { $sort: ORDEN },
       { $unwind: "$proyectos" },
+      ...filtroPorEtiqueta,
       {
         $facet: {
           items: [{ $skip: salto }, { $limit: limitePorPagina }],

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { tieneAlgunCampoDefinido } from "../utils/validaciones.js";
 import { mediosDeContactoSchema } from "./medioDeContactoSchema.js";
+import { redesSocialesSchema } from "./comunesSchema.js";
 
 export const crearColaboradorSchema = z
   .object({
@@ -13,6 +14,7 @@ export const crearColaboradorSchema = z
     codigosHabilidades: z.array(z.string().trim().min(1)).default([]),
     recibeMensajeriaInterna: z.boolean().optional(),
     mediosDeContacto: mediosDeContactoSchema.default([]),
+    redesSociales: redesSocialesSchema.default([]),
   })
   .strict();
 
@@ -21,6 +23,7 @@ export const actualizarColaboradorSchema = z
     pronombres: z.array(z.string().trim().min(1)).optional(),
     presentacion: z.string().trim().min(1).nullish(),
     recibeMensajeriaInterna: z.boolean().optional(),
+    redesSociales: redesSocialesSchema.optional(),
   })
   .strict()
   .refine(tieneAlgunCampoDefinido, {

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { TIPO_COLECTIVO } from "../domain/enums/TIPO_COLECTIVO.js";
 import { TIPO_UBICACION } from "../domain/enums/TIPO_UBICACION.js";
 import { tieneAlgunCampoDefinido } from "../utils/validaciones.js";
+import { redesSocialesSchema, etiquetasSchema } from "./comunesSchema.js";
 
 export const ubicacionSchema = z
   .object({
@@ -16,6 +17,8 @@ export const crearColectivoSchema = z
     descripcion: z.string().trim().min(1),
     tipoColectivo: z.enum(Object.values(TIPO_COLECTIVO)),
     ubicacion: ubicacionSchema.nullish(),
+    redesSociales: redesSocialesSchema.default([]),
+    etiquetas: etiquetasSchema.default([]),
   })
   .strict();
 
@@ -24,6 +27,8 @@ export const actualizarColectivoSchema = z
     nombre: z.string().trim().min(1).optional(),
     descripcion: z.string().trim().min(1).optional(),
     ubicacion: ubicacionSchema.nullish(),
+    redesSociales: redesSocialesSchema.optional(),
+    etiquetas: etiquetasSchema.optional(),
   })
   .strict()
   .refine(tieneAlgunCampoDefinido, {

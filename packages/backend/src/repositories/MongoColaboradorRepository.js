@@ -1,6 +1,7 @@
 import { ColaboradorModel } from "../models/ColaboradorModel.js";
 import { Colaborador } from "../domain/Colaborador.js";
 import { MedioDeContacto } from "../domain/MedioDeContacto.js";
+import { RedSocial } from "../domain/RedSocial.js";
 
 function aDocumento(colaborador) {
   return {
@@ -16,6 +17,7 @@ function aDocumento(colaborador) {
       tipo: medio.tipo,
       valor: medio.valor,
     })),
+    redesSociales: colaborador.redesSociales.map(({ nombre, url }) => ({ nombre, url })),
     // Solo los codigos: las habilidades viven en su propia coleccion.
     codigosHabilidades: colaborador.habilidades.map((habilidad) => habilidad.codigo),
   };
@@ -48,6 +50,8 @@ export class MongoColaboradorRepository {
     colaborador.mediosDeContacto = (documento.mediosDeContacto ?? []).map(
       (medio) => new MedioDeContacto(medio),
     );
+
+    colaborador.redesSociales = (documento.redesSociales ?? []).map((red) => new RedSocial(red));
 
     const habilidades = await Promise.all(
       (documento.codigosHabilidades ?? []).map((codigo) =>

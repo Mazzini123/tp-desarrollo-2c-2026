@@ -11,6 +11,7 @@ import {
   crearPerfilSchema,
 } from "../schemas/perfilSchema.js";
 import { invitacionSchema } from "../schemas/reclutamientoSchema.js";
+import { listadoConEtiquetaSchema } from "../schemas/comunesSchema.js";
 
 export function crearProyectosRouter(
   proyectoController,
@@ -19,7 +20,7 @@ export function crearProyectosRouter(
 ) {
   const router = Router();
 
-  router.get("/", validarQuery(paginacionSchema), proyectoController.listar);
+  router.get("/", validarQuery(listadoConEtiquetaSchema), proyectoController.listar);
   router.get("/:id", proyectoController.obtenerPorId);
   router.put(
     "/:id",

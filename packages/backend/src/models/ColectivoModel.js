@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { redSocialSchema } from "./subesquemas.js";
 
 // Colectivo es el agregado raiz: proyectos, perfiles y colaboraciones viven
 // EMBEBIDOS en su documento. Habilidades y colaboradores son entidades
@@ -61,6 +62,7 @@ const proyectoSchema = new mongoose.Schema({
   perfiles: { type: [perfilSchema], default: [] },
   colaboraciones: { type: [colaboracionSchema], default: [] },
   logros: { type: [logroSchema], default: [] },
+  etiquetas: { type: [String], default: [] },
 });
 
 const colectivoSchema = new mongoose.Schema(
@@ -71,6 +73,8 @@ const colectivoSchema = new mongoose.Schema(
     tipoColectivo: { type: String, required: true },
     ubicacion: { type: ubicacionSchema, default: null },
     proyectos: { type: [proyectoSchema], default: [] },
+    redesSociales: { type: [redSocialSchema], default: [] },
+    etiquetas: { type: [String], default: [] },
   },
   {
     versionKey: false,
@@ -82,5 +86,8 @@ const colectivoSchema = new mongoose.Schema(
 
 // Para que buscarProyecto no recorra toda la coleccion.
 colectivoSchema.index({ "proyectos._id": 1 });
+// Para los filtros por etiqueta de GET /colectivos y GET /proyectos.
+colectivoSchema.index({ etiquetas: 1 });
+colectivoSchema.index({ "proyectos.etiquetas": 1 });
 
 export const ColectivoModel = mongoose.model("Colectivo", colectivoSchema);

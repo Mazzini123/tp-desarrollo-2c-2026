@@ -20,6 +20,7 @@ export class Proyecto {
     this.perfiles = [];
     this.urlSistema = urlSistema;
     this.urlRepositorio = urlRepositorio;
+    this.etiquetas = [];
   }
 
   estaAbierto() {
