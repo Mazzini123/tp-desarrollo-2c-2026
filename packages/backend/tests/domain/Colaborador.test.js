@@ -1,6 +1,5 @@
 import { Colaborador } from "../../src/domain/Colaborador.js";
 import { Habilidad } from "../../src/domain/Habilidad.js";
-import { ConflictError } from "../../src/errors/ConflictError.js";
 
 // Correccion C1: los pronombres son una lista y la unicidad la garantiza la
 // logica del dominio, no el tipo del atributo.
@@ -21,10 +20,12 @@ describe("Colaborador · pronombres", () => {
     expect(colaborador.pronombres).toEqual(["elle"]);
   });
 
-  test("agregar uno repetido tira ConflictError", () => {
+  // El rechazo del repetido (ConflictError) lo hace ColaboradorService: el
+  // dominio solo expone la pregunta. Ver ColaboradorService.test.js.
+  test("tienePronombre detecta uno ya cargado", () => {
     colaborador.agregarPronombre("elle");
-    expect(() => colaborador.agregarPronombre("elle")).toThrow(ConflictError);
-    expect(colaborador.pronombres).toEqual(["elle"]);
+    expect(colaborador.tienePronombre("elle")).toBe(true);
+    expect(colaborador.tienePronombre("ella")).toBe(false);
   });
 
   test("reemplazar la lista completa deduplica en silencio", () => {

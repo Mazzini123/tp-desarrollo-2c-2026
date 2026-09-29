@@ -9,9 +9,9 @@ export class ColaboracionService {
     this.colaboradorService = colaboradorService;
   }
 
-  registrar({ proyectoId, colaboradorId }) {
-    const { colectivo, proyecto } = this.proyectoService.buscarProyectoConColectivo(proyectoId);
-    const colaborador = this.colaboradorService.buscarPorId(colaboradorId);
+  async registrar({ proyectoId, colaboradorId }) {
+    const { colectivo, proyecto } = await this.proyectoService.buscarProyectoConColectivo(proyectoId);
+    const colaborador = await this.colaboradorService.buscarPorId(colaboradorId);
 
     if (!proyecto.estaAbierto()) {
       throw new ConflictError("No se puede anotar a un proyecto que ya está finalizado");
@@ -27,7 +27,7 @@ export class ColaboracionService {
 
     const colaboracion = new Colaboracion({ colaborador });
     proyecto.agregarColaboracion(colaboracion);
-    this.colectivoRepository.guardar(colectivo);
+    await this.colectivoRepository.guardar(colectivo);
 
     return colaboracion;
   }
@@ -36,14 +36,15 @@ export class ColaboracionService {
     return proyecto.yaColaboraron(colaborador);
   }
 
-  listarPorProyecto(proyectoId) {
-    return this.proyectoService.buscarPorId(proyectoId).colaboraciones;
+  async listarPorProyecto(proyectoId) {
+    return (await this.proyectoService.buscarPorId(proyectoId)).colaboraciones;
   }
 
-  listarPorColaborador(colaboradorId) {
-    const colaborador = this.colaboradorService.buscarPorId(colaboradorId);
+  async listarPorColaborador(colaboradorId) {
+    const colaborador = await this.colaboradorService.buscarPorId(colaboradorId);
+    const proyectos = await this.colectivoRepository.listarProyectos();
 
-    return this.colectivoRepository.listarProyectos().flatMap((proyecto) =>
+    return proyectos.flatMap((proyecto) =>
       proyecto.colaboraciones
         .filter((c) => c.colaborador.id === colaborador.id)
         .map((c) => ({ proyectoId: proyecto.id, colaboracion: c })),

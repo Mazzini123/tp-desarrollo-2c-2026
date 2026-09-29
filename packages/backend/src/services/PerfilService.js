@@ -15,12 +15,12 @@ export class PerfilService {
     this.habilidadService = habilidadService;
   }
 
-  listar(proyectoId) {
-    return this.buscarProyectoConColectivo(proyectoId).proyecto.perfiles;
+  async listar(proyectoId) {
+    return (await this.buscarProyectoConColectivo(proyectoId)).proyecto.perfiles;
   }
 
-  buscarProyectoConColectivo(proyectoId) {
-    const resultado = this.colectivoRepository.buscarProyecto(proyectoId);
+  async buscarProyectoConColectivo(proyectoId) {
+    const resultado = await this.colectivoRepository.buscarProyecto(proyectoId);
 
     if (!resultado) {
       throw new NotFoundError(`No existe un proyecto con id "${proyectoId}"`);
@@ -29,8 +29,8 @@ export class PerfilService {
     return resultado;
   }
 
-  buscarPerfilConProyecto(proyectoId, perfilId) {
-    const resultado = this.colectivoRepository.buscarPerfil(proyectoId, perfilId);
+  async buscarPerfilConProyecto(proyectoId, perfilId) {
+    const resultado = await this.colectivoRepository.buscarPerfil(proyectoId, perfilId);
 
     if (!resultado) {
       throw new NotFoundError(`No existe un perfil con id "${perfilId}" en el proyecto "${proyectoId}"`);
@@ -39,8 +39,8 @@ export class PerfilService {
     return resultado;
   }
 
-  buscarPorId(proyectoId, perfilId) {
-    return this.buscarPerfilConProyecto(proyectoId, perfilId).perfil;
+  async buscarPorId(proyectoId, perfilId) {
+    return (await this.buscarPerfilConProyecto(proyectoId, perfilId)).perfil;
   }
 
   verificarProyectoAbierto(proyecto, accion) {
@@ -49,18 +49,18 @@ export class PerfilService {
     }
   }
 
-  crear(proyectoId, datos) {
-    const { colectivo, proyecto } = this.buscarProyectoConColectivo(proyectoId);
+  async crear(proyectoId, datos) {
+    const { colectivo, proyecto } = await this.buscarProyectoConColectivo(proyectoId);
     this.verificarProyectoAbierto(proyecto, "agregar perfiles a");
 
-    const perfil = this.construirPerfil(datos);
+    const perfil = await this.construirPerfil(datos);
     proyecto.agregarPerfil(perfil);
-    this.colectivoRepository.guardar(colectivo);
+    await this.colectivoRepository.guardar(colectivo);
     return perfil;
   }
 
-  actualizar(proyectoId, perfilId, { descripcion, compromiso, modalidadColaboracion }) {
-    const { colectivo, proyecto, perfil } = this.buscarPerfilConProyecto(proyectoId, perfilId);
+  async actualizar(proyectoId, perfilId, { descripcion, compromiso, modalidadColaboracion }) {
+    const { colectivo, proyecto, perfil } = await this.buscarPerfilConProyecto(proyectoId, perfilId);
     this.verificarProyectoAbierto(proyecto, "modificar perfiles de");
 
     if (descripcion !== undefined) {
@@ -75,12 +75,12 @@ export class PerfilService {
       perfil.modalidadColaboracion = this.resolverModalidadColaboracion(modalidadColaboracion);
     }
 
-    this.colectivoRepository.guardar(colectivo);
+    await this.colectivoRepository.guardar(colectivo);
     return perfil;
   }
 
-  eliminar(proyectoId, perfilId) {
-    const { colectivo, proyecto, perfil } = this.buscarPerfilConProyecto(proyectoId, perfilId);
+  async eliminar(proyectoId, perfilId) {
+    const { colectivo, proyecto, perfil } = await this.buscarPerfilConProyecto(proyectoId, perfilId);
     this.verificarProyectoAbierto(proyecto, "eliminar perfiles de");
 
     if (proyecto.perfiles.length <= 1) {
@@ -88,15 +88,15 @@ export class PerfilService {
     }
 
     proyecto.quitarPerfil(perfil);
-    this.colectivoRepository.guardar(colectivo);
+    await this.colectivoRepository.guardar(colectivo);
   }
 
-  agregarHabilidadRequerida(proyectoId, perfilId, codigoHabilidad) {
-    const { colectivo, proyecto, perfil } = this.buscarPerfilConProyecto(proyectoId, perfilId);
+  async agregarHabilidadRequerida(proyectoId, perfilId, codigoHabilidad) {
+    const { colectivo, proyecto, perfil } = await this.buscarPerfilConProyecto(proyectoId, perfilId);
     this.verificarProyectoAbierto(proyecto, "agregar habilidades a perfiles de");
 
-    const [habilidad] = this.habilidadService.resolverPorCodigos([codigoHabilidad]);
-    
+    const [habilidad] = await this.habilidadService.resolverPorCodigos([codigoHabilidad]);
+
     if (perfil.tieneHabilidadOpcional(habilidad)) {
       throw new ConflictError(`La habilidad "${codigoHabilidad}" ya es opcional en este perfil`);
     }
@@ -106,12 +106,12 @@ export class PerfilService {
     }
 
     perfil.agregarHabilidadRequerida(habilidad);
-    this.colectivoRepository.guardar(colectivo);
+    await this.colectivoRepository.guardar(colectivo);
     return perfil;
   }
 
-  quitarHabilidadRequerida(proyectoId, perfilId, codigoHabilidad) {
-    const { colectivo, proyecto, perfil } = this.buscarPerfilConProyecto(proyectoId, perfilId);
+  async quitarHabilidadRequerida(proyectoId, perfilId, codigoHabilidad) {
+    const { colectivo, proyecto, perfil } = await this.buscarPerfilConProyecto(proyectoId, perfilId);
     this.verificarProyectoAbierto(proyecto, "quitar habilidades de perfiles de");
 
     const habilidad = perfil.habilidadesRequeridas.find((item) => item.codigo === codigoHabilidad);
@@ -125,15 +125,15 @@ export class PerfilService {
     }
 
     perfil.quitarHabilidadRequerida(habilidad);
-    this.colectivoRepository.guardar(colectivo);
+    await this.colectivoRepository.guardar(colectivo);
     return perfil;
   }
 
-  agregarHabilidadOpcional(proyectoId, perfilId, codigoHabilidad) {
-    const { colectivo, proyecto, perfil } = this.buscarPerfilConProyecto(proyectoId, perfilId);
+  async agregarHabilidadOpcional(proyectoId, perfilId, codigoHabilidad) {
+    const { colectivo, proyecto, perfil } = await this.buscarPerfilConProyecto(proyectoId, perfilId);
     this.verificarProyectoAbierto(proyecto, "agregar habilidades a perfiles de");
 
-    const [habilidad] = this.habilidadService.resolverPorCodigos([codigoHabilidad]);
+    const [habilidad] = await this.habilidadService.resolverPorCodigos([codigoHabilidad]);
 
     if (perfil.tieneHabilidadRequerida(habilidad)) {
       throw new ConflictError(`La habilidad "${codigoHabilidad}" ya es requerida en este perfil`);
@@ -144,22 +144,22 @@ export class PerfilService {
     }
 
     perfil.agregarHabilidadOpcional(habilidad);
-    this.colectivoRepository.guardar(colectivo);
+    await this.colectivoRepository.guardar(colectivo);
     return perfil;
   }
 
-  quitarHabilidadOpcional(proyectoId, perfilId, codigoHabilidad) {
-    const { colectivo, proyecto, perfil } = this.buscarPerfilConProyecto(proyectoId, perfilId);
+  async quitarHabilidadOpcional(proyectoId, perfilId, codigoHabilidad) {
+    const { colectivo, proyecto, perfil } = await this.buscarPerfilConProyecto(proyectoId, perfilId);
     this.verificarProyectoAbierto(proyecto, "quitar habilidades de perfiles de");
 
     const habilidad = perfil.habilidadesOpcionales.find((item) => item.codigo === codigoHabilidad);
-    
+
     if (!habilidad) {
       throw new NotFoundError(`La habilidad "${codigoHabilidad}" no es opcional en el perfil "${perfilId}"`);
     }
 
     perfil.quitarHabilidadOpcional(habilidad);
-    this.colectivoRepository.guardar(colectivo);
+    await this.colectivoRepository.guardar(colectivo);
     return perfil;
   }
 
@@ -189,7 +189,7 @@ export class PerfilService {
     return new Compromiso(datos);
   }
 
-  construirPerfil({
+  async construirPerfil({
     descripcion,
     compromiso,
     modalidadColaboracion,
@@ -221,14 +221,12 @@ export class PerfilService {
       ),
     });
 
-    this.habilidadService
-      .resolverPorCodigos(requeridas)
-      .forEach((habilidad) => perfil.agregarHabilidadRequerida(habilidad));
+    const habilidadesRequeridas = await this.habilidadService.resolverPorCodigos(requeridas);
+    habilidadesRequeridas.forEach((habilidad) => perfil.agregarHabilidadRequerida(habilidad));
 
     if (opcionales.length > 0) {
-      this.habilidadService
-        .resolverPorCodigos(opcionales)
-        .forEach((habilidad) => perfil.agregarHabilidadOpcional(habilidad));
+      const habilidadesOpcionales = await this.habilidadService.resolverPorCodigos(opcionales);
+      habilidadesOpcionales.forEach((habilidad) => perfil.agregarHabilidadOpcional(habilidad));
     }
 
     return perfil;

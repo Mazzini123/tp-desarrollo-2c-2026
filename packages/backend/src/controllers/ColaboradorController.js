@@ -7,56 +7,56 @@ export class ColaboradorController extends BaseController {
     this.colaboracionService = colaboracionService;
   }
 
-  crear = (req, res) => {
-    res.status(201).json(this.colaboradorService.crear(req.body));
+  crear = async (req, res) => {
+    res.status(201).json(await this.colaboradorService.crear(req.body));
   };
 
-  listar = (req, res) => {
+  listar = async (req, res) => {
     const paginacion = this.aPaginacionDeDominio(req.paginacion);
-    this.responderPaginado(res, this.colaboradorService.listar(paginacion));
+    this.responderPaginado(res, await this.colaboradorService.listar(paginacion));
   };
 
-  obtenerPorId = (req, res) => {
-    res.status(200).json(this.colaboradorService.buscarPorId(req.params.id));
+  obtenerPorId = async (req, res) => {
+    res.status(200).json(await this.colaboradorService.buscarPorId(req.params.id));
   };
 
-  actualizar = (req, res) => {
-    res.status(200).json(this.colaboradorService.actualizar(req.params.id, req.body));
+  actualizar = async (req, res) => {
+    res.status(200).json(await this.colaboradorService.actualizar(req.params.id, req.body));
   };
 
-  agregarPronombre = (req, res) => {
-    const colaborador = this.colaboradorService.agregarPronombre(
+  agregarPronombre = async (req, res) => {
+    const colaborador = await this.colaboradorService.agregarPronombre(
       req.params.id,
       req.body.pronombre,
     );
     res.status(200).json(colaborador);
   };
 
-  quitarPronombre = (req, res) => {
-    const colaborador = this.colaboradorService.quitarPronombre(
+  quitarPronombre = async (req, res) => {
+    const colaborador = await this.colaboradorService.quitarPronombre(
       req.params.id,
       req.params.pronombre,
     );
     res.status(200).json(colaborador);
   };
 
-  agregarHabilidad = (req, res) => {
-    const colaborador = this.colaboradorService.agregarHabilidad(
+  agregarHabilidad = async (req, res) => {
+    const colaborador = await this.colaboradorService.agregarHabilidad(
       req.params.id,
       req.body.codigoHabilidad,
     );
     res.status(200).json(colaborador);
   };
 
-  quitarHabilidad = (req, res) => {
-    const colaborador = this.colaboradorService.quitarHabilidad(
+  quitarHabilidad = async (req, res) => {
+    const colaborador = await this.colaboradorService.quitarHabilidad(
       req.params.id,
       req.params.codigoHabilidad,
     );
     res.status(200).json(colaborador);
   };
 
-  listarColaboraciones = (req, res) => {
-    res.status(200).json(this.colaboracionService.listarPorColaborador(req.params.id));
+  listarColaboraciones = async (req, res) => {
+    res.status(200).json(await this.colaboracionService.listarPorColaborador(req.params.id));
   };
 }

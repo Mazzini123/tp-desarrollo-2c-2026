@@ -12,93 +12,94 @@ describe("ColaboracionService · anotar un colaborador", () => {
   let services;
   let proyecto;
 
-  beforeEach(() => {
-    services = armarServices();
-    proyecto = crearProyectoDePrueba(services, { habilidades: [CODIGOS.node] }).proyecto;
+  beforeEach(async () => {
+    services = await armarServices();
+    proyecto = (await crearProyectoDePrueba(services, { habilidades: [CODIGOS.node] })).proyecto;
   });
 
-  test("se anota si tiene la habilidad requerida", () => {
-    const colaborador = crearColaboradorDePrueba(services.colaboradorService, {
+  test("se anota si tiene la habilidad requerida", async () => {
+    const colaborador = await crearColaboradorDePrueba(services.colaboradorService, {
       habilidades: [CODIGOS.node],
     });
 
-    const colaboracion = services.colaboracionService.registrar({
+    const colaboracion = await services.colaboracionService.registrar({
       proyectoId: proyecto.id,
       colaboradorId: colaborador.id,
     });
 
     expect(colaboracion.colaborador.id).toBe(colaborador.id);
-    expect(services.colaboracionService.listarPorProyecto(proyecto.id)).toHaveLength(1);
+    expect(await services.colaboracionService.listarPorProyecto(proyecto.id)).toHaveLength(1);
   });
 
-  // "Se debera validar que la persona cuente con al menos una de las
-  // habilidades requeridas" — enunciado, primera entrega.
-  test("sin ninguna de las habilidades requeridas tira DomainError", () => {
-    const colaborador = crearColaboradorDePrueba(services.colaboradorService, {
+  // El colaborador tiene que cumplir TODAS las habilidades requeridas de al
+  // menos uno de los perfiles del proyecto.
+  test("sin las habilidades requeridas de ningun perfil tira DomainError", async () => {
+    const colaborador = await crearColaboradorDePrueba(services.colaboradorService, {
       habilidades: [CODIGOS.react],
     });
 
-    expect(() =>
+    await expect(
       services.colaboracionService.registrar({
         proyectoId: proyecto.id,
         colaboradorId: colaborador.id,
       }),
-    ).toThrow(DomainError);
+    ).rejects.toThrow(DomainError);
   });
 
-  test("anotarse dos veces al mismo proyecto tira ConflictError", () => {
-    const colaborador = crearColaboradorDePrueba(services.colaboradorService);
+  test("anotarse dos veces al mismo proyecto tira ConflictError", async () => {
+    const colaborador = await crearColaboradorDePrueba(services.colaboradorService);
     const anotar = () =>
       services.colaboracionService.registrar({
         proyectoId: proyecto.id,
         colaboradorId: colaborador.id,
       });
 
-    anotar();
-    expect(anotar).toThrow(ConflictError);
-    expect(services.colaboracionService.listarPorProyecto(proyecto.id)).toHaveLength(1);
+    await anotar();
+    await expect(anotar()).rejects.toThrow(ConflictError);
+    expect(await services.colaboracionService.listarPorProyecto(proyecto.id)).toHaveLength(1);
   });
 
   // "Luego de esto, ya no se pueden anotar personas colaboradoras al mismo"
   // — enunciado, primera entrega.
-  test("no se puede anotar a un proyecto finalizado", () => {
-    const colaborador = crearColaboradorDePrueba(services.colaboradorService);
-    services.proyectoService.finalizar(proyecto.id);
+  test("no se puede anotar a un proyecto finalizado", async () => {
+    const colaborador = await crearColaboradorDePrueba(services.colaboradorService);
+    await services.proyectoService.finalizar(proyecto.id);
 
-    expect(() =>
+    await expect(
       services.colaboracionService.registrar({
         proyectoId: proyecto.id,
         colaboradorId: colaborador.id,
       }),
-    ).toThrow(ConflictError);
+    ).rejects.toThrow(ConflictError);
   });
 
-  test("un proyecto que no existe tira NotFoundError", () => {
-    const colaborador = crearColaboradorDePrueba(services.colaboradorService);
-    expect(() =>
+  test("un proyecto que no existe tira NotFoundError", async () => {
+    const colaborador = await crearColaboradorDePrueba(services.colaboradorService);
+    await expect(
       services.colaboracionService.registrar({
         proyectoId: "no-existe",
         colaboradorId: colaborador.id,
       }),
-    ).toThrow(NotFoundError);
+    ).rejects.toThrow(NotFoundError);
   });
 });
 
 describe("ColaboracionService · listar por colaborador", () => {
-  test("devuelve cada colaboracion con el proyecto al que pertenece", () => {
-    const services = armarServices();
-    const colaborador = crearColaboradorDePrueba(services.colaboradorService);
-    const a = crearProyectoDePrueba(services, { titulo: "Uno" }).proyecto;
-    const b = crearProyectoDePrueba(services, { titulo: "Dos" }).proyecto;
+  test("devuelve cada colaboracion con el proyecto al que pertenece", async () => {
+    const services = await armarServices();
+    const colaborador = await crearColaboradorDePrueba(services.colaboradorService);
+    const a = (await crearProyectoDePrueba(services, { titulo: "Uno" })).proyecto;
+    const b = (await crearProyectoDePrueba(services, { titulo: "Dos" })).proyecto;
 
-    [a, b].forEach((proyecto) =>
-      services.colaboracionService.registrar({
+    // for...of y no forEach: forEach no espera a las promesas.
+    for (const proyecto of [a, b]) {
+      await services.colaboracionService.registrar({
         proyectoId: proyecto.id,
         colaboradorId: colaborador.id,
-      }),
-    );
+      });
+    }
 
-    const resultado = services.colaboracionService.listarPorColaborador(colaborador.id);
+    const resultado = await services.colaboracionService.listarPorColaborador(colaborador.id);
     expect(resultado).toHaveLength(2);
     expect(resultado.map((r) => r.proyectoId).sort()).toEqual([a.id, b.id].sort());
   });

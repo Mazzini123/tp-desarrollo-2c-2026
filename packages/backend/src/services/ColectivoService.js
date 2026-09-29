@@ -12,7 +12,7 @@ export class ColectivoService {
     this.colectivoRepository = colectivoRepository;
   }
 
-  crear({ nombre, descripcion, tipoColectivo, ubicacion }) {
+  async crear({ nombre, descripcion, tipoColectivo, ubicacion }) {
     this.validarNombre(nombre);
     this.validarDescripcion(descripcion);
     this.validarTipoColectivo(tipoColectivo);
@@ -27,24 +27,24 @@ export class ColectivoService {
     return this.colectivoRepository.guardar(colectivo);
   }
 
-  listar({ numeroPagina = 1, limitePorPagina = 10 } = {}) {
+  async listar({ numeroPagina = 1, limitePorPagina = 10 } = {}) {
     return armarPaginado(
-      this.colectivoRepository.listarPaginado(numeroPagina, limitePorPagina),
+      await this.colectivoRepository.listarPaginado(numeroPagina, limitePorPagina),
       numeroPagina,
       limitePorPagina,
     );
   }
 
-  buscarPorId(id) {
-    const colectivo = this.colectivoRepository.buscarPorId(id);
+  async buscarPorId(id) {
+    const colectivo = await this.colectivoRepository.buscarPorId(id);
     if (!colectivo) {
       throw new NotFoundError(`No existe un colectivo con id "${id}"`);
     }
     return colectivo;
   }
 
-  actualizar(id, { nombre, descripcion, ubicacion }) {
-    const colectivo = this.buscarPorId(id);
+  async actualizar(id, { nombre, descripcion, ubicacion }) {
+    const colectivo = await this.buscarPorId(id);
 
     if (nombre !== undefined) {
       this.validarNombre(nombre);

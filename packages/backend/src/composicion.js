@@ -1,6 +1,9 @@
 import { InMemoryRepository } from "./repositories/InMemoryRepository.js";
 import { InMemoryColectivoRepository } from "./repositories/InMemoryColectivoRepository.js";
 import { InMemoryHabilidadRepository } from "./repositories/InMemoryHabilidadRepository.js";
+import { MongoHabilidadRepository } from "./repositories/MongoHabilidadRepository.js";
+import { MongoColaboradorRepository } from "./repositories/MongoColaboradorRepository.js";
+import { MongoColectivoRepository } from "./repositories/MongoColectivoRepository.js";
 
 import { ColectivoService } from "./services/ColectivoService.js";
 import { ProyectoService } from "./services/ProyectoService.js";
@@ -15,10 +18,29 @@ import { PerfilController } from "./controllers/PerfilController.js";
 import { HabilidadController } from "./controllers/HabilidadController.js";
 import { ColaboradorController } from "./controllers/ColaboradorController.js";
 
-export function componerApp() {
-  const colectivoRepository = new InMemoryColectivoRepository();
-  const colaboradorRepository = new InMemoryRepository();
-  const habilidadRepository = new InMemoryHabilidadRepository();
+// Los repositorios de verdad: los que usa la app levantada.
+export function crearRepositoriosMongo() {
+  const habilidadRepository = new MongoHabilidadRepository();
+  const colaboradorRepository = new MongoColaboradorRepository({ habilidadRepository });
+  const colectivoRepository = new MongoColectivoRepository({
+    habilidadRepository,
+    colaboradorRepository,
+  });
+
+  return { habilidadRepository, colaboradorRepository, colectivoRepository };
+}
+
+// Los dobles de test: permiten correr los tests de services sin una base.
+export function crearRepositoriosEnMemoria() {
+  return {
+    habilidadRepository: new InMemoryHabilidadRepository(),
+    colaboradorRepository: new InMemoryRepository(),
+    colectivoRepository: new InMemoryColectivoRepository(),
+  };
+}
+
+export function componerApp({ repositorios = crearRepositoriosMongo() } = {}) {
+  const { habilidadRepository, colaboradorRepository, colectivoRepository } = repositorios;
 
   const habilidadService = new HabilidadService({ habilidadRepository });
 
