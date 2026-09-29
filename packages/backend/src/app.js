@@ -5,12 +5,14 @@ import swaggerUi from "swagger-ui-express";
 import { crearRouter } from "./routes/router.js";
 import { noEncontrado } from "./middlewares/noEncontrado.js";
 import { manejadorErrores } from "./middlewares/manejadorErrores.js";
+import { sanitizarBody } from "./middlewares/sanitizar.js";
 import { openapi } from "./docs/openapi.js";
 
 export function crearApp(controllers) {
   const app = express();
 
   app.use(express.json());
+  app.use(sanitizarBody);
   app.use(cors());
 
   app.use("/docs", swaggerUi.serve, swaggerUi.setup(openapi));
