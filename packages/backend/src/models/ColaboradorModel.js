@@ -25,4 +25,7 @@ const colaboradorSchema = new mongoose.Schema(
   { versionKey: false },
 );
 
+// Para la busqueda de colaboradoras por habilidades.
+colaboradorSchema.index({ codigosHabilidades: 1 });
+
 export const ColaboradorModel = mongoose.model("Colaborador", colaboradorSchema);

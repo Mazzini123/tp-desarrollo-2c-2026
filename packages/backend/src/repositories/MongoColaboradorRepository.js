@@ -81,6 +81,15 @@ export class MongoColaboradorRepository {
     return Promise.all(documentos.map((doc) => this.aDominio(doc)));
   }
 
+  // Las que tienen TODAS las habilidades pedidas: $all compara contra el
+  // array de codigos guardado, sin traer a memoria a las que no califican.
+  async buscarPorHabilidades(codigos) {
+    const documentos = await ColaboradorModel.find({ codigosHabilidades: { $all: codigos } })
+      .sort({ _id: 1 })
+      .lean();
+    return Promise.all(documentos.map((doc) => this.aDominio(doc)));
+  }
+
   async listarPaginado(numeroPagina, limitePorPagina) {
     const salto = (numeroPagina - 1) * limitePorPagina;
 

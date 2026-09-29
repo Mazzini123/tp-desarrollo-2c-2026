@@ -10,8 +10,13 @@ import {
   agregarHabilidadPerfilSchema,
   crearPerfilSchema,
 } from "../schemas/perfilSchema.js";
+import { invitacionSchema } from "../schemas/reclutamientoSchema.js";
 
-export function crearProyectosRouter(proyectoController, perfilController) {
+export function crearProyectosRouter(
+  proyectoController,
+  perfilController,
+  reclutamientoController,
+) {
   const router = Router();
 
   router.get("/", validarQuery(paginacionSchema), proyectoController.listar);
@@ -52,6 +57,18 @@ export function crearProyectosRouter(proyectoController, perfilController) {
   router.delete(
     "/:id/perfiles/:perfilId/habilidades-opcionales/:codigoHabilidad",
     perfilController.quitarHabilidadOpcional,
+  );
+
+  // Busqueda de potenciales colaboradoras para un perfil, e invitacion.
+  router.get(
+    "/:id/perfiles/:perfilId/colaboradoras-potenciales",
+    validarQuery(paginacionSchema),
+    reclutamientoController.buscarColaboradoras,
+  );
+  router.post(
+    "/:id/perfiles/:perfilId/invitaciones",
+    validarBody(invitacionSchema),
+    reclutamientoController.invitar,
   );
 
   router.post(

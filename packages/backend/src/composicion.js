@@ -1,6 +1,5 @@
 import nodemailer from "nodemailer";
 
-import { InMemoryRepository } from "./repositories/InMemoryRepository.js";
 import { InMemoryColectivoRepository } from "./repositories/InMemoryColectivoRepository.js";
 import { InMemoryHabilidadRepository } from "./repositories/InMemoryHabilidadRepository.js";
 import { MongoHabilidadRepository } from "./repositories/MongoHabilidadRepository.js";
@@ -8,6 +7,7 @@ import { MongoColaboradorRepository } from "./repositories/MongoColaboradorRepos
 import { MongoColectivoRepository } from "./repositories/MongoColectivoRepository.js";
 import { MongoNotificacionRepository } from "./repositories/MongoNotificacionRepository.js";
 import { InMemoryNotificacionRepository } from "./repositories/InMemoryNotificacionRepository.js";
+import { InMemoryColaboradorRepository } from "./repositories/InMemoryColaboradorRepository.js";
 
 import { CanalEmail } from "./canales/CanalEmail.js";
 import { CanalSimulado } from "./canales/CanalSimulado.js";
@@ -20,6 +20,7 @@ import { HabilidadService } from "./services/HabilidadService.js";
 import { ColaboradorService } from "./services/ColaboradorService.js";
 import { ColaboracionService } from "./services/ColaboracionService.js";
 import { NotificacionService } from "./services/NotificacionService.js";
+import { ReclutamientoService } from "./services/ReclutamientoService.js";
 
 import { ColectivoController } from "./controllers/ColectivoController.js";
 import { ProyectoController } from "./controllers/ProyectoController.js";
@@ -27,6 +28,7 @@ import { PerfilController } from "./controllers/PerfilController.js";
 import { HabilidadController } from "./controllers/HabilidadController.js";
 import { ColaboradorController } from "./controllers/ColaboradorController.js";
 import { NotificacionController } from "./controllers/NotificacionController.js";
+import { ReclutamientoController } from "./controllers/ReclutamientoController.js";
 
 // Los repositorios de verdad: los que usa la app levantada.
 export function crearRepositoriosMongo() {
@@ -51,7 +53,7 @@ export function crearRepositoriosMongo() {
 export function crearRepositoriosEnMemoria() {
   return {
     habilidadRepository: new InMemoryHabilidadRepository(),
-    colaboradorRepository: new InMemoryRepository(),
+    colaboradorRepository: new InMemoryColaboradorRepository(),
     colectivoRepository: new InMemoryColectivoRepository(),
     notificacionRepository: new InMemoryNotificacionRepository(),
   };
@@ -113,6 +115,13 @@ export function componerApp({
     canales,
   });
 
+  const reclutamientoService = new ReclutamientoService({
+    colaboradorRepository,
+    colaboradorService,
+    perfilService,
+    notificacionService,
+  });
+
   const colaboracionService = new ColaboracionService({
     colectivoRepository,
     proyectoService,
@@ -126,6 +135,7 @@ export function componerApp({
     habilidad: new HabilidadController({ habilidadService }),
     colaborador: new ColaboradorController({ colaboradorService, colaboracionService }),
     notificacion: new NotificacionController({ notificacionService }),
+    reclutamiento: new ReclutamientoController({ reclutamientoService }),
   };
 
   const services = {
@@ -136,6 +146,7 @@ export function componerApp({
     colaboradorService,
     colaboracionService,
     notificacionService,
+    reclutamientoService,
   };
 
   return { controllers, services };
