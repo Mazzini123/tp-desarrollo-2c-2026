@@ -8,6 +8,8 @@ import { MongoColectivoRepository } from "./repositories/MongoColectivoRepositor
 import { MongoNotificacionRepository } from "./repositories/MongoNotificacionRepository.js";
 import { InMemoryNotificacionRepository } from "./repositories/InMemoryNotificacionRepository.js";
 import { InMemoryColaboradorRepository } from "./repositories/InMemoryColaboradorRepository.js";
+import { MongoEstadisticaRepository } from "./repositories/MongoEstadisticaRepository.js";
+import { InMemoryEstadisticaRepository } from "./repositories/InMemoryEstadisticaRepository.js";
 
 import { CanalEmail } from "./canales/CanalEmail.js";
 import { CanalSimulado } from "./canales/CanalSimulado.js";
@@ -22,6 +24,7 @@ import { ColaboracionService } from "./services/ColaboracionService.js";
 import { NotificacionService } from "./services/NotificacionService.js";
 import { ReclutamientoService } from "./services/ReclutamientoService.js";
 import { AvisoAutomaticoService } from "./services/AvisoAutomaticoService.js";
+import { EstadisticaService } from "./services/EstadisticaService.js";
 
 import { ColectivoController } from "./controllers/ColectivoController.js";
 import { ProyectoController } from "./controllers/ProyectoController.js";
@@ -31,6 +34,7 @@ import { ColaboradorController } from "./controllers/ColaboradorController.js";
 import { NotificacionController } from "./controllers/NotificacionController.js";
 import { ReclutamientoController } from "./controllers/ReclutamientoController.js";
 import { PostulacionController } from "./controllers/PostulacionController.js";
+import { EstadisticaController } from "./controllers/EstadisticaController.js";
 
 // Los repositorios de verdad: los que usa la app levantada.
 export function crearRepositoriosMongo() {
@@ -42,22 +46,31 @@ export function crearRepositoriosMongo() {
   });
 
   const notificacionRepository = new MongoNotificacionRepository();
+  const estadisticaRepository = new MongoEstadisticaRepository();
 
   return {
     habilidadRepository,
     colaboradorRepository,
     colectivoRepository,
     notificacionRepository,
+    estadisticaRepository,
   };
 }
 
 // Los dobles de test: permiten correr los tests de services sin una base.
 export function crearRepositoriosEnMemoria() {
+  const colaboradorRepository = new InMemoryColaboradorRepository();
+  const colectivoRepository = new InMemoryColectivoRepository();
+
   return {
     habilidadRepository: new InMemoryHabilidadRepository(),
-    colaboradorRepository: new InMemoryColaboradorRepository(),
-    colectivoRepository: new InMemoryColectivoRepository(),
+    colaboradorRepository,
+    colectivoRepository,
     notificacionRepository: new InMemoryNotificacionRepository(),
+    estadisticaRepository: new InMemoryEstadisticaRepository({
+      colectivoRepository,
+      colaboradorRepository,
+    }),
   };
 }
 
@@ -89,6 +102,7 @@ export function componerApp({
     colaboradorRepository,
     colectivoRepository,
     notificacionRepository,
+    estadisticaRepository,
   } = repositorios;
 
   const habilidadService = new HabilidadService({ habilidadRepository });
@@ -142,6 +156,8 @@ export function componerApp({
     notificacionService,
   });
 
+  const estadisticaService = new EstadisticaService({ estadisticaRepository, colectivoService });
+
   const controllers = {
     colectivo: new ColectivoController({ colectivoService, proyectoService, colaboracionService }),
     proyecto: new ProyectoController({ proyectoService, colaboracionService }),
@@ -151,6 +167,7 @@ export function componerApp({
     notificacion: new NotificacionController({ notificacionService }),
     reclutamiento: new ReclutamientoController({ reclutamientoService }),
     postulacion: new PostulacionController({ colaboracionService }),
+    estadistica: new EstadisticaController({ estadisticaService }),
   };
 
   const services = {
@@ -163,6 +180,7 @@ export function componerApp({
     notificacionService,
     reclutamientoService,
     avisoAutomaticoService,
+    estadisticaService,
   };
 
   return { controllers, services };

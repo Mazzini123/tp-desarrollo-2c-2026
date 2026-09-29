@@ -14,7 +14,7 @@ export class ProyectoController extends BaseController {
   };
 
   obtenerPorId = async (req, res) => {
-    res.status(200).json(await this.proyectoService.buscarPorId(req.params.id));
+    res.status(200).json(await this.proyectoService.verDetalle(req.params.id));
   };
 
   actualizar = async (req, res) => {

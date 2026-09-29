@@ -10,7 +10,12 @@ import { crearLimitadores, limitesDesdeEntorno } from "./middlewares/limiteDeTas
 import { openapi } from "./docs/openapi.js";
 
 // Rutas de busqueda: ademas del limite general, tienen uno propio mas bajo.
-export const RUTAS_DE_BUSQUEDA = ["/proyectos/:id/perfiles/:perfilId/colaboradoras-potenciales"];
+export const RUTAS_DE_BUSQUEDA = [
+  "/proyectos/:id/perfiles/:perfilId/colaboradoras-potenciales",
+  // Las estadisticas son consultas de agregacion: de las mas caras.
+  "/estadisticas",
+  "/colectivos/:id/estadisticas",
+];
 
 export function crearApp(controllers, { limites = limitesDesdeEntorno() } = {}) {
   const app = express();

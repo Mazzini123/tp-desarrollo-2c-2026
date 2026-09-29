@@ -100,6 +100,18 @@ export class ProyectoService {
     return resultado;
   }
 
+  // GET /proyectos/:id: la consulta de una persona cuenta como visualizacion
+  // (req. adicional 17). Los usos internos de buscarPorId no suman.
+  async verDetalle(proyectoId) {
+    try {
+      await this.colectivoRepository.registrarVisualizacion(proyectoId);
+    } catch (error) {
+      // Un contador que no se pudo sumar no puede impedir ver el proyecto.
+      console.error("No se pudo registrar la visualizacion:", error.message);
+    }
+    return this.buscarPorId(proyectoId);
+  }
+
   async buscarPorId(proyectoId) {
     return (await this.buscarProyectoConColectivo(proyectoId)).proyecto;
   }

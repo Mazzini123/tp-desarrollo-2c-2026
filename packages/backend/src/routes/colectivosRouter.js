@@ -7,7 +7,7 @@ import {
 import { crearProyectoSchema } from "../schemas/proyectoSchema.js";
 import { listadoConEtiquetaSchema } from "../schemas/comunesSchema.js";
 
-export function crearColectivosRouter(colectivoController) {
+export function crearColectivosRouter(colectivoController, estadisticaController) {
   const router = Router();
 
   router.post("/", validarBody(crearColectivoSchema), colectivoController.crear);
@@ -26,6 +26,8 @@ export function crearColectivosRouter(colectivoController) {
   );
   router.get("/:id/proyectos", colectivoController.listarProyectos);
   router.get("/:id/valoraciones", colectivoController.listarValoraciones);
+  // Panel de la organizacion (req. adicional 17).
+  router.get("/:id/estadisticas", estadisticaController.deColectivo);
 
   return router;
 }

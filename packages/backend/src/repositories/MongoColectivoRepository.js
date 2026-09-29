@@ -79,6 +79,7 @@ function proyectoADocumento(proyecto) {
     fechaCreacion: proyecto.fechaCreacion,
     fechaFinalizacion: proyecto.fechaFinalizacion,
     fechaCierre: proyecto.fechaCierre,
+    visualizaciones: proyecto.visualizaciones,
   };
 }
 
@@ -201,6 +202,7 @@ export class MongoColectivoRepository {
     proyecto.porcentajeConcrecion = documento.porcentajeConcrecion ?? 0;
     proyecto.logros = (documento.logros ?? []).map((logro) => new Logro(logro));
     proyecto.etiquetas = documento.etiquetas ?? [];
+    proyecto.visualizaciones = documento.visualizaciones ?? 0;
 
     const [perfiles, colaboraciones] = await Promise.all([
       Promise.all((documento.perfiles ?? []).map((p) => this.perfilADominio(p, cache))),
@@ -298,6 +300,17 @@ export class MongoColectivoRepository {
 
     const proyecto = colectivo.proyectos.find((p) => p.id === proyectoId);
     return { colectivo, proyecto };
+  }
+
+  // Suma una visualizacion sin leer ni reescribir el colectivo: $inc lo hace
+  // la base, y "proyectos.$" apunta al proyecto que matcheo el filtro.
+  async registrarVisualizacion(proyectoId) {
+    await ColectivoModel.updateOne(
+      { "proyectos._id": proyectoId },
+      { $inc: { "proyectos.$.visualizaciones": 1 } },
+      // Sin esto, Mongoose agregaria updatedAt y tocaria el colectivo entero.
+      { timestamps: false },
+    );
   }
 
   async buscarPerfil(proyectoId, perfilId) {

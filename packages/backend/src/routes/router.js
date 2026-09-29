@@ -4,12 +4,17 @@ import { crearColectivosRouter } from "./colectivosRouter.js";
 import { crearProyectosRouter } from "./proyectosRouter.js";
 import { crearHabilidadesRouter } from "./habilidadesRouter.js";
 import { crearColaboradoresRouter } from "./colaboradoresRouter.js";
+import { crearEstadisticasRouter } from "./estadisticasRouter.js";
 
 export function crearRouter(controllers) {
   const router = Router();
 
   router.use("/health", crearHealthRouter());
-  router.use("/colectivos", crearColectivosRouter(controllers.colectivo));
+  router.use(
+    "/colectivos",
+    crearColectivosRouter(controllers.colectivo, controllers.estadistica),
+  );
+  router.use("/estadisticas", crearEstadisticasRouter(controllers.estadistica));
   router.use(
     "/proyectos",
     crearProyectosRouter(

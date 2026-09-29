@@ -35,6 +35,8 @@ export class Proyecto {
     this.fechaFinalizacion = fechaFinalizacion;
     // Requerimiento adicional 10: fecha limite para cerrarse solo.
     this.fechaCierre = fechaCierre;
+    // Requerimiento adicional 17: cuantas veces se consulto el proyecto.
+    this.visualizaciones = 0;
   }
 
   estaAbierto() {

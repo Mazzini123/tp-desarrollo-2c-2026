@@ -11,6 +11,13 @@ export class InMemoryColectivoRepository extends InMemoryRepository {
     return null;
   }
 
+  registrarVisualizacion(proyectoId) {
+    const resultado = this.buscarProyecto(proyectoId);
+    if (resultado) {
+      resultado.proyecto.visualizaciones += 1;
+    }
+  }
+
   buscarPerfil(proyectoId, perfilId) {
     const proyectoConColectivo = this.buscarProyecto(proyectoId);
 

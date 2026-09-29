@@ -82,6 +82,7 @@ const proyectoSchema = new mongoose.Schema({
   fechaCreacion: { type: Date, default: null },
   fechaFinalizacion: { type: Date, default: null },
   fechaCierre: { type: Date, default: null },
+  visualizaciones: { type: Number, default: 0 },
 });
 
 const colectivoSchema = new mongoose.Schema(
