@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { PROYECTO_ESTADO } from "./enums/PROYECTO_ESTADO.js";
+import { MODO_ACEPTACION } from "./enums/MODO_ACEPTACION.js";
 
 export class Proyecto {
   constructor({
@@ -9,6 +10,8 @@ export class Proyecto {
     urlSistema,
     urlRepositorio,
     estado = PROYECTO_ESTADO.ABIERTO,
+    modoAceptacion = MODO_ACEPTACION.TODO_SUMA,
+    limiteVacantes = null,
   }) {
     this.id = id;
     this.titulo = titulo;
@@ -21,6 +24,10 @@ export class Proyecto {
     this.urlSistema = urlSistema;
     this.urlRepositorio = urlRepositorio;
     this.etiquetas = [];
+    // Requerimiento adicional 8. TODO_SUMA sin limite es lo que pasaba antes
+    // de que existieran las postulaciones: quien se anota, queda adentro.
+    this.modoAceptacion = modoAceptacion;
+    this.limiteVacantes = limiteVacantes;
   }
 
   estaAbierto() {
@@ -61,5 +68,32 @@ export class Proyecto {
 
   quitarColaboracion(colaboracion) {
     this.colaboraciones = this.colaboraciones.filter((c) => c !== colaboracion);
+  }
+
+  buscarColaboracion(colaboracionId) {
+    return this.colaboraciones.find((c) => c.id === colaboracionId) ?? null;
+  }
+
+  // Las pendientes en el orden en que llegaron: se resuelven en ese orden.
+  colaboracionesPendientes() {
+    return this.colaboraciones.filter((c) => c.estaPendiente()).sort((a, b) => a.fecha - b.fecha);
+  }
+
+  cantidadAceptadas() {
+    return this.colaboraciones.filter((c) => c.estaAceptada()).length;
+  }
+
+  tieneLimiteDeVacantes() {
+    return this.limiteVacantes !== null && this.limiteVacantes !== undefined;
+  }
+
+  // El cupo se calcula, no se guarda: asi nunca queda desincronizado con las
+  // colaboraciones reales.
+  cupoCompleto() {
+    return this.tieneLimiteDeVacantes() && this.cantidadAceptadas() >= this.limiteVacantes;
+  }
+
+  aceptaPostulaciones() {
+    return this.estaAbierto() && !this.cupoCompleto();
   }
 }

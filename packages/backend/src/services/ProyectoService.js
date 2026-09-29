@@ -4,25 +4,42 @@ import { NotFoundError } from "../errors/NotFoundError.js";
 import { ConflictError } from "../errors/ConflictError.js";
 import { armarPaginado } from "../utils/paginacion.js";
 import { normalizarEtiquetas } from "../domain/etiquetas.js";
+import { MODO_ACEPTACION } from "../domain/enums/MODO_ACEPTACION.js";
+import {
+  aplicarModoDeAceptacion,
+  notificarResoluciones,
+  validarModoDeAceptacion,
+} from "./reglasDePostulacion.js";
 
 export class ProyectoService {
-  constructor({ colectivoRepository, colectivoService, perfilService }) {
+  constructor({ colectivoRepository, colectivoService, perfilService, notificacionService }) {
     this.colectivoRepository = colectivoRepository;
     this.colectivoService = colectivoService;
     this.perfilService = perfilService;
+    this.notificacionService = notificacionService;
   }
 
-  async crear({ colectivoId, titulo, descripcion, perfiles, etiquetas = [] }) {
+  async crear({
+    colectivoId,
+    titulo,
+    descripcion,
+    perfiles,
+    etiquetas = [],
+    modoAceptacion = MODO_ACEPTACION.TODO_SUMA,
+    limiteVacantes = null,
+  }) {
     if (!Array.isArray(perfiles) || perfiles.length === 0) {
       throw new DomainError("El proyecto debe tener al menos un perfil");
     }
+
+    validarModoDeAceptacion(modoAceptacion, limiteVacantes);
 
     const colectivo = await this.colectivoService.buscarPorId(colectivoId);
     // construirPerfil es async (resuelve habilidades): Promise.all espera a todos.
     const perfilesConstruidos = await Promise.all(
       perfiles.map((datos) => this.perfilService.construirPerfil(datos)),
     );
-    const proyecto = new Proyecto({ titulo, descripcion });
+    const proyecto = new Proyecto({ titulo, descripcion, modoAceptacion, limiteVacantes });
     proyecto.etiquetas = normalizarEtiquetas(etiquetas);
 
     perfilesConstruidos.forEach((perfil) => proyecto.agregarPerfil(perfil));
@@ -66,7 +83,11 @@ export class ProyectoService {
     }
   }
 
-  async actualizar(proyectoId, { titulo, descripcion, etiquetas }) {
+  async actualizar(
+    proyectoId,
+    { titulo, descripcion, etiquetas, modoAceptacion, limiteVacantes },
+    ahora = new Date(),
+  ) {
     const { colectivo, proyecto } = await this.buscarProyectoConColectivo(proyectoId);
     this.verificarAbierto(proyecto, "modificar");
 
@@ -82,7 +103,21 @@ export class ProyectoService {
       proyecto.etiquetas = normalizarEtiquetas(etiquetas);
     }
 
+    let cambios = { aceptadas: [], rechazadas: [] };
+    if (modoAceptacion !== undefined || limiteVacantes !== undefined) {
+      const nuevoModo = modoAceptacion ?? proyecto.modoAceptacion;
+      const nuevoLimite = limiteVacantes !== undefined ? limiteVacantes : proyecto.limiteVacantes;
+      validarModoDeAceptacion(nuevoModo, nuevoLimite, proyecto.cantidadAceptadas());
+
+      proyecto.modoAceptacion = nuevoModo;
+      proyecto.limiteVacantes = nuevoLimite;
+      // Con las reglas nuevas se resuelven las pendientes que ya habia (por
+      // ejemplo, pasar a TODO_SUMA acepta a todas).
+      cambios = aplicarModoDeAceptacion(proyecto, ahora);
+    }
+
     await this.colectivoRepository.guardar(colectivo);
+    await notificarResoluciones(this.notificacionService, proyecto, cambios);
     return proyecto;
   }
 

@@ -29,6 +29,7 @@ import { HabilidadController } from "./controllers/HabilidadController.js";
 import { ColaboradorController } from "./controllers/ColaboradorController.js";
 import { NotificacionController } from "./controllers/NotificacionController.js";
 import { ReclutamientoController } from "./controllers/ReclutamientoController.js";
+import { PostulacionController } from "./controllers/PostulacionController.js";
 
 // Los repositorios de verdad: los que usa la app levantada.
 export function crearRepositoriosMongo() {
@@ -98,12 +99,6 @@ export function componerApp({
     habilidadService,
   });
 
-  const proyectoService = new ProyectoService({
-    colectivoRepository,
-    colectivoService,
-    perfilService,
-  });
-
   const colaboradorService = new ColaboradorService({
     colaboradorRepository,
     habilidadService,
@@ -113,6 +108,13 @@ export function componerApp({
     notificacionRepository,
     colaboradorService,
     canales,
+  });
+
+  const proyectoService = new ProyectoService({
+    colectivoRepository,
+    colectivoService,
+    perfilService,
+    notificacionService,
   });
 
   const reclutamientoService = new ReclutamientoService({
@@ -126,6 +128,7 @@ export function componerApp({
     colectivoRepository,
     proyectoService,
     colaboradorService,
+    notificacionService,
   });
 
   const controllers = {
@@ -136,6 +139,7 @@ export function componerApp({
     colaborador: new ColaboradorController({ colaboradorService, colaboracionService }),
     notificacion: new NotificacionController({ notificacionService }),
     reclutamiento: new ReclutamientoController({ reclutamientoService }),
+    postulacion: new PostulacionController({ colaboracionService }),
   };
 
   const services = {

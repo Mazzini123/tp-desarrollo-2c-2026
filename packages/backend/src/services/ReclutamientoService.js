@@ -58,8 +58,10 @@ export class ReclutamientoService {
     );
     const colaborador = await this.colaboradorService.buscarPorId(colaboradorId);
 
-    if (!proyecto.estaAbierto()) {
-      throw new ConflictError("No se puede invitar a un proyecto finalizado");
+    if (!proyecto.aceptaPostulaciones()) {
+      throw new ConflictError(
+        "El proyecto no esta recibiendo postulaciones (finalizado o con el cupo completo)",
+      );
     }
 
     if (!perfil.cumpleHabilidadesRequeridas(colaborador)) {

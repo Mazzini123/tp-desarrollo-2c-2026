@@ -12,7 +12,12 @@ export function crearRouter(controllers) {
   router.use("/colectivos", crearColectivosRouter(controllers.colectivo));
   router.use(
     "/proyectos",
-    crearProyectosRouter(controllers.proyecto, controllers.perfil, controllers.reclutamiento),
+    crearProyectosRouter(
+      controllers.proyecto,
+      controllers.perfil,
+      controllers.reclutamiento,
+      controllers.postulacion,
+    ),
   );
   router.use("/habilidades", crearHabilidadesRouter(controllers.habilidad));
   router.use(

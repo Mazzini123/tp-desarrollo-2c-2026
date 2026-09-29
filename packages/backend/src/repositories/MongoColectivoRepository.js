@@ -7,6 +7,8 @@ import { Colaboracion } from "../domain/Colaboracion.js";
 import { Logro } from "../domain/Logro.js";
 import { Ubicacion } from "../domain/Ubicacion.js";
 import { RedSocial } from "../domain/RedSocial.js";
+import { COLABORACION_ESTADO } from "../domain/enums/COLABORACION_ESTADO.js";
+import { MODO_ACEPTACION } from "../domain/enums/MODO_ACEPTACION.js";
 
 // Orden estable para paginar: primero por fecha de alta, y el _id desempata.
 const ORDEN = { createdAt: 1, _id: 1 };
@@ -35,6 +37,8 @@ function colaboracionADocumento(colaboracion) {
     colaboradorId: colaboracion.colaborador.id,
     esPublica: colaboracion.esPublica,
     fecha: colaboracion.fecha,
+    estado: colaboracion.estado,
+    fechaResolucion: colaboracion.fechaResolucion,
   };
 }
 
@@ -55,6 +59,8 @@ function proyectoADocumento(proyecto) {
       fecha: logro.fecha,
     })),
     etiquetas: proyecto.etiquetas,
+    modoAceptacion: proyecto.modoAceptacion,
+    limiteVacantes: proyecto.limiteVacantes,
   };
 }
 
@@ -144,6 +150,10 @@ export class MongoColectivoRepository {
       colaborador,
       esPublica: documento.esPublica,
       fecha: documento.fecha,
+      // Las colaboraciones guardadas antes de que existieran las postulaciones
+      // no tienen estado: en ese entonces anotarse era quedar adentro.
+      estado: documento.estado ?? COLABORACION_ESTADO.ACEPTADA,
+      fechaResolucion: documento.fechaResolucion ?? null,
     });
   }
 
@@ -155,6 +165,9 @@ export class MongoColectivoRepository {
       urlSistema: documento.urlSistema,
       urlRepositorio: documento.urlRepositorio,
       estado: documento.estado,
+      // Los proyectos guardados antes del requerimiento 8 funcionaban asi.
+      modoAceptacion: documento.modoAceptacion ?? MODO_ACEPTACION.TODO_SUMA,
+      limiteVacantes: documento.limiteVacantes ?? null,
     });
 
     proyecto.porcentajeConcrecion = documento.porcentajeConcrecion ?? 0;

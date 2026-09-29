@@ -17,6 +17,7 @@ export function crearProyectosRouter(
   proyectoController,
   perfilController,
   reclutamientoController,
+  postulacionController,
 ) {
   const router = Router();
 
@@ -78,6 +79,13 @@ export function crearProyectosRouter(
     proyectoController.anotarColaborador,
   );
   router.get("/:id/colaboraciones", proyectoController.listarColaboraciones);
+
+  // Resolucion manual de una postulacion (req. adicional 8).
+  router.post(
+    "/:id/colaboraciones/:colaboracionId/aceptacion",
+    postulacionController.aceptar,
+  );
+  router.post("/:id/colaboraciones/:colaboracionId/rechazo", postulacionController.rechazar);
 
   return router;
 }

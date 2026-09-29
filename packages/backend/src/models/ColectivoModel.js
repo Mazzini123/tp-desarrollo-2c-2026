@@ -40,6 +40,8 @@ const colaboracionSchema = new mongoose.Schema({
   colaboradorId: { type: String, required: true },
   esPublica: { type: Boolean, default: true },
   fecha: { type: Date, default: Date.now },
+  estado: { type: String, required: true },
+  fechaResolucion: { type: Date, default: null },
 });
 
 const logroSchema = new mongoose.Schema(
@@ -63,6 +65,8 @@ const proyectoSchema = new mongoose.Schema({
   colaboraciones: { type: [colaboracionSchema], default: [] },
   logros: { type: [logroSchema], default: [] },
   etiquetas: { type: [String], default: [] },
+  modoAceptacion: { type: String, required: true },
+  limiteVacantes: { type: Number, default: null },
 });
 
 const colectivoSchema = new mongoose.Schema(
