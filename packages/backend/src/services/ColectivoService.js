@@ -8,13 +8,25 @@ import { tieneContenido } from "../utils/validaciones.js";
 import { armarPaginado } from "../utils/paginacion.js";
 import { construirRedesSociales } from "../domain/RedSocial.js";
 import { normalizarEtiquetas } from "../domain/etiquetas.js";
+import { MedioDeContacto } from "../domain/MedioDeContacto.js";
+import { ConflictError } from "../errors/ConflictError.js";
+import { cerrarProyecto, notificarResoluciones } from "./reglasDePostulacion.js";
 
 export class ColectivoService {
-  constructor({ colectivoRepository }) {
+  constructor({ colectivoRepository, notificacionService }) {
     this.colectivoRepository = colectivoRepository;
+    this.notificacionService = notificacionService;
   }
 
-  async crear({ nombre, descripcion, tipoColectivo, ubicacion, redesSociales = [], etiquetas = [] }) {
+  async crear({
+    nombre,
+    descripcion,
+    tipoColectivo,
+    ubicacion,
+    redesSociales = [],
+    etiquetas = [],
+    mediosDeContacto = [],
+  }) {
     this.validarNombre(nombre);
     this.validarDescripcion(descripcion);
     this.validarTipoColectivo(tipoColectivo);
@@ -27,6 +39,7 @@ export class ColectivoService {
     });
     colectivo.redesSociales = construirRedesSociales(redesSociales);
     colectivo.etiquetas = normalizarEtiquetas(etiquetas);
+    colectivo.mediosDeContacto = this.construirMediosDeContacto(mediosDeContacto);
 
     return this.colectivoRepository.guardar(colectivo);
   }
@@ -47,8 +60,12 @@ export class ColectivoService {
     return colectivo;
   }
 
-  async actualizar(id, { nombre, descripcion, ubicacion, redesSociales, etiquetas }) {
+  async actualizar(id, { nombre, descripcion, ubicacion, redesSociales, etiquetas, mediosDeContacto }) {
     const colectivo = await this.buscarPorId(id);
+
+    if (colectivo.estaDadoDeBaja()) {
+      throw new ConflictError("No se puede modificar un colectivo dado de baja");
+    }
 
     if (nombre !== undefined) {
       this.validarNombre(nombre);
@@ -72,7 +89,43 @@ export class ColectivoService {
       colectivo.etiquetas = normalizarEtiquetas(etiquetas);
     }
 
+    if (mediosDeContacto !== undefined) {
+      colectivo.mediosDeContacto = this.construirMediosDeContacto(mediosDeContacto);
+    }
+
     return this.colectivoRepository.guardar(colectivo);
+  }
+
+  // Requerimiento adicional 23: el colectivo elimina su cuenta. Sus proyectos
+  // abiertos se cierran con las mismas consecuencias que un cierre manual
+  // (se rechazan las postulaciones pendientes y terminan las colaboraciones
+  // en curso), porque una organizacion que se fue no puede seguir sumando
+  // gente. Lo historico queda: proyectos, logros, colaboraciones.
+  async darDeBaja(id, ahora = new Date()) {
+    const colectivo = await this.buscarPorId(id);
+
+    if (colectivo.estaDadoDeBaja()) {
+      throw new ConflictError("El colectivo ya esta dado de baja");
+    }
+
+    const cierres = colectivo.proyectos
+      .filter((proyecto) => proyecto.estaAbierto())
+      .map((proyecto) => [proyecto, cerrarProyecto(proyecto, ahora)]);
+
+    colectivo.darDeBaja(ahora);
+    await this.colectivoRepository.guardar(colectivo);
+
+    for (const [proyecto, cambios] of cierres) {
+      await notificarResoluciones(this.notificacionService, proyecto, cambios);
+    }
+
+    return colectivo;
+  }
+
+  construirMediosDeContacto(lista) {
+    return lista
+      .map((datos) => new MedioDeContacto(datos))
+      .filter((medio, i, todos) => todos.findIndex((otro) => otro.equals(medio)) === i);
   }
 
   construirUbicacion(datos) {

@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { redSocialSchema } from "./subesquemas.js";
+import { medioDeContactoSchema, redSocialSchema } from "./subesquemas.js";
 
 // Colectivo es el agregado raiz: proyectos, perfiles y colaboraciones viven
 // EMBEBIDOS en su documento. Habilidades y colaboradores son entidades
@@ -94,6 +94,9 @@ const colectivoSchema = new mongoose.Schema(
     proyectos: { type: [proyectoSchema], default: [] },
     redesSociales: { type: [redSocialSchema], default: [] },
     etiquetas: { type: [String], default: [] },
+    mediosDeContacto: { type: [medioDeContactoSchema], default: [] },
+    fechaAlta: { type: Date, default: null },
+    fechaBaja: { type: Date, default: null },
   },
   {
     versionKey: false,

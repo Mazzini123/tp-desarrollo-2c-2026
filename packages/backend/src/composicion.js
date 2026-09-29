@@ -92,7 +92,6 @@ export function componerApp({
 
   const habilidadService = new HabilidadService({ habilidadRepository });
 
-  const colectivoService = new ColectivoService({ colectivoRepository });
 
   const perfilService = new PerfilService({
     colectivoRepository,
@@ -109,6 +108,8 @@ export function componerApp({
     colaboradorService,
     canales,
   });
+
+  const colectivoService = new ColectivoService({ colectivoRepository, notificacionService });
 
   const proyectoService = new ProyectoService({
     colectivoRepository,

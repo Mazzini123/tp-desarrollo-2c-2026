@@ -26,6 +26,10 @@ export class ColectivoController extends BaseController {
     res.status(200).json(await this.colectivoService.actualizar(req.params.id, req.body));
   };
 
+  darDeBaja = async (req, res) => {
+    res.status(200).json(await this.colectivoService.darDeBaja(req.params.id));
+  };
+
   crearProyecto = async (req, res) => {
     const proyecto = await this.proyectoService.crear({
       ...req.body,

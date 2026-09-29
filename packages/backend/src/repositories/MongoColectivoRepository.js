@@ -8,6 +8,7 @@ import { Logro } from "../domain/Logro.js";
 import { Ubicacion } from "../domain/Ubicacion.js";
 import { RedSocial } from "../domain/RedSocial.js";
 import { Valoracion } from "../domain/Valoracion.js";
+import { MedioDeContacto } from "../domain/MedioDeContacto.js";
 import { COLABORACION_ESTADO } from "../domain/enums/COLABORACION_ESTADO.js";
 import { MODO_ACEPTACION } from "../domain/enums/MODO_ACEPTACION.js";
 
@@ -93,6 +94,9 @@ function aDocumento(colectivo) {
     proyectos: colectivo.proyectos.map(proyectoADocumento),
     redesSociales: colectivo.redesSociales.map(({ nombre, url }) => ({ nombre, url })),
     etiquetas: colectivo.etiquetas,
+    mediosDeContacto: colectivo.mediosDeContacto.map(({ tipo, valor }) => ({ tipo, valor })),
+    fechaAlta: colectivo.fechaAlta,
+    fechaBaja: colectivo.fechaBaja,
   };
 }
 
@@ -220,7 +224,14 @@ export class MongoColectivoRepository {
       descripcion: documento.descripcion,
       tipoColectivo: documento.tipoColectivo,
       ubicacion: documento.ubicacion ? new Ubicacion(documento.ubicacion) : null,
+      // Los colectivos anteriores a esta entrega no tienen fechaAlta: se usa la
+      // que Mongoose guarda sola (timestamps).
+      fechaAlta: documento.fechaAlta ?? documento.createdAt ?? null,
+      fechaBaja: documento.fechaBaja ?? null,
     });
+    colectivo.mediosDeContacto = (documento.mediosDeContacto ?? []).map(
+      (medio) => new MedioDeContacto(medio),
+    );
     colectivo.redesSociales = (documento.redesSociales ?? []).map((red) => new RedSocial(red));
     colectivo.etiquetas = documento.etiquetas ?? [];
 

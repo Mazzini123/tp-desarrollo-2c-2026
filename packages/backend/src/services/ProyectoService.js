@@ -38,6 +38,9 @@ export class ProyectoService {
     this.validarFechaCierre(fechaCierre, ahora);
 
     const colectivo = await this.colectivoService.buscarPorId(colectivoId);
+    if (colectivo.estaDadoDeBaja()) {
+      throw new ConflictError("Un colectivo dado de baja no puede publicar proyectos");
+    }
     // construirPerfil es async (resuelve habilidades): Promise.all espera a todos.
     const perfilesConstruidos = await Promise.all(
       perfiles.map((datos) => this.perfilService.construirPerfil(datos)),

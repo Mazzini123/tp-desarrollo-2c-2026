@@ -14,6 +14,10 @@ export function crearColectivosRouter(colectivoController) {
   router.get("/", validarQuery(listadoConEtiquetaSchema), colectivoController.listar);
   router.get("/:id", colectivoController.obtenerPorId);
   router.put("/:id", validarBody(actualizarColectivoSchema), colectivoController.actualizar);
+  // Req. adicional 23. Es una accion (como /finalizacion) y no un DELETE: el
+  // colectivo sigue existiendo como historia, asi que GET /colectivos/:id
+  // tiene que seguir respondiendo.
+  router.post("/:id/baja", colectivoController.darDeBaja);
 
   router.post(
     "/:id/proyectos",
