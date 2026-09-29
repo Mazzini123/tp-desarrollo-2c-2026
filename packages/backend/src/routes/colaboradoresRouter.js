@@ -9,7 +9,7 @@ import {
 } from "../schemas/colaboradorSchema.js";
 import { medioDeContactoSchema } from "../schemas/medioDeContactoSchema.js";
 
-export function crearColaboradoresRouter(colaboradorController) {
+export function crearColaboradoresRouter(colaboradorController, notificacionController) {
   const router = Router();
 
   router.post("/", validarBody(crearColaboradorSchema), colaboradorController.crear);
@@ -46,6 +46,17 @@ export function crearColaboradoresRouter(colaboradorController) {
   );
 
   router.get("/:id/colaboraciones", colaboradorController.listarColaboraciones);
+
+  // La bandeja de mensajes internos de la persona.
+  router.get(
+    "/:id/notificaciones",
+    validarQuery(paginacionSchema),
+    notificacionController.listar,
+  );
+  router.post(
+    "/:id/notificaciones/:notificacionId/lectura",
+    notificacionController.marcarComoLeida,
+  );
 
   return router;
 }

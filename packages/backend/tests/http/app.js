@@ -1,5 +1,9 @@
 import request from "supertest";
-import { componerApp, crearRepositoriosEnMemoria } from "../../src/composicion.js";
+import {
+  componerApp,
+  crearRepositoriosEnMemoria,
+  crearCanalesEnMemoria,
+} from "../../src/composicion.js";
 import { crearApp } from "../../src/app.js";
 import { cargarHabilidadesIniciales } from "../../src/seed/habilidadesSeed.js";
 
@@ -12,10 +16,12 @@ import { cargarHabilidadesIniciales } from "../../src/seed/habilidadesSeed.js";
  * JSON no muestre lo que no debe.
  */
 export async function armarApp() {
+  const canales = crearCanalesEnMemoria();
   const { controllers, services } = componerApp({
     repositorios: crearRepositoriosEnMemoria(),
+    canales,
   });
   await cargarHabilidadesIniciales(services.habilidadService);
   const app = crearApp(controllers);
-  return { api: request(app), services };
+  return { api: request(app), services, canales };
 }
