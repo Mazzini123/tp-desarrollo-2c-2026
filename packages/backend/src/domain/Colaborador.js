@@ -68,6 +68,14 @@ export class Colaborador {
     this.habilidades = this.habilidades.filter((h) => !h.equals(habilidad));
   }
 
+  // Como se la nombra en listados publicos: su nombre de fantasia, o su
+  // nombre y apellido, o su cuenta de Git (siempre tiene alguno de los tres).
+  nombreParaMostrar() {
+    if (this.nombreFantasia) return this.nombreFantasia;
+    if (this.nombre && this.apellido) return `${this.nombre} ${this.apellido}`;
+    return this.cuentaGit;
+  }
+
   // Lo que se ve de la persona hacia afuera. JSON.stringify (y por lo tanto
   // res.json) llama a toJSON() si existe, asi que ningun endpoint puede
   // filtrar los medios de contacto por olvido: "no se muestran de forma

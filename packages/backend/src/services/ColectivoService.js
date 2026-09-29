@@ -11,6 +11,7 @@ import { normalizarEtiquetas } from "../domain/etiquetas.js";
 import { MedioDeContacto } from "../domain/MedioDeContacto.js";
 import { ConflictError } from "../errors/ConflictError.js";
 import { cerrarProyecto, notificarResoluciones } from "./reglasDePostulacion.js";
+import { TIPO_EVENTO_TIMELINE } from "../domain/enums/TIPO_EVENTO_TIMELINE.js";
 
 export class ColectivoService {
   constructor({ colectivoRepository, notificacionService }) {
@@ -122,6 +123,54 @@ export class ColectivoService {
     return colectivo;
   }
 
+  // Requerimiento adicional 19: "Vista cronologica que muestre todos los
+  // proyectos creados por un colectivo, logros cargados y colaboraciones
+  // cerradas de una organizacion, a modo de historial publico".
+  //
+  // No se guarda en ningun lado: se arma recorriendo el agregado, porque toda
+  // la informacion ya esta adentro del documento del colectivo.
+  async timeline(id) {
+    const colectivo = await this.buscarPorId(id);
+    const eventos = [
+      evento(TIPO_EVENTO_TIMELINE.ALTA_DEL_COLECTIVO, colectivo.fechaAlta),
+      evento(TIPO_EVENTO_TIMELINE.BAJA_DEL_COLECTIVO, colectivo.fechaBaja),
+    ];
+
+    colectivo.proyectos.forEach((proyecto) => {
+      const delProyecto = { proyecto: { id: proyecto.id, titulo: proyecto.titulo } };
+
+      eventos.push(
+        evento(TIPO_EVENTO_TIMELINE.PROYECTO_CREADO, proyecto.fechaCreacion, delProyecto),
+        evento(TIPO_EVENTO_TIMELINE.PROYECTO_FINALIZADO, proyecto.fechaFinalizacion, delProyecto),
+        ...proyecto.logros.map((logro) =>
+          evento(TIPO_EVENTO_TIMELINE.LOGRO, logro.fecha, {
+            ...delProyecto,
+            logro: { titulo: logro.titulo, descripcion: logro.descripcion },
+          }),
+        ),
+        ...proyecto.colaboraciones
+          .filter((c) => c.estaFinalizada())
+          .map((c) =>
+            evento(TIPO_EVENTO_TIMELINE.COLABORACION_CERRADA, c.fechaFin, {
+              ...delProyecto,
+              // Una contribucion anonima figura, pero sin decir de quien.
+              colaborador: c.esPublica
+                ? { id: c.colaborador.id, nombre: c.colaborador.nombreParaMostrar() }
+                : null,
+            }),
+          ),
+      );
+    });
+
+    return (
+      eventos
+        // Lo guardado antes de esta entrega puede no tener fecha: no se inventa.
+        .filter((e) => e.fecha)
+        // Cronologica: de lo mas viejo a lo mas nuevo.
+        .sort((a, b) => a.fecha - b.fecha)
+    );
+  }
+
   construirMediosDeContacto(lista) {
     return lista
       .map((datos) => new MedioDeContacto(datos))
@@ -165,4 +214,8 @@ export class ColectivoService {
       throw new DomainError(`Tipo de colectivo inválido: ${tipoColectivo}`);
     }
   }
+}
+
+function evento(tipo, fecha, datos = {}) {
+  return { tipo, fecha, ...datos };
 }

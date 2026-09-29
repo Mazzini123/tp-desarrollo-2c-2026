@@ -26,6 +26,8 @@ export function crearColectivosRouter(colectivoController, estadisticaController
   );
   router.get("/:id/proyectos", colectivoController.listarProyectos);
   router.get("/:id/valoraciones", colectivoController.listarValoraciones);
+  // Historial publico del colectivo (req. adicional 19).
+  router.get("/:id/timeline", colectivoController.timeline);
   // Panel de la organizacion (req. adicional 17).
   router.get("/:id/estadisticas", estadisticaController.deColectivo);
 

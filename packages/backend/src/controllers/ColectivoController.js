@@ -42,6 +42,10 @@ export class ColectivoController extends BaseController {
     res.status(200).json(await this.proyectoService.listarPorColectivo(req.params.id));
   };
 
+  timeline = async (req, res) => {
+    res.status(200).json(await this.colectivoService.timeline(req.params.id));
+  };
+
   listarValoraciones = async (req, res) => {
     res
       .status(200)
