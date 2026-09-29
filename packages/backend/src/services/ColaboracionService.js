@@ -9,7 +9,7 @@ export class ColaboracionService {
     this.colaboradorService = colaboradorService;
   }
 
-  async registrar({ proyectoId, colaboradorId }) {
+  async registrar({ proyectoId, colaboradorId, esPublica = true }) {
     const { colectivo, proyecto } = await this.proyectoService.buscarProyectoConColectivo(proyectoId);
     const colaborador = await this.colaboradorService.buscarPorId(colaboradorId);
 
@@ -25,7 +25,7 @@ export class ColaboracionService {
       throw new ConflictError("El colaborador ya está anotado en este proyecto");
     }
 
-    const colaboracion = new Colaboracion({ colaborador });
+    const colaboracion = new Colaboracion({ colaborador, esPublica });
     proyecto.agregarColaboracion(colaboracion);
     await this.colectivoRepository.guardar(colectivo);
 
@@ -40,13 +40,15 @@ export class ColaboracionService {
     return (await this.proyectoService.buscarPorId(proyectoId)).colaboraciones;
   }
 
+  // Es el historial publico de la persona: las contribuciones anonimas no
+  // aparecen, porque listarlas aca diria justamente quien las hizo.
   async listarPorColaborador(colaboradorId) {
     const colaborador = await this.colaboradorService.buscarPorId(colaboradorId);
     const proyectos = await this.colectivoRepository.listarProyectos();
 
     return proyectos.flatMap((proyecto) =>
       proyecto.colaboraciones
-        .filter((c) => c.colaborador.id === colaborador.id)
+        .filter((c) => c.colaborador.id === colaborador.id && c.esPublica)
         .map((c) => ({ proyectoId: proyecto.id, colaboracion: c })),
     );
   }

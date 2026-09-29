@@ -21,5 +21,9 @@ export const actualizarProyectoSchema = z
   });
 
 export const anotarColaboradorSchema = z
-  .object({ colaboradorId: z.string().trim().min(1) })
+  .object({
+    colaboradorId: z.string().trim().min(1),
+    // false = contribucion anonima: figura en el proyecto, pero sin decir quien.
+    esPublica: z.boolean().default(true),
+  })
   .strict();

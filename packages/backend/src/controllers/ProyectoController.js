@@ -28,6 +28,7 @@ export class ProyectoController extends BaseController {
     const colaboracion = await this.colaboracionService.registrar({
       proyectoId: req.params.id,
       colaboradorId: req.body.colaboradorId,
+      esPublica: req.body.esPublica,
     });
     res.status(201).json(colaboracion);
   };
