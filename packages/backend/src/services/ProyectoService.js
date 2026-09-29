@@ -7,6 +7,7 @@ import { normalizarEtiquetas } from "../domain/etiquetas.js";
 import { MODO_ACEPTACION } from "../domain/enums/MODO_ACEPTACION.js";
 import {
   aplicarModoDeAceptacion,
+  cerrarProyecto,
   notificarResoluciones,
   validarModoDeAceptacion,
 } from "./reglasDePostulacion.js";
@@ -27,19 +28,28 @@ export class ProyectoService {
     etiquetas = [],
     modoAceptacion = MODO_ACEPTACION.TODO_SUMA,
     limiteVacantes = null,
-  }) {
+    fechaCierre = null,
+  }, ahora = new Date()) {
     if (!Array.isArray(perfiles) || perfiles.length === 0) {
       throw new DomainError("El proyecto debe tener al menos un perfil");
     }
 
     validarModoDeAceptacion(modoAceptacion, limiteVacantes);
+    this.validarFechaCierre(fechaCierre, ahora);
 
     const colectivo = await this.colectivoService.buscarPorId(colectivoId);
     // construirPerfil es async (resuelve habilidades): Promise.all espera a todos.
     const perfilesConstruidos = await Promise.all(
       perfiles.map((datos) => this.perfilService.construirPerfil(datos)),
     );
-    const proyecto = new Proyecto({ titulo, descripcion, modoAceptacion, limiteVacantes });
+    const proyecto = new Proyecto({
+      titulo,
+      descripcion,
+      modoAceptacion,
+      limiteVacantes,
+      fechaCierre,
+      fechaCreacion: ahora,
+    });
     proyecto.etiquetas = normalizarEtiquetas(etiquetas);
 
     perfilesConstruidos.forEach((perfil) => proyecto.agregarPerfil(perfil));
@@ -85,7 +95,7 @@ export class ProyectoService {
 
   async actualizar(
     proyectoId,
-    { titulo, descripcion, etiquetas, modoAceptacion, limiteVacantes },
+    { titulo, descripcion, etiquetas, modoAceptacion, limiteVacantes, fechaCierre },
     ahora = new Date(),
   ) {
     const { colectivo, proyecto } = await this.buscarProyectoConColectivo(proyectoId);
@@ -101,6 +111,13 @@ export class ProyectoService {
 
     if (etiquetas !== undefined) {
       proyecto.etiquetas = normalizarEtiquetas(etiquetas);
+    }
+
+    // "En cualquier momento el colectivo podra indicar una fecha limite de
+    // cierre". null la saca.
+    if (fechaCierre !== undefined) {
+      this.validarFechaCierre(fechaCierre, ahora);
+      proyecto.fechaCierre = fechaCierre;
     }
 
     let cambios = { aceptadas: [], rechazadas: [] };
@@ -121,12 +138,44 @@ export class ProyectoService {
     return proyecto;
   }
 
-  async finalizar(proyectoId) {
+  async finalizar(proyectoId, ahora = new Date()) {
     const { colectivo, proyecto } = await this.buscarProyectoConColectivo(proyectoId);
     this.verificarAbierto(proyecto, "finalizar");
 
-    proyecto.finalizarProyecto();
-    await this.colectivoRepository.guardar(colectivo);
+    await this.cerrar(colectivo, [proyecto], ahora);
     return proyecto;
+  }
+
+  // Cierre con todas sus consecuencias. Lo usan el cierre manual, el
+  // automatico y cualquier operacion que descubra un cierre vencido.
+  async cerrar(colectivo, proyectos, ahora) {
+    const cambios = proyectos.map((proyecto) => [proyecto, cerrarProyecto(proyecto, ahora)]);
+    await this.colectivoRepository.guardar(colectivo);
+
+    for (const [proyecto, cambiosDelProyecto] of cambios) {
+      await notificarResoluciones(this.notificacionService, proyecto, cambiosDelProyecto);
+    }
+  }
+
+  // Requerimiento adicional 10. Lo llama periodicamente el job de
+  // jobs/cierreAutomatico.js. Devuelve los proyectos que cerro.
+  async cerrarVencidos(ahora = new Date()) {
+    const colectivos = await this.colectivoRepository.buscarConCierreVencido(ahora);
+    const cerrados = [];
+
+    for (const colectivo of colectivos) {
+      const vencidos = colectivo.proyectos.filter((p) => p.cierreVencido(ahora));
+      if (vencidos.length === 0) continue;
+      await this.cerrar(colectivo, vencidos, ahora);
+      cerrados.push(...vencidos);
+    }
+
+    return cerrados;
+  }
+
+  validarFechaCierre(fechaCierre, ahora) {
+    if (fechaCierre !== null && fechaCierre !== undefined && fechaCierre <= ahora) {
+      throw new DomainError("La fecha de cierre tiene que ser futura");
+    }
   }
 }

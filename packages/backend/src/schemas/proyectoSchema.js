@@ -7,6 +7,11 @@ import { MODO_ACEPTACION } from "../domain/enums/MODO_ACEPTACION.js";
 const modoAceptacionSchema = z.enum(Object.values(MODO_ACEPTACION));
 // null = sin limite de vacantes.
 const limiteVacantesSchema = z.int().positive().nullable();
+// Fecha ISO ("2026-12-01" o "2026-12-01T18:00:00-03:00"); null la saca.
+const fechaCierreSchema = z
+  .union([z.iso.datetime({ offset: true }), z.iso.date()])
+  .transform((texto) => new Date(texto))
+  .nullable();
 
 export const crearProyectoSchema = z
   .object({
@@ -16,6 +21,7 @@ export const crearProyectoSchema = z
     etiquetas: etiquetasSchema.default([]),
     modoAceptacion: modoAceptacionSchema.optional(),
     limiteVacantes: limiteVacantesSchema.optional(),
+    fechaCierre: fechaCierreSchema.optional(),
   })
   .strict();
 
@@ -26,6 +32,7 @@ export const actualizarProyectoSchema = z
     etiquetas: etiquetasSchema.optional(),
     modoAceptacion: modoAceptacionSchema.optional(),
     limiteVacantes: limiteVacantesSchema.optional(),
+    fechaCierre: fechaCierreSchema.optional(),
   })
   .strict()
   .refine(tieneAlgunCampoDefinido, {

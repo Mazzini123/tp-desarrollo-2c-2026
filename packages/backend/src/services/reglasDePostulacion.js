@@ -43,6 +43,15 @@ export function aplicarModoDeAceptacion(proyecto, fecha) {
   return { aceptadas, rechazadas };
 }
 
+// Requerimiento adicional 10: "El cierre automatico tendra las mismas
+// consecuencias que uno manual, se rechazan todas las postulaciones
+// existentes y ya no se pueden crear ni aceptar nuevas postulaciones". Por eso
+// el cierre manual (finalizar) y el automatico pasan los dos por aca.
+export function cerrarProyecto(proyecto, fecha) {
+  proyecto.finalizarProyecto(fecha);
+  return { aceptadas: [], rechazadas: rechazarPendientes(proyecto, fecha) };
+}
+
 export function rechazarPendientes(proyecto, fecha) {
   const pendientes = proyecto.colaboracionesPendientes();
   pendientes.forEach((c) => c.rechazar(fecha));

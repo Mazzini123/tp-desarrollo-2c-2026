@@ -12,6 +12,9 @@ export class Proyecto {
     estado = PROYECTO_ESTADO.ABIERTO,
     modoAceptacion = MODO_ACEPTACION.TODO_SUMA,
     limiteVacantes = null,
+    fechaCreacion = new Date(),
+    fechaFinalizacion = null,
+    fechaCierre = null,
   }) {
     this.id = id;
     this.titulo = titulo;
@@ -28,14 +31,23 @@ export class Proyecto {
     // de que existieran las postulaciones: quien se anota, queda adentro.
     this.modoAceptacion = modoAceptacion;
     this.limiteVacantes = limiteVacantes;
+    this.fechaCreacion = fechaCreacion;
+    this.fechaFinalizacion = fechaFinalizacion;
+    // Requerimiento adicional 10: fecha limite para cerrarse solo.
+    this.fechaCierre = fechaCierre;
   }
 
   estaAbierto() {
     return this.estado === PROYECTO_ESTADO.ABIERTO;
   }
 
-  finalizarProyecto() {
+  finalizarProyecto(fecha = new Date()) {
     this.estado = PROYECTO_ESTADO.FINALIZADO;
+    this.fechaFinalizacion = fecha;
+  }
+
+  cierreVencido(ahora) {
+    return this.estaAbierto() && this.fechaCierre !== null && this.fechaCierre <= ahora;
   }
 
   cumpleAlgunPerfil(colaborador) {

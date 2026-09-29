@@ -35,6 +35,10 @@ export class InMemoryColectivoRepository extends InMemoryRepository {
     return { items: todos.slice(inicio, inicio + limitePorPagina), total: todos.length };
   }
 
+  buscarConCierreVencido(ahora) {
+    return this.listar().filter((c) => c.proyectos.some((p) => p.cierreVencido(ahora)));
+  }
+
   listarProyectos() {
     return this.listar().flatMap((colectivo) => colectivo.proyectos);
   }

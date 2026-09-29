@@ -67,6 +67,9 @@ const proyectoSchema = new mongoose.Schema({
   etiquetas: { type: [String], default: [] },
   modoAceptacion: { type: String, required: true },
   limiteVacantes: { type: Number, default: null },
+  fechaCreacion: { type: Date, default: null },
+  fechaFinalizacion: { type: Date, default: null },
+  fechaCierre: { type: Date, default: null },
 });
 
 const colectivoSchema = new mongoose.Schema(

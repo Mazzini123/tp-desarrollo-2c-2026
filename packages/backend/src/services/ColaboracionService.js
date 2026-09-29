@@ -18,6 +18,12 @@ export class ColaboracionService {
     const { colectivo, proyecto } = await this.proyectoService.buscarProyectoConColectivo(proyectoId);
     const colaborador = await this.colaboradorService.buscarPorId(colaboradorId);
 
+    // Si la fecha de cierre ya paso pero el job todavia no lo cerro, se
+    // cierra ahora: nadie puede postularse despues de la fecha limite.
+    if (proyecto.cierreVencido(ahora)) {
+      await this.proyectoService.cerrar(colectivo, [proyecto], ahora);
+    }
+
     if (!proyecto.estaAbierto()) {
       throw new ConflictError("No se puede anotar a un proyecto que ya está finalizado");
     }
@@ -73,6 +79,10 @@ export class ColaboracionService {
       proyectoId,
       colaboracionId,
     );
+
+    if (proyecto.cierreVencido(ahora)) {
+      await this.proyectoService.cerrar(colectivo, [proyecto], ahora);
+    }
 
     this.verificarPendiente(proyecto, colaboracion, "aceptar");
 

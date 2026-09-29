@@ -61,6 +61,9 @@ function proyectoADocumento(proyecto) {
     etiquetas: proyecto.etiquetas,
     modoAceptacion: proyecto.modoAceptacion,
     limiteVacantes: proyecto.limiteVacantes,
+    fechaCreacion: proyecto.fechaCreacion,
+    fechaFinalizacion: proyecto.fechaFinalizacion,
+    fechaCierre: proyecto.fechaCierre,
   };
 }
 
@@ -168,6 +171,10 @@ export class MongoColectivoRepository {
       // Los proyectos guardados antes del requerimiento 8 funcionaban asi.
       modoAceptacion: documento.modoAceptacion ?? MODO_ACEPTACION.TODO_SUMA,
       limiteVacantes: documento.limiteVacantes ?? null,
+      // Los proyectos anteriores a esta entrega no tienen fecha de alta.
+      fechaCreacion: documento.fechaCreacion ?? null,
+      fechaFinalizacion: documento.fechaFinalizacion ?? null,
+      fechaCierre: documento.fechaCierre ?? null,
     });
 
     proyecto.porcentajeConcrecion = documento.porcentajeConcrecion ?? 0;
@@ -280,6 +287,18 @@ export class MongoColectivoRepository {
     }
 
     return { colectivo, proyecto, perfil };
+  }
+
+  // Preselecciona los colectivos que PUEDEN tener un proyecto vencido: alguno
+  // abierto y alguno con fecha de cierre pasada (no necesariamente el mismo).
+  // La condicion exacta la decide el dominio (Proyecto.cierreVencido) en el
+  // service; traer de mas solo cuesta un poco, nunca cierra algo que no toca.
+  async buscarConCierreVencido(ahora) {
+    const documentos = await ColectivoModel.find({
+      "proyectos.estado": "ABIERTO",
+      "proyectos.fechaCierre": { $lte: ahora },
+    }).lean();
+    return this.aDominioVarios(documentos);
   }
 
   async listarProyectos() {
