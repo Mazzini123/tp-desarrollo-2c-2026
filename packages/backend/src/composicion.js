@@ -143,6 +143,7 @@ export function componerApp({
 
   const reclutamientoService = new ReclutamientoService({
     colaboradorRepository,
+    colectivoRepository,
     colaboradorService,
     perfilService,
     notificacionService,

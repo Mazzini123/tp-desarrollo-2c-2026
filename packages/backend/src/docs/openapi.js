@@ -740,6 +740,24 @@ export const openapi = {
       },
     },
 
+    "/colaboradores/{id}/proyectos-potenciales": {
+      parameters: [paramId],
+      get: {
+        tags: ["Reclutamiento"],
+        summary: "Buscar proyectos para un colaborador",
+        description:
+          "Minimo de la segunda entrega (req. 3.d). Proyectos abiertos y con vacantes donde " +
+          "la persona cumple las habilidades requeridas de al menos un perfil, y todavia no " +
+          "se postulo.",
+        parameters: paramsPaginacion,
+        responses: {
+          ...listado("Proyecto"),
+          404: errores[404],
+          429: errores[429],
+        },
+      },
+    },
+
     "/colaboradores/{id}/medios-de-contacto": {
       parameters: [paramId],
       post: {
