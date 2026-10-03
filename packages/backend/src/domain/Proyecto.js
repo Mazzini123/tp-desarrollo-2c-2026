@@ -26,6 +26,7 @@ export class Proyecto {
     this.perfiles = [];
     this.urlSistema = urlSistema;
     this.urlRepositorio = urlRepositorio;
+    this.avances = [];
     this.etiquetas = [];
     // Requerimiento adicional 8. TODO_SUMA sin limite es lo que pasaba antes
     // de que existieran las postulaciones: quien se anota, queda adentro.
@@ -109,5 +110,9 @@ export class Proyecto {
 
   aceptaPostulaciones() {
     return this.estaAbierto() && !this.cupoCompleto();
+  }
+
+  agregarAvance(avance) {
+    this.avances.push(avance);
   }
 }

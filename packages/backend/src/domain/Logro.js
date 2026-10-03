@@ -1,5 +1,8 @@
+import { randomUUID } from "node:crypto";
+
 export class Logro {
-  constructor({ titulo, descripcion, fecha = new Date() }) {
+  constructor({ id = randomUUID(), titulo, descripcion, fecha = new Date() }) {
+    this.id = id
     this.titulo = titulo;
     this.descripcion = descripcion;
     this.fecha = fecha;

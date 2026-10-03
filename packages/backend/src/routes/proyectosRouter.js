@@ -13,12 +13,18 @@ import {
 import { invitacionSchema } from "../schemas/reclutamientoSchema.js";
 import { listadoConEtiquetaSchema } from "../schemas/comunesSchema.js";
 import { valoracionSchema } from "../schemas/valoracionSchema.js";
+import { crearLogroSchema, 
+         actualizarLogroSchema
+} from "../schemas/logroSchema.js";
+import { crearAvanceSchema } from "../schemas/avanceSchema.js";
 
 export function crearProyectosRouter(
   proyectoController,
   perfilController,
   reclutamientoController,
   postulacionController,
+  logroController,
+  avanceController
 ) {
   const router = Router();
 
@@ -98,6 +104,51 @@ export function crearProyectosRouter(
     validarBody(valoracionSchema),
     postulacionController.valorar,
   );
+
+  // Logros
+  router.post(
+    "/:id/logros",
+    validarBody(crearLogroSchema),
+    logroController.crearParaProyecto
+  );
+
+  router.get(
+    "/:id/logros",
+    logroController.conseguirTodosDeProyecto
+  )
+
+  router.get(
+    "/:id/logros/logroId",
+    logroController.conseguirPorIdParaProyecto
+  )
+
+  router.put(
+    "/:id/logros/logroId",
+    validarBody(actualizarLogroSchema),
+    logroController.actualizarParaProyecto
+  )
+
+  router.delete(
+    "/:id/logros/logroId",
+    logroController.eliminarParaProyecto
+  )
+
+  // Avances
+  router.post(
+    "/:id/avances",
+    validarBody(crearAvanceSchema),
+    avanceController.registrarAvanceParaProyecto
+  )
+
+  router.get(
+    "/:id/avances",
+    avanceController.listarParaProyecto
+  )
+
+  router.get(
+    "/:id/avances/avanceId",
+    avanceController.buscarPorIdParaProyecto
+  )
 
   return router;
 }

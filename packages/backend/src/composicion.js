@@ -25,6 +25,8 @@ import { NotificacionService } from "./services/NotificacionService.js";
 import { ReclutamientoService } from "./services/ReclutamientoService.js";
 import { AvisoAutomaticoService } from "./services/AvisoAutomaticoService.js";
 import { EstadisticaService } from "./services/EstadisticaService.js";
+import { LogroService } from "./services/LogroService.js";
+import { AvanceService } from "./services/AvanceService.js";
 
 import { ColectivoController } from "./controllers/ColectivoController.js";
 import { ProyectoController } from "./controllers/ProyectoController.js";
@@ -35,6 +37,8 @@ import { NotificacionController } from "./controllers/NotificacionController.js"
 import { ReclutamientoController } from "./controllers/ReclutamientoController.js";
 import { PostulacionController } from "./controllers/PostulacionController.js";
 import { EstadisticaController } from "./controllers/EstadisticaController.js";
+import { LogroController} from "./controllers/LogroController.js"
+import { AvanceController } from "./controllers/AvanceController.js";
 
 // Los repositorios de verdad: los que usa la app levantada.
 export function crearRepositoriosMongo() {
@@ -158,6 +162,10 @@ export function componerApp({
 
   const estadisticaService = new EstadisticaService({ estadisticaRepository, colectivoService });
 
+  const logroService = new LogroService({ colectivoRepository });
+
+  const avanceService = new AvanceService({ colectivoRepository });
+
   const controllers = {
     colectivo: new ColectivoController({ colectivoService, proyectoService, colaboracionService }),
     proyecto: new ProyectoController({ proyectoService, colaboracionService }),
@@ -168,6 +176,8 @@ export function componerApp({
     reclutamiento: new ReclutamientoController({ reclutamientoService }),
     postulacion: new PostulacionController({ colaboracionService }),
     estadistica: new EstadisticaController({ estadisticaService }),
+    logro: new LogroController({ logroService }),
+    avance: new AvanceController({ avanceService })
   };
 
   const services = {
@@ -181,6 +191,8 @@ export function componerApp({
     reclutamientoService,
     avisoAutomaticoService,
     estadisticaService,
+    logroService,
+    avanceService
   };
 
   return { controllers, services };
