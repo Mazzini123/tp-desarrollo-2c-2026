@@ -7,8 +7,15 @@ import { armarPaginado } from "../utils/paginacion.js";
 // contactarlas: si la persona destinataria ha aceptado ser contactada, se
 // envia un mensaje interno dentro de la aplicacion" — enunciado, 2da entrega.
 export class ReclutamientoService {
-  constructor({ colaboradorRepository, colaboradorService, perfilService, notificacionService }) {
+  constructor({
+    colaboradorRepository,
+    colectivoRepository,
+    colaboradorService,
+    perfilService,
+    notificacionService,
+  }) {
     this.colaboradorRepository = colaboradorRepository;
+    this.colectivoRepository = colectivoRepository;
     this.colaboradorService = colaboradorService;
     this.perfilService = perfilService;
     this.notificacionService = notificacionService;
@@ -43,6 +50,32 @@ export class ReclutamientoService {
 
     // El orden depende de las opcionales, que no estan en el filtro de la base:
     // por eso se pagina en memoria, despues de ordenar.
+    const inicio = (numeroPagina - 1) * limitePorPagina;
+    return armarPaginado(
+      { items: resultados.slice(inicio, inicio + limitePorPagina), total: resultados.length },
+      numeroPagina,
+      limitePorPagina,
+    );
+  }
+
+  // "Las personas colaboradoras pueden buscar proyectos que encajen con sus
+  // habilidades" — enunciado, 2da entrega (requerimiento 3.d).
+  async buscarProyectos(colaboradorId, { numeroPagina = 1, limitePorPagina = 10 } = {}) {
+    const colaborador = await this.colaboradorService.buscarPorId(colaboradorId);
+
+    // A diferencia de buscarColaboradoras, aca no hay un unico perfil fijo
+    // contra el que filtrar en la base: cada proyecto puede tener varios
+    // perfiles con distintas habilidades requeridas. Se trae todo y se
+    // filtra en memoria, igual que AvisoAutomaticoService.avisarPorColaboradorNuevo.
+    const proyectos = await this.colectivoRepository.listarProyectos();
+
+    const resultados = proyectos.filter(
+      (proyecto) =>
+        proyecto.aceptaPostulaciones() &&
+        proyecto.cumpleAlgunPerfil(colaborador) &&
+        !proyecto.yaColaboraron(colaborador),
+    );
+
     const inicio = (numeroPagina - 1) * limitePorPagina;
     return armarPaginado(
       { items: resultados.slice(inicio, inicio + limitePorPagina), total: resultados.length },

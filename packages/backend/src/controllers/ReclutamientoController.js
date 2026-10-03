@@ -18,6 +18,14 @@ export class ReclutamientoController extends BaseController {
     );
   };
 
+  buscarProyectos = async (req, res) => {
+    const paginacion = this.aPaginacionDeDominio(req.paginacion);
+    this.responderPaginado(
+      res,
+      await this.reclutamientoService.buscarProyectos(req.params.id, paginacion),
+    );
+  };
+
   invitar = async (req, res) => {
     res
       .status(201)

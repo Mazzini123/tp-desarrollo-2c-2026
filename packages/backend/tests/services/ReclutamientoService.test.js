@@ -84,6 +84,87 @@ describe("ReclutamientoService · buscar colaboradoras segun un perfil", () => {
   });
 });
 
+describe("ReclutamientoService · buscar proyectos segun habilidades", () => {
+  let services;
+  let colectivo;
+
+  beforeEach(async () => {
+    services = await armarServices();
+    colectivo = await crearColectivoDePrueba(services.colectivoService);
+  });
+
+  const crearProyecto = ({ titulo = "Proyecto", requeridas = [CODIGOS.node], modoAceptacion, limiteVacantes } = {}) =>
+    services.proyectoService.crear({
+      colectivoId: colectivo.id,
+      titulo,
+      descripcion: "...",
+      perfiles: [datosDePerfil({ requeridas })],
+      modoAceptacion,
+      limiteVacantes,
+    });
+
+  const crearColaborador = (cuentaGit, habilidades) =>
+    services.colaboradorService.crear({ cuentaGit, codigosHabilidades: habilidades });
+
+  function buscar(colaboradorId, paginacion) {
+    return services.reclutamientoService.buscarProyectos(colaboradorId, paginacion);
+  }
+
+  test("devuelve solo los proyectos donde cumple algun perfil", async () => {
+    const compatible = await crearProyecto({ titulo: "Compatible", requeridas: [CODIGOS.node] });
+    await crearProyecto({ titulo: "No compatible", requeridas: [CODIGOS.react] });
+
+    const ada = await crearColaborador("ada", [CODIGOS.node]);
+
+    const resultado = await buscar(ada.id);
+    expect(resultado.items.map((p) => p.id)).toEqual([compatible.id]);
+    expect(resultado.total).toBe(1);
+  });
+
+  test("no incluye proyectos finalizados", async () => {
+    const proyecto = await crearProyecto();
+    await services.proyectoService.finalizar(proyecto.id);
+
+    const ada = await crearColaborador("ada", [CODIGOS.node]);
+    expect((await buscar(ada.id)).total).toBe(0);
+  });
+
+  test("no incluye proyectos con el cupo de vacantes completo", async () => {
+    const proyecto = await crearProyecto({
+      modoAceptacion: "HASTA_LLENAR_VACANTES",
+      limiteVacantes: 1,
+    });
+    const grace = await crearColaborador("grace", [CODIGOS.node]);
+    await services.colaboracionService.registrar({ proyectoId: proyecto.id, colaboradorId: grace.id });
+
+    const ada = await crearColaborador("ada", [CODIGOS.node]);
+    expect((await buscar(ada.id)).total).toBe(0);
+  });
+
+  test("no incluye un proyecto al que ya se postulo", async () => {
+    const proyecto = await crearProyecto();
+    const ada = await crearColaborador("ada", [CODIGOS.node]);
+    await services.colaboracionService.registrar({ proyectoId: proyecto.id, colaboradorId: ada.id });
+
+    expect((await buscar(ada.id)).total).toBe(0);
+  });
+
+  test("un colaborador que no existe tira NotFoundError", async () => {
+    await expect(buscar("no-existe")).rejects.toThrow(NotFoundError);
+  });
+
+  test("pagina los resultados", async () => {
+    for (const titulo of ["a", "b", "c"]) {
+      await crearProyecto({ titulo });
+    }
+    const ada = await crearColaborador("ada", [CODIGOS.node]);
+
+    const pagina = await buscar(ada.id, { numeroPagina: 2, limitePorPagina: 2 });
+    expect(pagina.items).toHaveLength(1);
+    expect(pagina.totalPaginas).toBe(2);
+  });
+});
+
 describe("ReclutamientoService · invitar", () => {
   let services;
   let proyecto;

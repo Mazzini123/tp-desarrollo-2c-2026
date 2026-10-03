@@ -27,7 +27,11 @@ export function crearRouter(controllers) {
   router.use("/habilidades", crearHabilidadesRouter(controllers.habilidad));
   router.use(
     "/colaboradores",
-    crearColaboradoresRouter(controllers.colaborador, controllers.notificacion),
+    crearColaboradoresRouter(
+      controllers.colaborador,
+      controllers.notificacion,
+      controllers.reclutamiento,
+    ),
   );
 
   return router;
