@@ -22,6 +22,8 @@ export function crearRouter(controllers) {
       controllers.perfil,
       controllers.reclutamiento,
       controllers.postulacion,
+      controllers.logro,
+      controllers.avance
     ),
   );
   router.use("/habilidades", crearHabilidadesRouter(controllers.habilidad));

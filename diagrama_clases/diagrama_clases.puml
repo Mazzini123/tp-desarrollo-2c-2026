@@ -50,6 +50,7 @@ class Proyecto {
   -logros: Array<Logro>
   -urlSistema: string
   -urlRepositorio: string
+  -avances: Array<Avance>
 
   +estaAbierto(): boolean
   +finalizarProyecto(): void
@@ -61,7 +62,17 @@ class Proyecto {
   +yaColaboraron(colaborador: Colaborador): boolean
   +agregarColaboracion(colaboracion: Colaboracion): void
   +quitarColaboracion(colaboracion: Colaboracion): void
+  +agregarAvance(avance: Avance): void
 }
+
+class Avance {
+  -porcentajeConcrecion: number
+  -urlSistema: string
+  -urlRepositorio: string
+  -fecha: Date
+}
+
+Proyecto --> "*" Avance
 
 enum PROYECTO_ESTADO {
   ABIERTO
