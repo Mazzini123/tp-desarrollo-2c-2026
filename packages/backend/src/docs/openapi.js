@@ -430,6 +430,112 @@ export const openapi = {
       },
     },
 
+    "/proyectos/{id}/logros": {
+      parameters: [paramId],
+      post: {
+        tags: ["Proyectos"],
+        summary: "Crear logro",
+        requestBody: body("CrearLogro"),
+        responses: {
+          ...recurso("Logro", 201, "Logro creado."),
+          400: errores[400],
+          404: errores[404],
+          409: errores[409],
+        },
+      },
+      get: {
+        tags: ["Proyectos"],
+        summary: "Listar logros del proyecto",
+        responses: {
+          ...arrayDe("Logro", "Logros del proyecto."),
+          404: errores[404],
+        },
+      },
+    },
+
+    "/proyectos/{id}/logros/{logroId}": {
+      parameters: [
+        paramId,
+        {
+          name: "logroId",
+          in: "path",
+          required: true,
+          schema: { type: "string", format: "uuid" },
+        },
+      ],
+      get: {
+        tags: ["Proyectos"],
+        summary: "Obtener logro",
+        responses: {
+          ...recurso("Logro"),
+          404: errores[404],
+        },
+      },
+      put: {
+        tags: ["Proyectos"],
+        summary: "Actualizar logro",
+        requestBody: body("ActualizarLogro"),
+        responses: {
+          ...recurso("Logro"),
+          400: errores[400],
+          404: errores[404],
+          409: errores[409],
+        },
+      },
+      delete: {
+        tags: ["Proyectos"],
+        summary: "Eliminar logro",
+        responses: {
+          204: { description: "Logro eliminado." },
+          404: errores[404],
+          409: errores[409],
+        },
+      },
+    },
+
+    "/proyectos/{id}/avances": {
+      parameters: [paramId],
+      post: {
+        tags: ["Proyectos"],
+        summary: "Registrar avance",
+        requestBody: body("CrearAvance"),
+        responses: {
+          ...recurso("Avance", 201, "Avance registrado."),
+          400: errores[400],
+          404: errores[404],
+          409: errores[409],
+        },
+      },
+      get: {
+        tags: ["Proyectos"],
+        summary: "Listar avances del proyecto",
+        responses: {
+          ...arrayDe("Avance", "Historial de avances."),
+          404: errores[404],
+        },
+      },
+    },
+
+    "/proyectos/{id}/avances/{avanceId}": {
+      parameters: [
+        paramId,
+        {
+          name: "avanceId",
+          in: "path",
+          required: true,
+          schema: { type: "string", format: "uuid" },
+        },
+      ],
+      get: {
+        tags: ["Proyectos"],
+        summary: "Obtener avance",
+        responses: {
+          ...recurso("Avance"),
+          404: errores[404],
+        },
+      },
+    },
+
     "/proyectos/{id}/finalizacion": {
       parameters: [paramId],
       post: {
@@ -991,7 +1097,8 @@ export const openapi = {
             type: "array",
             items: { $ref: "#/components/schemas/Colaboracion" },
           },
-          logros: { type: "array", items: { type: "object" } },
+          logros: { type: "array", items: { $ref: "#/components/schemas/Logro" } },
+          avances: { type: "array", items: { $ref: "#/components/schemas/Avance" } },
           porcentajeConcrecion: { type: "number" },
           urlSistema: { type: "string", nullable: true },
           urlRepositorio: { type: "string", nullable: true },
@@ -1010,6 +1117,27 @@ export const openapi = {
             description: "Al llegar esta fecha se cierra solo (req. 10).",
           },
           visualizaciones: { type: "integer" },
+        },
+      },
+
+      Logro: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          titulo: { type: "string" },
+          descripcion: { type: "string" },
+          fecha: { type: "string", format: "date-time" },
+        },
+      },
+
+      Avance: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          porcentajeConcrecion: { type: "number", minimum: 0, maximum: 100 },
+          urlSistema: { type: "string" },
+          urlRepositorio: { type: "string" },
+          fecha: { type: "string", format: "date-time" },
         },
       },
 
@@ -1358,6 +1486,37 @@ export const openapi = {
           },
           limiteVacantes: { type: "integer", minimum: 1, nullable: true },
           fechaCierre: { type: "string", format: "date-time", nullable: true },
+        },
+      },
+
+      CrearLogro: {
+        type: "object",
+        required: ["titulo", "descripcion"],
+        additionalProperties: false,
+        properties: {
+          titulo: { type: "string", minLength: 1 },
+          descripcion: { type: "string", minLength: 1 },
+        },
+      },
+
+      ActualizarLogro: {
+        type: "object",
+        required: ["titulo", "descripcion"],
+        additionalProperties: false,
+        properties: {
+          titulo: { type: "string", minLength: 1 },
+          descripcion: { type: "string", minLength: 1 },
+        },
+      },
+
+      CrearAvance: {
+        type: "object",
+        required: ["porcentajeConcrecion", "urlSistema", "urlRepositorio"],
+        additionalProperties: false,
+        properties: {
+          porcentajeConcrecion: { type: "number", minimum: 0, maximum: 100 },
+          urlSistema: { type: "string", minLength: 1 },
+          urlRepositorio: { type: "string", minLength: 1 },
         },
       },
 
