@@ -118,18 +118,18 @@ export function crearProyectosRouter(
   )
 
   router.get(
-    "/:id/logros/logroId",
+    "/:id/logros/:logroId",
     logroController.conseguirPorIdParaProyecto
   )
 
   router.put(
-    "/:id/logros/logroId",
+    "/:id/logros/:logroId",
     validarBody(actualizarLogroSchema),
     logroController.actualizarParaProyecto
   )
 
   router.delete(
-    "/:id/logros/logroId",
+    "/:id/logros/:logroId",
     logroController.eliminarParaProyecto
   )
 
@@ -146,7 +146,7 @@ export function crearProyectosRouter(
   )
 
   router.get(
-    "/:id/avances/avanceId",
+    "/:id/avances/:avanceId",
     avanceController.buscarPorIdParaProyecto
   )
 
