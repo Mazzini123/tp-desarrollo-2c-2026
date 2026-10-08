@@ -56,14 +56,24 @@ const colaboracionSchema = new mongoose.Schema({
   valoracionDelColaborador: { type: valoracionSchema, default: null },
 });
 
-const logroSchema = new mongoose.Schema(
-  {
-    titulo: { type: String, required: true },
-    descripcion: { type: String, default: "" },
-    fecha: { type: Date, default: Date.now },
-  },
-  { _id: false },
-);
+// El logro tiene _id porque el CRUD de logros lo busca por id
+// (/proyectos/:id/logros/:logroId). Sin el, el id se perdia al guardar.
+const logroSchema = new mongoose.Schema({
+  _id: { type: String },
+  titulo: { type: String, required: true },
+  descripcion: { type: String, default: "" },
+  fecha: { type: Date, default: Date.now },
+});
+
+// Cada carga periodica del porcentaje de concrecion y los enlaces. Es el
+// historial: solo se agregan, nunca se editan ni se borran.
+const avanceSchema = new mongoose.Schema({
+  _id: { type: String },
+  porcentajeConcrecion: { type: Number, required: true },
+  urlSistema: { type: String, default: null },
+  urlRepositorio: { type: String, default: null },
+  fecha: { type: Date, required: true },
+});
 
 const proyectoSchema = new mongoose.Schema({
   _id: { type: String },
@@ -76,6 +86,7 @@ const proyectoSchema = new mongoose.Schema({
   perfiles: { type: [perfilSchema], default: [] },
   colaboraciones: { type: [colaboracionSchema], default: [] },
   logros: { type: [logroSchema], default: [] },
+  avances: { type: [avanceSchema], default: [] },
   etiquetas: { type: [String], default: [] },
   modoAceptacion: { type: String, required: true },
   limiteVacantes: { type: Number, default: null },

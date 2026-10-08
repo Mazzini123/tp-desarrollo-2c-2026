@@ -5,6 +5,7 @@ import { Perfil } from "../domain/Perfil.js";
 import { Compromiso } from "../domain/Compromiso.js";
 import { Colaboracion } from "../domain/Colaboracion.js";
 import { Logro } from "../domain/Logro.js";
+import { Avance } from "../domain/Avance.js";
 import { Ubicacion } from "../domain/Ubicacion.js";
 import { RedSocial } from "../domain/RedSocial.js";
 import { Valoracion } from "../domain/Valoracion.js";
@@ -69,9 +70,17 @@ function proyectoADocumento(proyecto) {
     perfiles: proyecto.perfiles.map(perfilADocumento),
     colaboraciones: proyecto.colaboraciones.map(colaboracionADocumento),
     logros: proyecto.logros.map((logro) => ({
+      _id: logro.id,
       titulo: logro.titulo,
       descripcion: logro.descripcion,
       fecha: logro.fecha,
+    })),
+    avances: proyecto.avances.map((avance) => ({
+      _id: avance.id,
+      porcentajeConcrecion: avance.porcentajeConcrecion,
+      urlSistema: avance.urlSistema ?? null,
+      urlRepositorio: avance.urlRepositorio ?? null,
+      fecha: avance.fecha,
     })),
     etiquetas: proyecto.etiquetas,
     modoAceptacion: proyecto.modoAceptacion,
@@ -200,7 +209,16 @@ export class MongoColectivoRepository {
     });
 
     proyecto.porcentajeConcrecion = documento.porcentajeConcrecion ?? 0;
-    proyecto.logros = (documento.logros ?? []).map((logro) => new Logro(logro));
+    // Los logros guardados antes de tener _id reciben uno nuevo al leerse, y
+    // queda fijo la proxima vez que se guarde el colectivo.
+    proyecto.logros = (documento.logros ?? []).map(
+      ({ _id, titulo, descripcion, fecha }) =>
+        new Logro({ id: _id ?? undefined, titulo, descripcion, fecha }),
+    );
+    proyecto.avances = (documento.avances ?? []).map(
+      ({ _id, porcentajeConcrecion, urlSistema, urlRepositorio, fecha }) =>
+        new Avance({ id: _id, porcentajeConcrecion, urlSistema, urlRepositorio, fecha }),
+    );
     proyecto.etiquetas = documento.etiquetas ?? [];
     proyecto.visualizaciones = documento.visualizaciones ?? 0;
 

@@ -63,6 +63,14 @@ const paramColaboracionId = {
   schema: { type: "string", format: "uuid" },
 };
 
+const paramCodigoHabilidad = {
+  name: "codigoHabilidad",
+  in: "path",
+  required: true,
+  description: "Codigo de la habilidad en el catalogo, por ejemplo `desarrollo_node`.",
+  schema: { type: "string" },
+};
+
 const paramPerfilId = {
   name: "perfilId",
   in: "path",
@@ -189,6 +197,13 @@ export const openapi = {
       description:
         "Viven dentro de un colectivo: un proyecto sin colectivo no existe, por eso se " +
         "crean desde POST /colectivos/{id}/proyectos y se consultan por su id propio.",
+    },
+    {
+      name: "Perfiles",
+      description:
+        "CRUD de los perfiles de un proyecto (req. minimo 3.a). Cada perfil tiene una " +
+        "descripcion, una o mas habilidades requeridas, habilidades opcionales, un " +
+        "compromiso y una modalidad de colaboracion. Solo se modifican en proyectos abiertos.",
     },
     { name: "Colaboradores", description: "Personas que se anotan a los proyectos." },
     { name: "Habilidades", description: "Catalogo precargado por el administrador." },
@@ -362,7 +377,8 @@ export const openapi = {
         summary: "Linea de tiempo del colectivo",
         description:
           "Req. adicional 19. Historial publico, de lo mas viejo a lo mas nuevo: alta y baja " +
-          "del colectivo, proyectos creados y finalizados, logros y colaboraciones cerradas.",
+          "del colectivo, proyectos creados y finalizados, logros, avances (porcentaje de " +
+          "concrecion) y colaboraciones cerradas.",
         responses: { ...arrayDe("EventoTimeline", "Eventos en orden cronologico."), 404: errores[404] },
       },
     },
@@ -424,6 +440,134 @@ export const openapi = {
         responses: {
           ...recurso("Proyecto"),
           400: errores[400],
+          404: errores[404],
+          409: errores[409],
+        },
+      },
+    },
+
+    "/proyectos/{id}/perfiles": {
+      parameters: [paramId],
+      post: {
+        tags: ["Perfiles"],
+        summary: "Agregar un perfil al proyecto",
+        description:
+          "Las habilidades se indican por codigo y tienen que existir en el catalogo (404) y " +
+          "estar activas (400). Una habilidad no puede ser requerida y opcional a la vez (400). " +
+          "Si el proyecto esta finalizado, 409.",
+        requestBody: body("CrearPerfil"),
+        responses: {
+          ...recurso("Perfil", 201, "Perfil creado."),
+          400: errores[400],
+          404: errores[404],
+          409: errores[409],
+        },
+      },
+      get: {
+        tags: ["Perfiles"],
+        summary: "Listar los perfiles del proyecto",
+        responses: { ...arrayDe("Perfil", "Perfiles del proyecto."), 404: errores[404] },
+      },
+    },
+
+    "/proyectos/{id}/perfiles/{perfilId}": {
+      parameters: [paramId, paramPerfilId],
+      get: {
+        tags: ["Perfiles"],
+        summary: "Obtener un perfil",
+        responses: { ...recurso("Perfil"), 404: errores[404] },
+      },
+      put: {
+        tags: ["Perfiles"],
+        summary: "Actualizar descripcion, compromiso o modalidad",
+        description:
+          "Actualizacion parcial: se manda solo lo que cambia, pero al menos un campo (400 si " +
+          "viene vacio). Las habilidades se cambian con sus propias rutas. Si el proyecto " +
+          "esta finalizado, 409.",
+        requestBody: body("ActualizarPerfil"),
+        responses: {
+          ...recurso("Perfil"),
+          400: errores[400],
+          404: errores[404],
+          409: errores[409],
+        },
+      },
+      delete: {
+        tags: ["Perfiles"],
+        summary: "Eliminar un perfil",
+        description:
+          "El proyecto tiene que conservar al menos un perfil: borrar el ultimo responde 400. " +
+          "Si el proyecto esta finalizado, 409.",
+        responses: {
+          204: { description: "Perfil eliminado." },
+          400: errores[400],
+          404: errores[404],
+          409: errores[409],
+        },
+      },
+    },
+
+    "/proyectos/{id}/perfiles/{perfilId}/habilidades-requeridas": {
+      parameters: [paramId, paramPerfilId],
+      post: {
+        tags: ["Perfiles"],
+        summary: "Agregar una habilidad requerida",
+        description:
+          "409 si la habilidad ya es requerida u opcional en el perfil. 404 si el codigo no " +
+          "existe en el catalogo.",
+        requestBody: body("HabilidadDePerfil"),
+        responses: {
+          ...recurso("Perfil", 200, "Perfil actualizado."),
+          400: errores[400],
+          404: errores[404],
+          409: errores[409],
+        },
+      },
+    },
+
+    "/proyectos/{id}/perfiles/{perfilId}/habilidades-requeridas/{codigoHabilidad}": {
+      parameters: [paramId, paramPerfilId, paramCodigoHabilidad],
+      delete: {
+        tags: ["Perfiles"],
+        summary: "Quitar una habilidad requerida",
+        description:
+          "El perfil tiene que conservar al menos una habilidad requerida: quitar la ultima " +
+          "responde 400. 404 si la habilidad no es requerida en el perfil.",
+        responses: {
+          ...recurso("Perfil", 200, "Perfil actualizado."),
+          400: errores[400],
+          404: errores[404],
+          409: errores[409],
+        },
+      },
+    },
+
+    "/proyectos/{id}/perfiles/{perfilId}/habilidades-opcionales": {
+      parameters: [paramId, paramPerfilId],
+      post: {
+        tags: ["Perfiles"],
+        summary: "Agregar una habilidad opcional",
+        description:
+          "409 si la habilidad ya es opcional o requerida en el perfil. 404 si el codigo no " +
+          "existe en el catalogo.",
+        requestBody: body("HabilidadDePerfil"),
+        responses: {
+          ...recurso("Perfil", 200, "Perfil actualizado."),
+          400: errores[400],
+          404: errores[404],
+          409: errores[409],
+        },
+      },
+    },
+
+    "/proyectos/{id}/perfiles/{perfilId}/habilidades-opcionales/{codigoHabilidad}": {
+      parameters: [paramId, paramPerfilId, paramCodigoHabilidad],
+      delete: {
+        tags: ["Perfiles"],
+        summary: "Quitar una habilidad opcional",
+        description: "404 si la habilidad no es opcional en el perfil.",
+        responses: {
+          ...recurso("Perfil", 200, "Perfil actualizado."),
           404: errores[404],
           409: errores[409],
         },
@@ -498,6 +642,11 @@ export const openapi = {
       post: {
         tags: ["Proyectos"],
         summary: "Registrar avance",
+        description:
+          "Agrega una entrada al historial de avances y actualiza el porcentaje de concrecion " +
+          "y los enlaces actuales del proyecto. Los avances no se editan ni se borran: son la " +
+          "trazabilidad del proyecto. El porcentaje tiene que superar al actual (400). Si el " +
+          "proyecto esta finalizado, 409.",
         requestBody: body("CrearAvance"),
         responses: {
           ...recurso("Avance", 201, "Avance registrado."),
@@ -1289,6 +1438,7 @@ export const openapi = {
               "ALTA_DEL_COLECTIVO",
               "PROYECTO_CREADO",
               "LOGRO",
+              "AVANCE",
               "COLABORACION_CERRADA",
               "PROYECTO_FINALIZADO",
               "BAJA_DEL_COLECTIVO",
@@ -1300,6 +1450,15 @@ export const openapi = {
             properties: { id: { type: "string" }, titulo: { type: "string" } },
           },
           logro: { type: "object" },
+          avance: {
+            type: "object",
+            description: "Solo en los eventos AVANCE.",
+            properties: {
+              porcentajeConcrecion: { type: "number" },
+              urlSistema: { type: "string" },
+              urlRepositorio: { type: "string" },
+            },
+          },
           colaborador: {
             type: "object",
             nullable: true,
@@ -1445,6 +1604,27 @@ export const openapi = {
         },
       },
 
+      ActualizarPerfil: {
+        type: "object",
+        additionalProperties: false,
+        minProperties: 1,
+        properties: {
+          descripcion: { type: "string", minLength: 1 },
+          compromiso: { $ref: "#/components/schemas/Compromiso" },
+          modalidadColaboracion: {
+            type: "string",
+            enum: ["GRATUITA", "OFRECE_INCENTIVO_ECONOMICO", "EXISTE_POSIBILIDAD_DE_CONTRATACION"],
+          },
+        },
+      },
+
+      HabilidadDePerfil: {
+        type: "object",
+        required: ["codigoHabilidad"],
+        additionalProperties: false,
+        properties: { codigoHabilidad: { type: "string", example: "testing_e2e_con_cypress" } },
+      },
+
       CrearProyecto: {
         type: "object",
         required: ["titulo", "descripcion", "perfiles"],
@@ -1515,8 +1695,18 @@ export const openapi = {
         additionalProperties: false,
         properties: {
           porcentajeConcrecion: { type: "number", minimum: 0, maximum: 100 },
-          urlSistema: { type: "string", minLength: 1 },
-          urlRepositorio: { type: "string", minLength: 1 },
+          urlSistema: {
+            type: "string",
+            format: "uri",
+            description: "Solo http o https.",
+            example: "https://mi-sistema.example.org",
+          },
+          urlRepositorio: {
+            type: "string",
+            format: "uri",
+            description: "Solo http o https. El codigo tiene que ser publico.",
+            example: "https://github.com/colectivo/proyecto",
+          },
         },
       },
 

@@ -127,6 +127,9 @@ export class ColectivoService {
   // proyectos creados por un colectivo, logros cargados y colaboraciones
   // cerradas de una organizacion, a modo de historial publico".
   //
+  // Ademas de lo que pide, se suman los avances (porcentaje de concrecion):
+  // son el historial de "trazabilidad" que pide la entrega 2 para los logros.
+  //
   // No se guarda en ningun lado: se arma recorriendo el agregado, porque toda
   // la informacion ya esta adentro del documento del colectivo.
   async timeline(id) {
@@ -146,6 +149,16 @@ export class ColectivoService {
           evento(TIPO_EVENTO_TIMELINE.LOGRO, logro.fecha, {
             ...delProyecto,
             logro: { titulo: logro.titulo, descripcion: logro.descripcion },
+          }),
+        ),
+        ...proyecto.avances.map((avance) =>
+          evento(TIPO_EVENTO_TIMELINE.AVANCE, avance.fecha, {
+            ...delProyecto,
+            avance: {
+              porcentajeConcrecion: avance.porcentajeConcrecion,
+              urlSistema: avance.urlSistema,
+              urlRepositorio: avance.urlRepositorio,
+            },
           }),
         ),
         ...proyecto.colaboraciones

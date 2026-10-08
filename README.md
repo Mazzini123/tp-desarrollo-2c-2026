@@ -63,7 +63,7 @@ Mongo.
 |---|---|---|
 | `habilidads` | El catálogo. `_id` es el código (`desarrollo_node`) | — |
 | `colaboradors` | Colaboradores | `codigosHabilidades` |
-| `colectivos` | El colectivo **con sus proyectos, perfiles y colaboraciones embebidos** | `codigosHabilidades*` en perfiles, `colaboradorId` en colaboraciones |
+| `colectivos` | El colectivo **con sus proyectos, perfiles, colaboraciones, logros y avances embebidos** | `codigosHabilidades*` en perfiles, `colaboradorId` en colaboraciones |
 | `notificaciones` | Los mensajes internos de cada persona | `destinatarioId` |
 
 Colectivo es el agregado raíz: todo lo que le pertenece viaja dentro de su
@@ -85,10 +85,13 @@ mapa, con el requerimiento del enunciado que resuelve cada cosa.
 | Funcionalidad | Rutas |
 |---|---|
 | Perfiles (CRUD) | `/proyectos/:id/perfiles...` |
+| Logros (CRUD) | `/proyectos/:id/logros` y `/proyectos/:id/logros/:logroId` |
+| Avances: porcentaje de concreción y enlaces, con historial | `POST /proyectos/:id/avances` (solo se agregan), `GET /proyectos/:id/avances` |
 | Medios de contacto: se registran pero **nunca se muestran** | `POST /colaboradores/:id/medios-de-contacto`, `DELETE .../medios-de-contacto/:tipo/:valor` |
 | Contribuciones anónimas | `esPublica: false` en `POST /proyectos/:id/colaboraciones` |
 | Búsqueda de colaboradoras según un perfil | `GET /proyectos/:id/perfiles/:perfilId/colaboradoras-potenciales` |
 | Contactarlas (mensaje interno) | `POST /proyectos/:id/perfiles/:perfilId/invitaciones` |
+| Búsqueda de proyectos según las habilidades de la colaboradora | `GET /colaboradores/:id/proyectos-potenciales` |
 | Notificaciones internas, replicadas por email/WhatsApp/SMS | `GET /colaboradores/:id/notificaciones`, `POST .../notificaciones/:notificacionId/lectura` |
 
 ### Requerimientos adicionales
@@ -102,7 +105,7 @@ mapa, con el requerimiento del enunciado que resuelve cada cosa.
 | 14 | Límite de solicitudes | `src/middlewares/limiteDeTasa.js`: 300 cada 15 min por IP; 30 por minuto en búsquedas y estadísticas |
 | 16, 30 | Estadísticas globales / API pública | `GET /estadisticas`, con el Aggregation Framework |
 | 17 | Estadísticas por organización | `GET /colectivos/:id/estadisticas`; `GET /proyectos/:id` suma visualizaciones |
-| 19 | Línea de tiempo | `GET /colectivos/:id/timeline` |
+| 19 | Línea de tiempo | `GET /colectivos/:id/timeline`: alta, proyectos, logros, avances, colaboraciones cerradas y baja |
 | 23 | Eliminación de colectivos | `POST /colectivos/:id/baja` |
 | 27 | Redes sociales | `redesSociales` en colectivos y colaboradores |
 | 34 | Etiquetas | `etiquetas` en colectivos y proyectos; filtro `?etiqueta=` en los listados |
