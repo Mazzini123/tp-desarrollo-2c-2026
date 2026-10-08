@@ -2,8 +2,8 @@ import { z } from "zod";
 
 export const crearHabilidadSchema = z
   .object({
-    titulo: z.string().min(1),
-    descripcion: z.string().default(""),
-    usuario: z.string().min(1).optional(),
+    titulo: z.string().trim().min(1),
+    descripcion: z.string().trim().default(""),
+    usuario: z.string().trim().min(1).optional(),
   })
   .strict();

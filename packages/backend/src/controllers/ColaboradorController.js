@@ -1,108 +1,86 @@
 import { BaseController } from "./BaseController.js";
-import { colaboradorService, colaboracionService } from "../services/index.js";
-import { actualizarColaboradorSchema, crearColaboradorSchema } from "../schemas/colaboradorSchema.js";
-import { agregarHabilidadSchema } from "../schemas/proyectoSchema.js";
-import { serializar } from "../utils/serializadores.js";
+import { medioDeContactoSchema } from "../schemas/medioDeContactoSchema.js";
 
 export class ColaboradorController extends BaseController {
-  constructor(servicioColaborador = colaboradorService, servicioColaboracion = colaboracionService) {
+  constructor({ colaboradorService, colaboracionService }) {
     super();
-    this.colaboradorService = servicioColaborador;
-    this.colaboracionService = servicioColaboracion;
+    this.colaboradorService = colaboradorService;
+    this.colaboracionService = colaboracionService;
   }
 
-  crear = (req, res) => {
-    const body = req.body;
-    const resultado = crearColaboradorSchema.safeParse(body);
-    if (resultado.error) {
-      return this.manejarError(res, resultado.error);
-    }
-
-    try {
-      const colaborador = this.colaboradorService.crear(resultado.data);
-      return res.status(201).json({ status: "success", data: serializar(colaborador) });
-    } catch (error) {
-      return this.manejarError(res, error);
-    }
+  crear = async (req, res) => {
+    res.status(201).json(await this.colaboradorService.crear(req.body));
   };
 
-  listar = (req, res) => {
-    try {
-      const paginacion = this.extraerPaginacion(req.query);
-      const pagina = this.colaboradorService.listar(paginacion);
-      return this.responderPaginado(res, {
-        ...pagina,
-        items: pagina.items.map(serializar),
-      });
-    } catch (error) {
-      return this.manejarError(res, error);
-    }
+  listar = async (req, res) => {
+    const paginacion = this.aPaginacionDeDominio(req.paginacion);
+    this.responderPaginado(res, await this.colaboradorService.listar(paginacion));
   };
 
-  obtenerPorId = (req, res) => {
-    try {
-      const colaborador = this.colaboradorService.buscarPorId(req.params.id);
-      return res.status(200).json({ status: "success", data: serializar(colaborador) });
-    } catch (error) {
-      return this.manejarError(res, error);
-    }
+  obtenerPorId = async (req, res) => {
+    res.status(200).json(await this.colaboradorService.buscarPorId(req.params.id));
   };
 
-  actualizar = (req, res) => {
-    const body = req.body;
-    const resultado = actualizarColaboradorSchema.safeParse(body);
-    if (resultado.error) {
-      return this.manejarError(res, resultado.error);
-    }
-
-    try {
-      const colaborador = this.colaboradorService.actualizar(req.params.id, resultado.data);
-      return res.status(200).json({ status: "success", data: serializar(colaborador) });
-    } catch (error) {
-      return this.manejarError(res, error);
-    }
+  actualizar = async (req, res) => {
+    res.status(200).json(await this.colaboradorService.actualizar(req.params.id, req.body));
   };
 
-  agregarHabilidad = (req, res) => {
-    const body = req.body;
-    const resultado = agregarHabilidadSchema.safeParse(body);
-    if (resultado.error) {
-      return this.manejarError(res, resultado.error);
-    }
-
-    try {
-      const colaborador = this.colaboradorService.agregarHabilidad(
-        req.params.id,
-        resultado.data.codigoHabilidad,
-      );
-      return res.status(200).json({ status: "success", data: serializar(colaborador) });
-    } catch (error) {
-      return this.manejarError(res, error);
-    }
+  agregarPronombre = async (req, res) => {
+    const colaborador = await this.colaboradorService.agregarPronombre(
+      req.params.id,
+      req.body.pronombre,
+    );
+    res.status(200).json(colaborador);
   };
 
-  quitarHabilidad = (req, res) => {
-    try {
-      const colaborador = this.colaboradorService.quitarHabilidad(
-        req.params.id,
-        req.params.codigoHabilidad,
-      );
-      return res.status(200).json({ status: "success", data: serializar(colaborador) });
-    } catch (error) {
-      return this.manejarError(res, error);
-    }
+  quitarPronombre = async (req, res) => {
+    const colaborador = await this.colaboradorService.quitarPronombre(
+      req.params.id,
+      req.params.pronombre,
+    );
+    res.status(200).json(colaborador);
   };
 
-  listarColaboraciones = (req, res) => {
-    try {
-      const colaboraciones = this.colaboracionService.listarPorColaborador(req.params.id);
-      const data = colaboraciones.map(({ proyectoId, colaboracion }) => ({
-        proyectoId,
-        colaboracion: serializar(colaboracion),
-      }));
-      return res.status(200).json({ status: "success", data });
-    } catch (error) {
-      return this.manejarError(res, error);
-    }
+  agregarHabilidad = async (req, res) => {
+    const colaborador = await this.colaboradorService.agregarHabilidad(
+      req.params.id,
+      req.body.codigoHabilidad,
+    );
+    res.status(200).json(colaborador);
+  };
+
+  quitarHabilidad = async (req, res) => {
+    const colaborador = await this.colaboradorService.quitarHabilidad(
+      req.params.id,
+      req.params.codigoHabilidad,
+    );
+    res.status(200).json(colaborador);
+  };
+
+  agregarMedioDeContacto = async (req, res) => {
+    res
+      .status(201)
+      .json(await this.colaboradorService.agregarMedioDeContacto(req.params.id, req.body));
+  };
+
+  quitarMedioDeContacto = async (req, res) => {
+    // El medio viaja en la ruta: se normaliza con el mismo schema que el alta
+    // para que "Ana@Mail.com" encuentre al "ana@mail.com" guardado.
+    const medio = medioDeContactoSchema.parse({
+      tipo: req.params.tipo,
+      valor: req.params.valor,
+    });
+    await this.colaboradorService.quitarMedioDeContacto(req.params.id, medio);
+    res.status(204).send();
+  };
+
+  listarValoraciones = async (req, res) => {
+    res
+      .status(200)
+      .json(await this.colaboracionService.listarValoracionesDeColaborador(req.params.id));
+  };
+
+  listarColaboraciones = async (req, res) => {
+    res.status(200).json(await this.colaboracionService.listarPorColaborador(req.params.id));
   };
 }

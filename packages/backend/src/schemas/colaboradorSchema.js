@@ -1,20 +1,39 @@
 import { z } from "zod";
+import { tieneAlgunCampoDefinido } from "../utils/validaciones.js";
+import { mediosDeContactoSchema } from "./medioDeContactoSchema.js";
+import { redesSocialesSchema } from "./comunesSchema.js";
 
 export const crearColaboradorSchema = z
   .object({
-    nombreFantasia: z.string().min(1).nullish(),
-    nombre: z.string().min(1).nullish(),
-    apellido: z.string().min(1).nullish(),
-    cuentaGit: z.string().min(1).nullish(),
-    pronombres: z.array(z.string()).default([]),
-    presentacion: z.string().nullish(),
-    codigosHabilidades: z.array(z.string().min(1)).default([]),
+    nombreFantasia: z.string().trim().min(1).nullish(),
+    nombre: z.string().trim().min(1).nullish(),
+    apellido: z.string().trim().min(1).nullish(),
+    cuentaGit: z.string().trim().min(1).nullish(),
+    pronombres: z.array(z.string().trim().min(1)).default([]),
+    presentacion: z.string().trim().min(1).nullish(),
+    codigosHabilidades: z.array(z.string().trim().min(1)).default([]),
+    recibeMensajeriaInterna: z.boolean().optional(),
+    mediosDeContacto: mediosDeContactoSchema.default([]),
+    redesSociales: redesSocialesSchema.default([]),
   })
   .strict();
 
 export const actualizarColaboradorSchema = z
   .object({
-    pronombres: z.array(z.string()).optional(),
-    presentacion: z.string().nullish(),
+    pronombres: z.array(z.string().trim().min(1)).optional(),
+    presentacion: z.string().trim().min(1).nullish(),
+    recibeMensajeriaInterna: z.boolean().optional(),
+    redesSociales: redesSocialesSchema.optional(),
   })
+  .strict()
+  .refine(tieneAlgunCampoDefinido, {
+    message: "Se debe indicar al menos un campo para actualizar",
+  });
+
+export const agregarPronombreSchema = z
+  .object({ pronombre: z.string().trim().min(1) })
+  .strict();
+
+export const agregarHabilidadColaboradorSchema = z
+  .object({ codigoHabilidad: z.string().trim().min(1) })
   .strict();

@@ -1,31 +1,42 @@
 import express from "express";
 import cors from "cors";
-import router from "./routes/router.js";
-import { AppError } from "./errors/AppError.js";
+import swaggerUi from "swagger-ui-express";
 
-const app = express();
-app.use(express.json());
-app.use(cors());
-app.use(router);
+import { crearRouter } from "./routes/router.js";
+import { noEncontrado } from "./middlewares/noEncontrado.js";
+import { manejadorErrores } from "./middlewares/manejadorErrores.js";
+import { sanitizarBody } from "./middlewares/sanitizar.js";
+import { crearLimitadores, limitesDesdeEntorno } from "./middlewares/limiteDeTasa.js";
+import { openapi } from "./docs/openapi.js";
 
-// Cuando se vea middleware se lo implementa ahi.
-app.use((req, res) => {
-  res.status(404).json({ status: "fail", message: "Recurso no encontrado" });
-});
+// Rutas de busqueda: ademas del limite general, tienen uno propio mas bajo.
+export const RUTAS_DE_BUSQUEDA = [
+  "/proyectos/:id/perfiles/:perfilId/colaboradoras-potenciales",
+  // Simetrico al anterior: recorre todos los proyectos y filtra en memoria.
+  "/colaboradores/:id/proyectos-potenciales",
+  // Las estadisticas son consultas de agregacion: de las mas caras.
+  "/estadisticas",
+  "/colectivos/:id/estadisticas",
+];
 
-app.use((err, req, res, _next) => {
-  if (err instanceof SyntaxError && "body" in err) {
-    res.status(400).json({ status: "fail", message: "JSON malformado en el body" });
-    return;
-  }
+export function crearApp(controllers, { limites = limitesDesdeEntorno() } = {}) {
+  const app = express();
+  const limitadores = crearLimitadores(limites);
 
-  if (err instanceof AppError) {
-    res.status(err.status).json({ status: "fail", message: err.message });
-    return;
-  }
+  app.use(limitadores.general);
+  app.use(RUTAS_DE_BUSQUEDA, limitadores.busquedas);
 
-  console.error(err);
-  res.status(500).json({ status: "error", message: "Error interno del servidor" });
-});
+  app.use(express.json());
+  app.use(sanitizarBody);
+  app.use(cors());
 
-export default app;
+  app.use("/docs", swaggerUi.serve, swaggerUi.setup(openapi));
+  app.get("/openapi.json", (_req, res) => res.json(openapi));
+
+  app.use(crearRouter(controllers));
+
+  app.use(noEncontrado);
+  app.use(manejadorErrores);
+
+  return app;
+}

@@ -1,45 +1,48 @@
 import { z } from "zod";
-import { PERIODO_COMPROMISO } from "../domain/enums/PERIODO_COMPROMISO.js";
-import { MODALIDAD_COLABORACION } from "../domain/enums/MODALIDAD_COLABORACION.js";
+import { crearPerfilSchema } from "./perfilSchema.js";
+import { tieneAlgunCampoDefinido } from "../utils/validaciones.js";
+import { etiquetasSchema } from "./comunesSchema.js";
+import { MODO_ACEPTACION } from "../domain/enums/MODO_ACEPTACION.js";
 
-export const compromisoSchema = z
-  .object({
-    cantidadHoras: z.int().positive(),
-    periodo: z.enum(Object.values(PERIODO_COMPROMISO)),
-  })
-  .strict();
-
-export const modalidadColaboracionSchema = z.enum(
-  Object.values(MODALIDAD_COLABORACION),
-);
+const modoAceptacionSchema = z.enum(Object.values(MODO_ACEPTACION));
+// null = sin limite de vacantes.
+const limiteVacantesSchema = z.int().positive().nullable();
+// Fecha ISO ("2026-12-01" o "2026-12-01T18:00:00-03:00"); null la saca.
+const fechaCierreSchema = z
+  .union([z.iso.datetime({ offset: true }), z.iso.date()])
+  .transform((texto) => new Date(texto))
+  .nullable();
 
 export const crearProyectoSchema = z
   .object({
-    titulo: z.string().min(1),
-    descripcion: z.string().min(1),
-    compromisoEsperado: compromisoSchema,
-    modalidadColaboracion: modalidadColaboracionSchema.default(
-      MODALIDAD_COLABORACION.GRATUITA,
-    ),
-    habilidadesNecesarias: z.array(z.string().min(1)).min(1),
+    titulo: z.string().trim().min(1),
+    descripcion: z.string().trim().min(1),
+    perfiles: z.array(crearPerfilSchema).min(1),
+    etiquetas: etiquetasSchema.default([]),
+    modoAceptacion: modoAceptacionSchema.optional(),
+    limiteVacantes: limiteVacantesSchema.optional(),
+    fechaCierre: fechaCierreSchema.optional(),
   })
   .strict();
 
 export const actualizarProyectoSchema = z
   .object({
-    titulo: z.string().min(1).optional(),
-    descripcion: z.string().min(1).optional(),
+    titulo: z.string().trim().min(1).optional(),
+    descripcion: z.string().trim().min(1).optional(),
+    etiquetas: etiquetasSchema.optional(),
+    modoAceptacion: modoAceptacionSchema.optional(),
+    limiteVacantes: limiteVacantesSchema.optional(),
+    fechaCierre: fechaCierreSchema.optional(),
   })
-  .strict();
-
-export const agregarHabilidadSchema = z
-  .object({ codigoHabilidad: z.string().min(1) })
-  .strict();
+  .strict()
+  .refine(tieneAlgunCampoDefinido, {
+    message: "Se debe indicar al menos un campo para actualizar",
+  });
 
 export const anotarColaboradorSchema = z
-  .object({ colaboradorId: z.string().min(1) })
-  .strict();
-
-export const cambiarEstadoProyectoSchema = z
-  .object({ estado: z.literal("finalizar") })
+  .object({
+    colaboradorId: z.string().trim().min(1),
+    // false = contribucion anonima: figura en el proyecto, pero sin decir quien.
+    esPublica: z.boolean().default(true),
+  })
   .strict();

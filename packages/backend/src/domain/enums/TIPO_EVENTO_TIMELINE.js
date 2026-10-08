@@ -1,0 +1,11 @@
+// Requerimiento adicional 19: los hitos que aparecen en la linea de tiempo.
+export const TIPO_EVENTO_TIMELINE = Object.freeze({
+  ALTA_DEL_COLECTIVO: "ALTA_DEL_COLECTIVO",
+  PROYECTO_CREADO: "PROYECTO_CREADO",
+  LOGRO: "LOGRO",
+  // Cada carga del porcentaje de concrecion (historial de avances).
+  AVANCE: "AVANCE",
+  COLABORACION_CERRADA: "COLABORACION_CERRADA",
+  PROYECTO_FINALIZADO: "PROYECTO_FINALIZADO",
+  BAJA_DEL_COLECTIVO: "BAJA_DEL_COLECTIVO",
+});

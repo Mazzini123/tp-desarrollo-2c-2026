@@ -1,16 +1,31 @@
 import { Colaborador } from "../domain/Colaborador.js";
-import { Habilidad } from "../domain/Habilidad.js";
+import { MedioDeContacto } from "../domain/MedioDeContacto.js";
+import { construirRedesSociales } from "../domain/RedSocial.js";
+import { esTipoMedioContactoValido } from "../domain/enums/TIPOS_MEDIOS_CONTACTO.js";
 import { DomainError } from "../errors/DomainError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
+import { ConflictError } from "../errors/ConflictError.js";
 import { armarPaginado } from "../utils/paginacion.js";
 
 export class ColaboradorService {
-  constructor({ colaboradorRepository, habilidadService }) {
+  constructor({ colaboradorRepository, habilidadService, avisoAutomaticoService }) {
     this.colaboradorRepository = colaboradorRepository;
     this.habilidadService = habilidadService;
+    this.avisoAutomaticoService = avisoAutomaticoService;
   }
 
-  crear({ nombreFantasia, nombre, apellido, cuentaGit, pronombres, presentacion, codigosHabilidades }) {
+  async crear({
+    nombreFantasia,
+    nombre,
+    apellido,
+    cuentaGit,
+    pronombres,
+    presentacion,
+    codigosHabilidades,
+    recibeMensajeriaInterna = true,
+    mediosDeContacto = [],
+    redesSociales = [],
+  }) {
     this.validarIdentificacion({ nombreFantasia, nombre, apellido, cuentaGit });
 
     const colaborador = new Colaborador({
@@ -19,43 +34,65 @@ export class ColaboradorService {
       apellido,
       cuentaGit,
       presentacion,
+      recibeMensajeriaInterna,
+    });
+
+    colaborador.redesSociales = construirRedesSociales(redesSociales);
+
+    mediosDeContacto.forEach((datos) => {
+      const medio = this.construirMedioDeContacto(datos);
+      // En el alta un repetido se ignora, igual que los pronombres del payload.
+      if (!colaborador.tieneMedioDeContacto(medio)) {
+        colaborador.agregarMedioDeContacto(medio);
+      }
     });
 
     if (pronombres) {
-      pronombres.forEach((p) => colaborador.agregarPronombre(p));
+      colaborador.reemplazarPronombres(pronombres);
     }
 
     if (codigosHabilidades && codigosHabilidades.length > 0) {
-      this.habilidadService.resolverPorCodigos(codigosHabilidades).forEach((h) => {
-        this.validarInstanciaHabilidad(h);
-        colaborador.agregarHabilidad(h);
-      });
+      // await ANTES del forEach: resolverPorCodigos ahora devuelve una promesa
+      const habilidades = await this.habilidadService.resolverPorCodigos(codigosHabilidades);
+      habilidades.forEach((h) => colaborador.agregarHabilidad(h));
     }
 
-    return this.colaboradorRepository.guardar(colaborador);
+    await this.colaboradorRepository.guardar(colaborador);
+    await avisarSinFallar(() => this.avisoAutomaticoService.avisarPorColaboradorNuevo(colaborador));
+    return colaborador;
   }
 
-  listar({ numeroPagina = 1, limitePorPagina = 10 } = {}) {
+  async listar({ numeroPagina = 1, limitePorPagina = 10 } = {}) {
     return armarPaginado(
-      this.colaboradorRepository.listarPaginado(numeroPagina, limitePorPagina),
+      await this.colaboradorRepository.listarPaginado(numeroPagina, limitePorPagina),
       numeroPagina,
       limitePorPagina,
     );
   }
 
-  buscarPorId(id) {
-    const colaborador = this.colaboradorRepository.buscarPorId(id);
+  async buscarPorId(id) {
+    const colaborador = await this.colaboradorRepository.buscarPorId(id);
+
     if (!colaborador) {
       throw new NotFoundError(`No existe un colaborador con id "${id}"`);
     }
+
     return colaborador;
   }
 
-  actualizar(id, { pronombres, presentacion }) {
-    const colaborador = this.buscarPorId(id);
+  async actualizar(id, { pronombres, presentacion, recibeMensajeriaInterna, redesSociales }) {
+    const colaborador = await this.buscarPorId(id);
+
+    if (redesSociales !== undefined) {
+      colaborador.redesSociales = construirRedesSociales(redesSociales);
+    }
+
+    if (recibeMensajeriaInterna !== undefined) {
+      colaborador.recibeMensajeriaInterna = recibeMensajeriaInterna;
+    }
 
     if (pronombres !== undefined) {
-      colaborador.pronombres = new Set(pronombres);
+      colaborador.reemplazarPronombres(pronombres);
     }
 
     if (presentacion !== undefined) {
@@ -65,21 +102,74 @@ export class ColaboradorService {
     return this.colaboradorRepository.guardar(colaborador);
   }
 
-  agregarHabilidad(id, codigoHabilidad) {
-    const colaborador = this.buscarPorId(id);
-    const [habilidad] = this.habilidadService.resolverPorCodigos([codigoHabilidad]);
+  async agregarPronombre(id, pronombre) {
+    const colaborador = await this.buscarPorId(id);
 
-    this.validarInstanciaHabilidad(habilidad);
+    if (colaborador.tienePronombre(pronombre)) {
+      throw new ConflictError(`El colaborador ya tiene el pronombre "${pronombre}"`);
+    }
+
+    colaborador.agregarPronombre(pronombre);
+    return this.colaboradorRepository.guardar(colaborador);
+  }
+
+  async quitarPronombre(id, pronombre) {
+    const colaborador = await this.buscarPorId(id);
+    colaborador.quitarPronombre(pronombre);
+    return this.colaboradorRepository.guardar(colaborador);
+  }
+
+  async agregarHabilidad(id, codigoHabilidad) {
+    const colaborador = await this.buscarPorId(id);
+    const [habilidad] = await this.habilidadService.resolverPorCodigos([codigoHabilidad]);
+
     colaborador.agregarHabilidad(habilidad);
     return this.colaboradorRepository.guardar(colaborador);
   }
 
-  quitarHabilidad(id, codigoHabilidad) {
-    const colaborador = this.buscarPorId(id);
-    const [habilidad] = this.habilidadService.resolverPorCodigos([codigoHabilidad]);
+  async quitarHabilidad(id, codigoHabilidad) {
+    const colaborador = await this.buscarPorId(id);
+    const [habilidad] = await this.habilidadService.resolverPorCodigos([codigoHabilidad]);
 
     colaborador.quitarHabilidad(habilidad);
     return this.colaboradorRepository.guardar(colaborador);
+  }
+
+  // Los medios de contacto se registran pero no se muestran (ver
+  // Colaborador.toJSON): por eso el alta devuelve solo el medio cargado.
+  async agregarMedioDeContacto(id, datos) {
+    const colaborador = await this.buscarPorId(id);
+    const medio = this.construirMedioDeContacto(datos);
+
+    if (colaborador.tieneMedioDeContacto(medio)) {
+      throw new ConflictError(`El colaborador ya tiene registrado ese medio de contacto`);
+    }
+
+    colaborador.agregarMedioDeContacto(medio);
+    await this.colaboradorRepository.guardar(colaborador);
+    return medio;
+  }
+
+  async quitarMedioDeContacto(id, datos) {
+    const colaborador = await this.buscarPorId(id);
+    const medio = this.construirMedioDeContacto(datos);
+
+    if (!colaborador.tieneMedioDeContacto(medio)) {
+      throw new NotFoundError("El colaborador no tiene registrado ese medio de contacto");
+    }
+
+    colaborador.quitarMedioDeContacto(medio);
+    await this.colaboradorRepository.guardar(colaborador);
+  }
+
+  construirMedioDeContacto({ tipo, valor }) {
+    if (!esTipoMedioContactoValido(tipo)) {
+      throw new DomainError(`Tipo de medio de contacto invalido: ${tipo}`);
+    }
+    if (typeof valor !== "string" || valor.trim().length === 0) {
+      throw new DomainError("El valor del medio de contacto es obligatorio");
+    }
+    return new MedioDeContacto({ tipo, valor: valor.trim() });
   }
 
   validarIdentificacion({ nombreFantasia, nombre, apellido, cuentaGit }) {
@@ -88,14 +178,18 @@ export class ColaboradorService {
     if (!nombreFantasia && !cuentaGit && !tieneNombreYApellido) {
       throw new DomainError(
         "El colaborador debe tener al menos un dato de identificación: " +
-          "nombreFantasia, cuentaGit, o (nombre + apellido)",
+        "nombreFantasia, cuentaGit, o (nombre + apellido)",
       );
     }
   }
+}
 
-  validarInstanciaHabilidad(habilidad) {
-    if (!(habilidad instanceof Habilidad)) {
-      throw new DomainError("Se esperaba una instancia de Habilidad");
-    }
+// Los avisos automaticos son un efecto secundario del alta: si fallan, el
+// alta igual quedo hecha.
+async function avisarSinFallar(avisar) {
+  try {
+    await avisar();
+  } catch (error) {
+    console.error("No se pudieron enviar los avisos automaticos:", error.message);
   }
 }

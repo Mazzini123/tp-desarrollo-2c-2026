@@ -1,16 +1,40 @@
 import { Router } from "express";
-import healthRouter from "./healthRouter.js";
-import colectivosRouter from "./colectivosRouter.js";
-import proyectosRouter from "./proyectosRouter.js";
-import habilidadesRouter from "./habilidadesRouter.js";
-import colaboradoresRouter from "./colaboradoresRouter.js";
+import { crearHealthRouter } from "./healthRouter.js";
+import { crearColectivosRouter } from "./colectivosRouter.js";
+import { crearProyectosRouter } from "./proyectosRouter.js";
+import { crearHabilidadesRouter } from "./habilidadesRouter.js";
+import { crearColaboradoresRouter } from "./colaboradoresRouter.js";
+import { crearEstadisticasRouter } from "./estadisticasRouter.js";
 
-const router = Router();
+export function crearRouter(controllers) {
+  const router = Router();
 
-router.use("/health", healthRouter);
-router.use("/colectivos", colectivosRouter);
-router.use("/proyectos", proyectosRouter);
-router.use("/habilidades", habilidadesRouter);
-router.use("/colaboradores", colaboradoresRouter);
+  router.use("/health", crearHealthRouter());
+  router.use(
+    "/colectivos",
+    crearColectivosRouter(controllers.colectivo, controllers.estadistica),
+  );
+  router.use("/estadisticas", crearEstadisticasRouter(controllers.estadistica));
+  router.use(
+    "/proyectos",
+    crearProyectosRouter(
+      controllers.proyecto,
+      controllers.perfil,
+      controllers.reclutamiento,
+      controllers.postulacion,
+      controllers.logro,
+      controllers.avance
+    ),
+  );
+  router.use("/habilidades", crearHabilidadesRouter(controllers.habilidad));
+  router.use(
+    "/colaboradores",
+    crearColaboradoresRouter(
+      controllers.colaborador,
+      controllers.notificacion,
+      controllers.reclutamiento,
+    ),
+  );
 
-export default router;
+  return router;
+}

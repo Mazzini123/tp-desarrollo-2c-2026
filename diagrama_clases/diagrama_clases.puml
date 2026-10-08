@@ -1,5 +1,16 @@
 @startuml
 
+' Todas las entidades (Colectivo, Proyecto, Perfil, Colaboracion, Logro,
+' Avance, Colaborador, NotificacionInterna) tienen un id: string (uuid) que
+' se omite para no repetirlo en cada clase. Habilidad se identifica por su
+' codigo. Ubicacion, Compromiso, MedioDeContacto, RedSocial y Valoracion son
+' objetos de valor: no tienen id.
+
+legend top left
+  Todas las entidades tienen <b>id: string</b> (uuid), omitido en el diagrama.
+  Habilidad se identifica por su <b>codigo</b>.
+endlegend
+
 ' ───────────────────────── Colectivo y Ubicación ─────────────────────────
 
 class Colectivo {
@@ -8,8 +19,15 @@ class Colectivo {
   -tipoColectivo: TIPO_COLECTIVO
   -ubicacion: Ubicacion
   -proyectos: Array<Proyecto>
+  -redesSociales: Array<RedSocial>
+  -etiquetas: Array<string>
+  -mediosDeContacto: Array<MedioDeContacto>
+  -fechaAlta: Date
+  -fechaBaja: Date
 
-  +agregarProyecto(proyecto: Proyecto): null
+  +agregarProyecto(proyecto: Proyecto): void
+  +estaDadoDeBaja(): boolean
+  +darDeBaja(fecha: Date): void
 }
 
 enum TIPO_COLECTIVO {
@@ -33,30 +51,57 @@ enum TIPO_UBICACION {
   LOCALIDAD
 }
 
+class RedSocial {
+  -nombre: string
+  -url: string
+}
+
 Colectivo --> TIPO_COLECTIVO
-Colectivo --> "*" Proyecto
+Colectivo *-- "*" Proyecto
 Colectivo --> "0..1" Ubicacion
+Colectivo --> "*" RedSocial
+Colectivo --> "*" MedioDeContacto
 Ubicacion --> TIPO_UBICACION
 
-' ───────────────────────── Proyecto y Compromiso ─────────────────────────
+' ───────────────────────── Proyecto, logros y avances ─────────────────────────
 
 class Proyecto {
   -titulo: string
   -descripcion: string
-  -colaboraciones: Array<Colaboracion>
-  -habilidadesNecesarias: Array<Habilidad>
-  -modalidadColaboracion: MODALIDAD_COLABORACION
   -estado: PROYECTO_ESTADO
-  -compromisoEsperado: Compromiso
+  -perfiles: Array<Perfil>
+  -colaboraciones: Array<Colaboracion>
+  -porcentajeConcrecion: number
+  -urlSistema: string
+  -urlRepositorio: string
+  -logros: Array<Logro>
+  -avances: Array<Avance>
+  -etiquetas: Array<string>
+  -modoAceptacion: MODO_ACEPTACION
+  -limiteVacantes: number
+  -fechaCreacion: Date
+  -fechaFinalizacion: Date
+  -fechaCierre: Date
+  -visualizaciones: number
 
-  +finalizarProyecto(): void
   +estaAbierto(): boolean
-  +yaColaboraron(colaborador): boolean
-  +cumpleAlgunaHabilidadRequerida(persona: Colaborador): boolean
-  +agregarHabilidadRequerida(habilidad: Habilidad): void
-  +quitarHabilidadRequerida(habilidad: Habilidad): void
+  +finalizarProyecto(fecha: Date): void
+  +cierreVencido(ahora: Date): boolean
+  +cumpleAlgunPerfil(colaborador: Colaborador): boolean
+  +agregarPerfil(perfil: Perfil): void
+  +quitarPerfil(perfil: Perfil): void
+  +yaColaboraron(colaborador: Colaborador): boolean
   +agregarColaboracion(colaboracion: Colaboracion): void
   +quitarColaboracion(colaboracion: Colaboracion): void
+  +buscarColaboracion(colaboracionId: string): Colaboracion
+  +colaboracionesPendientes(): Array<Colaboracion>
+  +cantidadAceptadas(): number
+  +tieneLimiteDeVacantes(): boolean
+  +cupoCompleto(): boolean
+  +aceptaPostulaciones(): boolean
+  +agregarLogro(logro: Logro): void
+  +quitarLogro(logro: Logro): void
+  +agregarAvance(avance: Avance): void
 }
 
 enum PROYECTO_ESTADO {
@@ -64,10 +109,56 @@ enum PROYECTO_ESTADO {
   FINALIZADO
 }
 
-enum MODALIDAD_COLABORACION {
-  GRATUITA
-  OFRECE_INCENTIVO_ECONOMICO
-  EXISTE_POSIBILIDAD_DE_CONTRATACION
+enum MODO_ACEPTACION {
+  REVISION_MANUAL
+  TODO_SUMA
+  HASTA_LLENAR_VACANTES
+}
+
+class Logro {
+  -titulo: string
+  -descripcion: string
+  -fecha: Date
+}
+
+class Avance {
+  -porcentajeConcrecion: number
+  -urlSistema: string
+  -urlRepositorio: string
+  -fecha: Date
+}
+
+note right of Avance
+  Historial del porcentaje de concreción
+  y los enlaces: solo se agregan, nunca
+  se editan ni se borran. El Proyecto
+  guarda los valores del último.
+end note
+
+Proyecto --> PROYECTO_ESTADO
+Proyecto --> MODO_ACEPTACION
+Proyecto *-- "1..*" Perfil
+Proyecto *-- "*" Colaboracion
+Proyecto *-- "*" Logro
+Proyecto *-- "*" Avance
+
+' ───────────────────────── Perfil y Compromiso ─────────────────────────
+
+class Perfil {
+  -descripcion: string
+  -habilidadesRequeridas: Array<Habilidad>
+  -habilidadesOpcionales: Array<Habilidad>
+  -compromiso: Compromiso
+  -modalidadColaboracion: MODALIDAD_COLABORACION
+
+  +tieneHabilidadRequerida(habilidad: Habilidad): boolean
+  +tieneHabilidadOpcional(habilidad: Habilidad): boolean
+  +agregarHabilidadRequerida(habilidad: Habilidad): void
+  +quitarHabilidadRequerida(habilidad: Habilidad): void
+  +agregarHabilidadOpcional(habilidad: Habilidad): void
+  +quitarHabilidadOpcional(habilidad: Habilidad): void
+  +cumpleHabilidadesRequeridas(colaborador: Colaborador): boolean
+  +cumpleAlgunaHabilidadOpcional(colaborador: Colaborador): boolean
 }
 
 class Compromiso {
@@ -81,12 +172,11 @@ enum PERIODO_COMPROMISO {
   HS_MENSUALES
 }
 
-Proyecto --> PROYECTO_ESTADO
-Proyecto --> Compromiso
-Proyecto --> MODALIDAD_COLABORACION
-Compromiso --> PERIODO_COMPROMISO
-
-' ───────────────────────── Habilidad y Colaboración ─────────────────────────
+enum MODALIDAD_COLABORACION {
+  GRATUITA
+  OFRECE_INCENTIVO_ECONOMICO
+  EXISTE_POSIBILIDAD_DE_CONTRATACION
+}
 
 class Habilidad {
   -titulo: string
@@ -95,32 +185,139 @@ class Habilidad {
   -fechaCreacion: Date
   -usuario: string
   -activo: boolean
+
+  +activar(): void
+  +desactivar(): void
+  +equals(otra: Habilidad): boolean
 }
 
+Perfil --> Compromiso
+Perfil --> MODALIDAD_COLABORACION
+Perfil --> "1..*" Habilidad : requeridas
+Perfil --> "*" Habilidad : opcionales
+Compromiso --> PERIODO_COMPROMISO
+
+' ───────────────────────── Colaboración y valoraciones ─────────────────────────
+
 class Colaboracion {
-  -fecha: Date
   -colaborador: Colaborador
+  -esPublica: boolean
+  -fecha: Date
+  -estado: COLABORACION_ESTADO
+  -fechaResolucion: Date
+  -fechaFin: Date
+  -valoracionDelColectivo: Valoracion
+  -valoracionDelColaborador: Valoracion
+
+  +estaPendiente(): boolean
+  +estaAceptada(): boolean
+  +estaFinalizada(): boolean
+  +aceptar(fecha: Date): void
+  +rechazar(fecha: Date): void
+  +finalizar(fecha: Date): void
+  +toJSON(): object
 }
+
+note right of Colaboracion
+  Si esPublica es false, toJSON()
+  oculta al colaborador
+  (contribución anónima).
+end note
+
+enum COLABORACION_ESTADO {
+  PENDIENTE
+  ACEPTADA
+  RECHAZADA
+  FINALIZADA
+}
+
+class Valoracion {
+  -puntaje: number
+  -comentario: string
+  -fecha: Date
+}
+
+Colaboracion --> Colaborador
+Colaboracion --> COLABORACION_ESTADO
+Colaboracion --> "0..1" Valoracion : delColectivo
+Colaboracion --> "0..1" Valoracion : delColaborador
+
+' ───────────────────────── Colaborador y contacto ─────────────────────────
 
 class Colaborador {
   -nombreFantasia: string
   -nombre: string
   -apellido: string
   -cuentaGit: string
-  -habilidades: Array<Habilidad>
-  -pronombres: Set<string>
+  -pronombres: Array<string>
   -presentacion: string
+  -habilidades: Array<Habilidad>
+  -recibeMensajeriaInterna: boolean
+  -mediosDeContacto: Array<MedioDeContacto>
+  -redesSociales: Array<RedSocial>
 
+  +tienePronombre(pronombre: string): boolean
   +agregarPronombre(pronombre: string): void
   +quitarPronombre(pronombre: string): void
+  +reemplazarPronombres(pronombres: Array<string>): void
   +tieneHabilidad(habilidad: Habilidad): boolean
   +agregarHabilidad(habilidad: Habilidad): void
   +quitarHabilidad(habilidad: Habilidad): void
+  +tieneMedioDeContacto(medio: MedioDeContacto): boolean
+  +agregarMedioDeContacto(medio: MedioDeContacto): void
+  +quitarMedioDeContacto(medio: MedioDeContacto): void
+  +nombreParaMostrar(): string
+  +toJSON(): object
 }
 
-Proyecto --> "*" Habilidad
-Proyecto --> "*" Colaboracion
-Colaboracion --> Colaborador
+note right of Colaborador
+  toJSON() nunca incluye
+  los medios de contacto:
+  se registran pero no se muestran.
+end note
+
+class MedioDeContacto {
+  -tipo: TIPOS_MEDIOS_CONTACTO
+  -valor: string
+
+  +equals(otro: MedioDeContacto): boolean
+}
+
+enum TIPOS_MEDIOS_CONTACTO {
+  SMS
+  EMAIL
+  WHATSAPP
+}
+
 Colaborador --> "*" Habilidad
+Colaborador --> "*" MedioDeContacto
+Colaborador --> "*" RedSocial
+MedioDeContacto --> TIPOS_MEDIOS_CONTACTO
+
+' ───────────────────────── Notificaciones ─────────────────────────
+
+class NotificacionInterna {
+  -destinatarioId: string
+  -tipo: TIPO_NOTIFICACION
+  -asunto: string
+  -contenido: string
+  -referencias: object
+  -fecha: Date
+  -esLeida: boolean
+  -envios: Array<{canal, exito}>
+
+  +marcarComoLeida(): void
+}
+
+enum TIPO_NOTIFICACION {
+  INVITACION
+  PROYECTOS_COMPATIBLES
+  POSTULACION_ACEPTADA
+  POSTULACION_RECHAZADA
+  COLABORACION_FINALIZADA
+}
+
+NotificacionInterna --> TIPO_NOTIFICACION
+NotificacionInterna ..> Colaborador : destinatarioId
 
 @enduml
