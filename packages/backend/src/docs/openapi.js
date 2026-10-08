@@ -362,7 +362,8 @@ export const openapi = {
         summary: "Linea de tiempo del colectivo",
         description:
           "Req. adicional 19. Historial publico, de lo mas viejo a lo mas nuevo: alta y baja " +
-          "del colectivo, proyectos creados y finalizados, logros y colaboraciones cerradas.",
+          "del colectivo, proyectos creados y finalizados, logros, avances (porcentaje de " +
+          "concrecion) y colaboraciones cerradas.",
         responses: { ...arrayDe("EventoTimeline", "Eventos en orden cronologico."), 404: errores[404] },
       },
     },
@@ -1289,6 +1290,7 @@ export const openapi = {
               "ALTA_DEL_COLECTIVO",
               "PROYECTO_CREADO",
               "LOGRO",
+              "AVANCE",
               "COLABORACION_CERRADA",
               "PROYECTO_FINALIZADO",
               "BAJA_DEL_COLECTIVO",
@@ -1300,6 +1302,15 @@ export const openapi = {
             properties: { id: { type: "string" }, titulo: { type: "string" } },
           },
           logro: { type: "object" },
+          avance: {
+            type: "object",
+            description: "Solo en los eventos AVANCE.",
+            properties: {
+              porcentajeConcrecion: { type: "number" },
+              urlSistema: { type: "string" },
+              urlRepositorio: { type: "string" },
+            },
+          },
           colaborador: {
             type: "object",
             nullable: true,
