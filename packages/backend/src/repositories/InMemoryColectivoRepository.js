@@ -3,7 +3,7 @@ import { InMemoryRepository } from "./InMemoryRepository.js";
 export class InMemoryColectivoRepository extends InMemoryRepository {
   buscarProyecto(proyectoId) {
     for (const colectivo of this.listar()) {
-      const proyecto = colectivo.proyectos.find((p) => p.id === proyectoId) ?? null;
+      const proyecto = colectivo.buscarProyecto(proyectoId);
       if (proyecto) {
         return { colectivo, proyecto };
       }
@@ -26,7 +26,7 @@ export class InMemoryColectivoRepository extends InMemoryRepository {
     }
 
     const { colectivo, proyecto } = proyectoConColectivo;
-    const perfil = proyecto.perfiles.find((p) => p.id === perfilId) ?? null;
+    const perfil = proyecto.buscarPerfil(perfilId);
 
     if (!perfil) {
       return null;
@@ -48,7 +48,7 @@ export class InMemoryColectivoRepository extends InMemoryRepository {
 
   buscarColectivosDeColaborador(colaboradorId) {
     return this.listar().filter((colectivo) =>
-      colectivo.proyectos.some((p) => p.colaboraciones.some((c) => c.colaborador.id === colaboradorId)),
+      colectivo.proyectos.some((p) => p.colaboraciones.some((c) => c.esDe(colaboradorId))),
     );
   }
 

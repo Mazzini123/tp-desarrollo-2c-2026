@@ -8,15 +8,19 @@
 //
 // Cada schema lo declara por su cuenta: Mongoose usa las opciones de toJSON
 // del schema de CADA subdocumento, no las del documento que lo contiene.
-export function aplicarFormatoJSON(schema, { ocultar = [] } = {}) {
+//
+// `transformar(documento, salida)` permite un ajuste propio del schema (por
+// ejemplo, ocultar quien hizo una contribucion anonima).
+export function aplicarFormatoJSON(schema, { ocultar = [], transformar } = {}) {
   schema.set("toJSON", {
     virtuals: true,
     versionKey: false,
-    transform(_documento, salida) {
+    transform(documento, salida) {
       delete salida._id;
       for (const campo of ocultar) {
         delete salida[campo];
       }
+      transformar?.(documento, salida);
       return salida;
     },
   });

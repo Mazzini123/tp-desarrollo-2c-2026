@@ -1,5 +1,3 @@
-import { Perfil } from "../domain/Perfil.js";
-import { Compromiso } from "../domain/Compromiso.js";
 import { DomainError } from "../errors/DomainError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
 import { ConflictError } from "../errors/ConflictError.js";
@@ -53,8 +51,7 @@ export class PerfilService {
     const { colectivo, proyecto } = await this.buscarProyectoConColectivo(proyectoId);
     this.verificarProyectoAbierto(proyecto, "agregar perfiles a");
 
-    const perfil = await this.construirPerfil(datos);
-    proyecto.agregarPerfil(perfil);
+    const perfil = proyecto.agregarPerfil(await this.construirPerfil(datos));
     await this.colectivoRepository.guardar(colectivo);
     return perfil;
   }
@@ -186,7 +183,7 @@ export class PerfilService {
       throw new DomainError(`Período de compromiso inválido: ${periodo}`);
     }
 
-    return new Compromiso(datos);
+    return { cantidadHoras, periodo };
   }
 
   async construirPerfil({
@@ -213,22 +210,16 @@ export class PerfilService {
       throw new DomainError(`Una habilidad no puede ser requerida y opcional al mismo tiempo: ${repetidasEntreListas.join(", ")}`);
     }
 
-    const perfil = new Perfil({
+    // Devuelve los DATOS del perfil: quien lo use lo agrega al proyecto con
+    // proyecto.agregarPerfil(), que crea el subdocumento. Las habilidades del
+    // catalogo se guardan como copia {codigo, titulo} (lo resuelve el schema).
+    return {
       descripcion,
       compromiso: this.construirCompromiso(compromiso),
-      modalidadColaboracion: this.resolverModalidadColaboracion(
-        modalidadColaboracion,
-      ),
-    });
-
-    const habilidadesRequeridas = await this.habilidadService.resolverPorCodigos(requeridas);
-    habilidadesRequeridas.forEach((habilidad) => perfil.agregarHabilidadRequerida(habilidad));
-
-    if (opcionales.length > 0) {
-      const habilidadesOpcionales = await this.habilidadService.resolverPorCodigos(opcionales);
-      habilidadesOpcionales.forEach((habilidad) => perfil.agregarHabilidadOpcional(habilidad));
-    }
-
-    return perfil;
+      modalidadColaboracion: this.resolverModalidadColaboracion(modalidadColaboracion),
+      habilidadesRequeridas: await this.habilidadService.resolverPorCodigos(requeridas),
+      habilidadesOpcionales:
+        opcionales.length > 0 ? await this.habilidadService.resolverPorCodigos(opcionales) : [],
+    };
   }
 }

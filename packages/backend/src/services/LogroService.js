@@ -1,4 +1,3 @@
-import { Logro } from "../domain/Logro.js"
 import { ConflictError } from "../errors/ConflictError.js";
 import { DomainError } from "../errors/DomainError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
@@ -12,12 +11,11 @@ export class LogroService {
         const { colectivo, proyecto } = await this.buscarProyectoAbiertoConColectivoOrThrow(proyectoId);
         this.validarTituloLogroParaProyecto(datos.titulo, proyecto);
 
-        const logro = new Logro({
+        const logro = proyecto.agregarLogro({
             titulo: datos.titulo,
             descripcion: datos.descripcion
         });
 
-        proyecto.agregarLogro(logro);
         await this.colectivoRepository.guardar(colectivo);
         return logro;
     }

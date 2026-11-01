@@ -1,32 +1,12 @@
-import { randomUUID } from "node:crypto";
-
+// Colectivo es el agregado raiz: sus proyectos (y adentro, perfiles,
+// colaboraciones, logros y avances) viven embebidos en su documento.
+//
+// Esta clase dice lo que el colectivo SABE HACER. Los datos, sus valores por
+// defecto y como se guardan estan en models/ColectivoModel.js, que la carga
+// con loadClass.
 export class Colectivo {
-  constructor({
-    id = randomUUID(),
-    nombre,
-    descripcion,
-    tipoColectivo,
-    ubicacion = null,
-    fechaAlta = new Date(),
-    fechaBaja = null,
-  }) {
-    this.id = id;
-    this.nombre = nombre;
-    this.descripcion = descripcion;
-    this.tipoColectivo = tipoColectivo;
-    this.ubicacion = ubicacion;
-    this.proyectos = [];
-    this.redesSociales = [];
-    this.etiquetas = [];
-    // Datos de contacto publicos de la organizacion (a diferencia de los de
-    // las personas colaboradoras, que no se muestran).
-    this.mediosDeContacto = [];
-    this.fechaAlta = fechaAlta;
-    this.fechaBaja = fechaBaja;
-  }
-
   estaDadoDeBaja() {
-    return this.fechaBaja !== null;
+    return this.fechaBaja !== null && this.fechaBaja !== undefined;
   }
 
   // Requerimiento adicional 23: "La informacion historica del colectivo no se
@@ -38,7 +18,15 @@ export class Colectivo {
     this.redesSociales = [];
   }
 
-  agregarProyecto(proyecto) {
+  // Recibe los datos y devuelve el proyecto ya creado como subdocumento: un
+  // proyecto no existe fuera de su colectivo.
+  agregarProyecto(datos) {
+    const proyecto = this.proyectos.create(datos);
     this.proyectos.push(proyecto);
+    return proyecto;
+  }
+
+  buscarProyecto(proyectoId) {
+    return this.proyectos.find((p) => p.id === String(proyectoId)) ?? null;
   }
 }

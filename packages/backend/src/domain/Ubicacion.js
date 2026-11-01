@@ -8,16 +8,18 @@ export const PROVINCIAS = Object.freeze([
   "Tucuman",
 ]);
 
+// Objeto de valor. ubicacionSchema (models/ColectivoModel.js) carga esta
+// clase con loadClass; que `nombre` solo aplique a PROVINCIA y LOCALIDAD lo
+// resuelve ColectivoService al armarla.
 export class Ubicacion {
-  constructor({ tipoUbicacion, nombre = null }) {
-    this.tipoUbicacion = tipoUbicacion;
-    this.nombre =
-      tipoUbicacion === TIPO_UBICACION.PROVINCIA || tipoUbicacion === TIPO_UBICACION.LOCALIDAD
-        ? nombre
-        : null;
-  }
-
   esDeAlcanceNacional() {
     return this.tipoUbicacion === TIPO_UBICACION.ARGENTINA;
   }
+}
+
+// Solo PROVINCIA y LOCALIDAD llevan nombre; en ARGENTINA y CABA se descarta.
+export function nombreDeUbicacion(tipoUbicacion, nombre) {
+  return tipoUbicacion === TIPO_UBICACION.PROVINCIA || tipoUbicacion === TIPO_UBICACION.LOCALIDAD
+    ? (nombre ?? null)
+    : null;
 }

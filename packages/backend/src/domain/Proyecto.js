@@ -1,45 +1,8 @@
-import { randomUUID } from "node:crypto";
 import { PROYECTO_ESTADO } from "./enums/PROYECTO_ESTADO.js";
-import { MODO_ACEPTACION } from "./enums/MODO_ACEPTACION.js";
 
+// Lo que un proyecto SABE HACER. Vive embebido en el colectivo: el schema
+// (proyectoSchema en models/ColectivoModel.js) carga esta clase con loadClass.
 export class Proyecto {
-  constructor({
-    id = randomUUID(),
-    titulo,
-    descripcion,
-    urlSistema,
-    urlRepositorio,
-    estado = PROYECTO_ESTADO.ABIERTO,
-    modoAceptacion = MODO_ACEPTACION.TODO_SUMA,
-    limiteVacantes = null,
-    fechaCreacion = new Date(),
-    fechaFinalizacion = null,
-    fechaCierre = null,
-  }) {
-    this.id = id;
-    this.titulo = titulo;
-    this.descripcion = descripcion;
-    this.estado = estado;
-    this.porcentajeConcrecion = 0;
-    this.colaboraciones = [];
-    this.logros = [];
-    this.perfiles = [];
-    this.urlSistema = urlSistema;
-    this.urlRepositorio = urlRepositorio;
-    this.avances = [];
-    this.etiquetas = [];
-    // Requerimiento adicional 8. TODO_SUMA sin limite es lo que pasaba antes
-    // de que existieran las postulaciones: quien se anota, queda adentro.
-    this.modoAceptacion = modoAceptacion;
-    this.limiteVacantes = limiteVacantes;
-    this.fechaCreacion = fechaCreacion;
-    this.fechaFinalizacion = fechaFinalizacion;
-    // Requerimiento adicional 10: fecha limite para cerrarse solo.
-    this.fechaCierre = fechaCierre;
-    // Requerimiento adicional 17: cuantas veces se consulto el proyecto.
-    this.visualizaciones = 0;
-  }
-
   estaAbierto() {
     return this.estado === PROYECTO_ESTADO.ABIERTO;
   }
@@ -50,43 +13,50 @@ export class Proyecto {
   }
 
   cierreVencido(ahora) {
-    return this.estaAbierto() && this.fechaCierre !== null && this.fechaCierre <= ahora;
+    return this.estaAbierto() && Boolean(this.fechaCierre) && this.fechaCierre <= ahora;
   }
 
   cumpleAlgunPerfil(colaborador) {
     return this.perfiles.some((perfil) => perfil.cumpleHabilidadesRequeridas(colaborador));
   }
 
-  agregarLogro(logro) {
+  // Los agregar* reciben los datos y devuelven el subdocumento creado.
+  agregarLogro(datos) {
+    const logro = this.logros.create(datos);
     this.logros.push(logro);
+    return logro;
   }
 
   quitarLogro(logro) {
-    this.logros = this.logros.filter((l) => l !== logro);
+    this.logros = this.logros.filter((l) => l.id !== logro.id);
   }
 
-  agregarPerfil(perfil) {
+  agregarPerfil(datos) {
+    const perfil = this.perfiles.create(datos);
     this.perfiles.push(perfil);
+    return perfil;
   }
 
   quitarPerfil(perfil) {
     this.perfiles = this.perfiles.filter((existente) => existente.id !== perfil.id);
   }
 
+  buscarPerfil(perfilId) {
+    return this.perfiles.find((p) => p.id === String(perfilId)) ?? null;
+  }
+
   yaColaboraron(colaborador) {
-    return this.colaboraciones.some((c) => c.colaborador.id === colaborador.id);
+    return this.colaboraciones.some((c) => c.esDe(colaborador));
   }
 
-  agregarColaboracion(colaboracion) {
+  agregarColaboracion(datos) {
+    const colaboracion = this.colaboraciones.create(datos);
     this.colaboraciones.push(colaboracion);
-  }
-
-  quitarColaboracion(colaboracion) {
-    this.colaboraciones = this.colaboraciones.filter((c) => c !== colaboracion);
+    return colaboracion;
   }
 
   buscarColaboracion(colaboracionId) {
-    return this.colaboraciones.find((c) => c.id === colaboracionId) ?? null;
+    return this.colaboraciones.find((c) => c.id === String(colaboracionId)) ?? null;
   }
 
   // Las pendientes en el orden en que llegaron: se resuelven en ese orden.
@@ -108,11 +78,29 @@ export class Proyecto {
     return this.tieneLimiteDeVacantes() && this.cantidadAceptadas() >= this.limiteVacantes;
   }
 
+  // Un getter de la clase se vuelve un VIRTUAL de Mongoose: se calcula cada
+  // vez, no se guarda en la base, y aparece en la respuesta JSON. null si el
+  // proyecto no tiene limite.
+  get vacantesLibres() {
+    if (!this.tieneLimiteDeVacantes()) {
+      return null;
+    }
+    return Math.max(this.limiteVacantes - this.cantidadAceptadas(), 0);
+  }
+
   aceptaPostulaciones() {
     return this.estaAbierto() && !this.cupoCompleto();
   }
 
-  agregarAvance(avance) {
+  agregarAvance(datos) {
+    const avance = this.avances.create(datos);
     this.avances.push(avance);
+    return avance;
+  }
+
+  // El ultimo avance cargado: de ahi salen el porcentaje y los enlaces
+  // vigentes del proyecto (ver el hook pre('validate') de proyectoSchema).
+  ultimoAvance() {
+    return this.avances.at(-1) ?? null;
   }
 }

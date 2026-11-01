@@ -1,6 +1,4 @@
-import { Proyecto } from "../../src/domain/Proyecto.js";
-import { Perfil } from "../../src/domain/Perfil.js";
-import { Compromiso } from "../../src/domain/Compromiso.js";
+import { ColectivoModel } from "../../src/models/ColectivoModel.js";
 import { ColaboradorModel } from "../../src/models/ColaboradorModel.js";
 import { HabilidadModel } from "../../src/models/HabilidadModel.js";
 import { PROYECTO_ESTADO } from "../../src/domain/enums/PROYECTO_ESTADO.js";
@@ -8,18 +6,25 @@ import { PROYECTO_ESTADO } from "../../src/domain/enums/PROYECTO_ESTADO.js";
 const node = new HabilidadModel({ titulo: "Desarrollo Node" });
 const react = new HabilidadModel({ titulo: "Desarrollo Web React" });
 
+// Los datos de un perfil: el subdocumento lo crea proyecto.agregarPerfil().
 function perfilQueRequiere(...habilidades) {
-  const perfil = new Perfil({
+  return {
     descripcion: "Perfil de prueba",
-    compromiso: new Compromiso({ cantidadHoras: 5, periodo: "HS_MENSUALES" }),
+    compromiso: { cantidadHoras: 5, periodo: "HS_MENSUALES" },
     modalidadColaboracion: "GRATUITA",
-  });
-  habilidades.forEach((h) => perfil.agregarHabilidadRequerida(h));
-  return perfil;
+    habilidadesRequeridas: habilidades,
+  };
 }
 
+// Un proyecto no existe fuera de su colectivo: se crea adentro de uno. No
+// hace falta una base: new ColectivoModel() arma el documento en memoria.
 function proyectoAbierto(...perfiles) {
-  const proyecto = new Proyecto({
+  const colectivo = new ColectivoModel({
+    nombre: "Fundacion Ejemplo",
+    descripcion: "Colectivo de prueba",
+    tipoColectivo: "FUNDACION",
+  });
+  const proyecto = colectivo.agregarProyecto({
     titulo: "Sitio institucional",
     descripcion: "Proyecto de prueba",
   });
@@ -65,10 +70,10 @@ describe("Proyecto · perfiles", () => {
   });
 
   test("quitarPerfil lo saca por id", () => {
-    const perfil = perfilQueRequiere(node);
-    const proyecto = proyectoAbierto(perfil, perfilQueRequiere(react));
-    proyecto.quitarPerfil(perfil);
-    expect(proyecto.perfiles).toHaveLength(1);
+    const proyecto = proyectoAbierto(perfilQueRequiere(node), perfilQueRequiere(react));
+    const [primero, segundo] = proyecto.perfiles;
+    proyecto.quitarPerfil(primero);
+    expect(proyecto.perfiles.map((p) => p.id)).toEqual([segundo.id]);
   });
 });
 

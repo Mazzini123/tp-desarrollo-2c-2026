@@ -9,6 +9,8 @@
 //
 // Asi el conteo lo hace la base y a la API solo le llega el resultado.
 
+import mongoose from "mongoose";
+
 // Dado de baja = tiene una fecha en fechaBaja. $type distingue sin ambiguedad
 // una fecha ("date") de un null ("null") o de un campo que no existe
 // ("missing", en los colectivos guardados antes de esta entrega).
@@ -56,8 +58,13 @@ export function habilidadesMasRequeridas(limite) {
   return [
     { $unwind: "$proyectos" },
     { $unwind: "$proyectos.perfiles" },
-    { $unwind: "$proyectos.perfiles.codigosHabilidadesRequeridas" },
-    { $group: { _id: "$proyectos.perfiles.codigosHabilidadesRequeridas", cantidad: { $sum: 1 } } },
+    { $unwind: "$proyectos.perfiles.habilidadesRequeridas" },
+    {
+      $group: {
+        _id: "$proyectos.perfiles.habilidadesRequeridas.codigo",
+        cantidad: { $sum: 1 },
+      },
+    },
     // El _id desempata, para que el orden sea siempre el mismo.
     { $sort: { cantidad: -1, _id: 1 } },
     { $limit: limite },
@@ -68,8 +75,8 @@ export function habilidadesMasRequeridas(limite) {
 // colaboradores).
 export function habilidadesMasOfrecidas(limite) {
   return [
-    { $unwind: "$codigosHabilidades" },
-    { $group: { _id: "$codigosHabilidades", cantidad: { $sum: 1 } } },
+    { $unwind: "$habilidades" },
+    { $group: { _id: "$habilidades.codigo", cantidad: { $sum: 1 } } },
     { $sort: { cantidad: -1, _id: 1 } },
     { $limit: limite },
   ];
@@ -86,7 +93,9 @@ export function estadisticasDeColectivo(colectivoId) {
   const lista = (campo) => ({ $ifNull: [`$${campo}`, []] });
 
   return [
-    { $match: { _id: colectivoId } },
+    // A diferencia de find(), aggregate() no convierte los tipos: el id que
+    // llega como texto hay que pasarlo a ObjectId a mano.
+    { $match: { _id: new mongoose.Types.ObjectId(String(colectivoId)) } },
     { $unwind: "$proyectos" },
     // De aca en adelante, cada documento ES un proyecto.
     { $replaceRoot: { newRoot: "$proyectos" } },

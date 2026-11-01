@@ -1,8 +1,6 @@
-import { Colaboracion } from "../domain/Colaboracion.js";
 import { DomainError } from "../errors/DomainError.js";
 import { ConflictError } from "../errors/ConflictError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
-import { Valoracion } from "../domain/Valoracion.js";
 import { AUTOR_VALORACION } from "../domain/enums/AUTOR_VALORACION.js";
 import { aplicarModoDeAceptacion, notificarResoluciones } from "./reglasDePostulacion.js";
 
@@ -49,8 +47,7 @@ export class ColaboracionService {
       throw new ConflictError("El colaborador ya está anotado en este proyecto");
     }
 
-    const colaboracion = new Colaboracion({ colaborador, esPublica, fecha: ahora });
-    proyecto.agregarColaboracion(colaboracion);
+    const colaboracion = proyecto.agregarColaboracion({ colaborador, esPublica, fecha: ahora });
 
     const cambios = aplicarModoDeAceptacion(proyecto, ahora);
     await this.colectivoRepository.guardar(colectivo);
@@ -176,7 +173,7 @@ export class ColaboracionService {
       throw new ConflictError("Esa parte ya valoro esta colaboracion");
     }
 
-    colaboracion[campo] = new Valoracion({ puntaje, comentario, fecha: ahora });
+    colaboracion[campo] = { puntaje, comentario, fecha: ahora };
     await this.colectivoRepository.guardar(colectivo);
 
     return colaboracion[campo];
@@ -194,12 +191,14 @@ export class ColaboracionService {
         proyecto.colaboraciones
           .filter(
             (c) =>
-              c.colaborador.id === colaboradorId && c.esPublica && c.valoracionDelColectivo,
+              c.esDe(colaboradorId) && c.esPublica && c.valoracionDelColectivo,
           )
           .map((c) => ({
             colectivo: { id: colectivo.id, nombre: colectivo.nombre },
             proyecto: { id: proyecto.id, titulo: proyecto.titulo },
-            ...c.valoracionDelColectivo,
+            // toObject: un subdocumento esparcido con ... traeria los
+            // internos de Mongoose, no solo puntaje, comentario y fecha.
+            ...c.valoracionDelColectivo.toObject(),
           })),
       ),
     );
@@ -218,7 +217,7 @@ export class ColaboracionService {
         .map((c) => ({
           proyecto: { id: proyecto.id, titulo: proyecto.titulo },
           autor: c.esPublica ? c.colaborador : null,
-          ...c.valoracionDelColaborador,
+          ...c.valoracionDelColaborador.toObject(),
         })),
     );
 
@@ -250,7 +249,7 @@ export class ColaboracionService {
 
     return proyectos.flatMap((proyecto) =>
       proyecto.colaboraciones
-        .filter((c) => c.colaborador.id === colaborador.id && c.esPublica)
+        .filter((c) => c.esDe(colaborador) && c.esPublica)
         .map((c) => ({ proyectoId: proyecto.id, colaboracion: c })),
     );
   }

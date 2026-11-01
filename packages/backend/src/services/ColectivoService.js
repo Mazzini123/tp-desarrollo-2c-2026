@@ -1,5 +1,5 @@
-import { Colectivo } from "../domain/Colectivo.js";
-import { Ubicacion, PROVINCIAS } from "../domain/Ubicacion.js";
+import { ColectivoModel } from "../models/ColectivoModel.js";
+import { PROVINCIAS, nombreDeUbicacion } from "../domain/Ubicacion.js";
 import { DomainError } from "../errors/DomainError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
 import { esTipoColectivoValido } from "../domain/enums/TIPO_COLECTIVO.js";
@@ -32,15 +32,15 @@ export class ColectivoService {
     this.validarDescripcion(descripcion);
     this.validarTipoColectivo(tipoColectivo);
 
-    const colectivo = new Colectivo({
+    const colectivo = new ColectivoModel({
       nombre,
       descripcion,
       tipoColectivo,
       ubicacion: this.construirUbicacion(ubicacion),
+      redesSociales: construirRedesSociales(redesSociales),
+      etiquetas: normalizarEtiquetas(etiquetas),
+      mediosDeContacto: this.construirMediosDeContacto(mediosDeContacto),
     });
-    colectivo.redesSociales = construirRedesSociales(redesSociales);
-    colectivo.etiquetas = normalizarEtiquetas(etiquetas);
-    colectivo.mediosDeContacto = this.construirMediosDeContacto(mediosDeContacto);
 
     return this.colectivoRepository.guardar(colectivo);
   }
@@ -209,7 +209,7 @@ export class ColectivoService {
       throw new DomainError("Para LOCALIDAD, nombre es obligatorio");
     }
 
-    return new Ubicacion(datos);
+    return { tipoUbicacion, nombre: nombreDeUbicacion(tipoUbicacion, nombre) };
   }
 
   validarNombre(nombre) {

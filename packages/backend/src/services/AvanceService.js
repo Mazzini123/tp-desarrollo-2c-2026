@@ -1,4 +1,3 @@
-import { Avance } from "../domain/Avance.js";
 import { DomainError } from "../errors/DomainError.js";
 import { ConflictError } from "../errors/ConflictError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
@@ -12,16 +11,13 @@ export class AvanceService {
         const { colectivo, proyecto } = await this.buscarProyectoAbiertoConColectivoOrThrow(proyectoId);
         this.validarPorcentajeConcrecionParaProyecto(proyecto, datos.porcentajeConcrecion);
 
-        const avance = new Avance({
+        // El porcentaje y los enlaces vigentes del proyecto los copia del
+        // ultimo avance el hook pre('validate') de proyectoSchema al guardar.
+        const avance = proyecto.agregarAvance({
             porcentajeConcrecion: datos.porcentajeConcrecion,
             urlSistema: datos.urlSistema,
             urlRepositorio: datos.urlRepositorio
-        })
-
-        proyecto.porcentajeConcrecion = avance.porcentajeConcrecion;
-        proyecto.urlSistema = avance.urlSistema;
-        proyecto.urlRepositorio = avance.urlRepositorio;
-        proyecto.agregarAvance(avance);
+        });
 
         await this.colectivoRepository.guardar(colectivo);
         return avance;
