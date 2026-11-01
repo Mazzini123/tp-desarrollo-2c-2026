@@ -42,22 +42,15 @@ import { AvanceController } from "./controllers/AvanceController.js";
 
 // Los repositorios de verdad: los que usa la app levantada.
 export function crearRepositoriosMongo() {
-  const habilidadRepository = new MongoHabilidadRepository();
-  const colaboradorRepository = new MongoColaboradorRepository({ habilidadRepository });
-  const colectivoRepository = new MongoColectivoRepository({
-    habilidadRepository,
-    colaboradorRepository,
-  });
-
-  const notificacionRepository = new MongoNotificacionRepository();
-  const estadisticaRepository = new MongoEstadisticaRepository();
-
+  // Ya no se necesitan entre si: con loadClass no hay que reconstruir
+  // referencias a mano (las habilidades vienen copiadas y los colaboradores
+  // se traen con populate).
   return {
-    habilidadRepository,
-    colaboradorRepository,
-    colectivoRepository,
-    notificacionRepository,
-    estadisticaRepository,
+    habilidadRepository: new MongoHabilidadRepository(),
+    colaboradorRepository: new MongoColaboradorRepository(),
+    colectivoRepository: new MongoColectivoRepository(),
+    notificacionRepository: new MongoNotificacionRepository(),
+    estadisticaRepository: new MongoEstadisticaRepository(),
   };
 }
 

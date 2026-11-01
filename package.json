@@ -16,7 +16,8 @@
     "// start:dev (deshabilitado hasta 3a entrega": "concurrently \"npm run dev:backend\" \"npm run start:frontend\"",
     "lint": "eslint .",
     "format": "prettier . --write",
-    "test": "npm test --workspace=backend"
+    "test": "npm test --workspace=backend",
+    "test:integracion": "npm run test:integracion --workspace=backend"
   },
   "license": "ISC",
   "devDependencies": {
