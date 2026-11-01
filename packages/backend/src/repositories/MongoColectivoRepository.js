@@ -130,7 +130,7 @@ export class MongoColectivoRepository {
     return {
       habilidad: (codigo) => {
         if (!habilidades.has(codigo)) {
-          habilidades.set(codigo, this.habilidadRepository.buscarPorId(codigo));
+          habilidades.set(codigo, this.habilidadRepository.buscarPorCodigo(codigo));
         }
         return habilidades.get(codigo);
       },

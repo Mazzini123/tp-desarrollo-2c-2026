@@ -1,5 +1,5 @@
 import { Colaborador } from "../../src/domain/Colaborador.js";
-import { Habilidad } from "../../src/domain/Habilidad.js";
+import { HabilidadModel } from "../../src/models/HabilidadModel.js";
 import { MedioDeContacto } from "../../src/domain/MedioDeContacto.js";
 
 // Correccion C1: los pronombres son una lista y la unicidad la garantiza la
@@ -52,19 +52,19 @@ describe("Colaborador · pronombres", () => {
 });
 
 describe("Colaborador · habilidades", () => {
-  const node = new Habilidad({ titulo: "Desarrollo Node" });
+  const node = new HabilidadModel({ titulo: "Desarrollo Node" });
 
   test("agregar la misma habilidad dos veces no la duplica", () => {
     const colaborador = new Colaborador({ cuentaGit: "octocat" });
     colaborador.agregarHabilidad(node);
-    colaborador.agregarHabilidad(new Habilidad({ titulo: "Desarrollo Node" }));
+    colaborador.agregarHabilidad(new HabilidadModel({ titulo: "Desarrollo Node" }));
     expect(colaborador.habilidades).toHaveLength(1);
   });
 
   test("tieneHabilidad compara por codigo, no por identidad", () => {
     const colaborador = new Colaborador({ cuentaGit: "octocat" });
     colaborador.agregarHabilidad(node);
-    expect(colaborador.tieneHabilidad(new Habilidad({ titulo: "desarrollo node" }))).toBe(true);
+    expect(colaborador.tieneHabilidad(new HabilidadModel({ titulo: "desarrollo node" }))).toBe(true);
   });
 });
 

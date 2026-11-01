@@ -2,11 +2,11 @@ import { Proyecto } from "../../src/domain/Proyecto.js";
 import { Perfil } from "../../src/domain/Perfil.js";
 import { Compromiso } from "../../src/domain/Compromiso.js";
 import { Colaborador } from "../../src/domain/Colaborador.js";
-import { Habilidad } from "../../src/domain/Habilidad.js";
+import { HabilidadModel } from "../../src/models/HabilidadModel.js";
 import { PROYECTO_ESTADO } from "../../src/domain/enums/PROYECTO_ESTADO.js";
 
-const node = new Habilidad({ titulo: "Desarrollo Node" });
-const react = new Habilidad({ titulo: "Desarrollo Web React" });
+const node = new HabilidadModel({ titulo: "Desarrollo Node" });
+const react = new HabilidadModel({ titulo: "Desarrollo Web React" });
 
 function perfilQueRequiere(...habilidades) {
   const perfil = new Perfil({
@@ -74,13 +74,16 @@ describe("Proyecto · perfiles", () => {
 
 describe("Habilidad · igualdad por codigo normalizado", () => {
   test("mismo titulo con distinta capitalizacion y acentos es la misma habilidad", () => {
-    const a = new Habilidad({ titulo: "Diseño UX UI" });
-    const b = new Habilidad({ titulo: "diseno ux ui" });
+    const a = new HabilidadModel({ titulo: "Diseño UX UI" });
+    const b = new HabilidadModel({ titulo: "diseno ux ui" });
     expect(a.codigo).toBe("diseno_ux_ui");
     expect(a.equals(b)).toBe(true);
   });
 
-  test("no se compara igual contra algo que no es una Habilidad", () => {
-    expect(node.equals({ codigo: "desarrollo_node" })).toBe(false);
+  // equals compara por codigo, no por clase: asi la habilidad del catalogo y
+  // la copia guardada dentro de un perfil o de una persona son la misma.
+  test("distinto codigo no es la misma habilidad", () => {
+    expect(node.equals(react)).toBe(false);
+    expect(node.equals(null)).toBe(false);
   });
 });

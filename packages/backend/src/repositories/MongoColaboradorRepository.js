@@ -55,7 +55,7 @@ export class MongoColaboradorRepository {
 
     const habilidades = await Promise.all(
       (documento.codigosHabilidades ?? []).map((codigo) =>
-        this.habilidadRepository.buscarPorId(codigo),
+        this.habilidadRepository.buscarPorCodigo(codigo),
       ),
     );
 
