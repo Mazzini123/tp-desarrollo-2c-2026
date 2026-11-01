@@ -31,7 +31,7 @@ describe("NotificacionService", () => {
     const notificacion = await services.notificacionService.notificar(ada, AVISO);
 
     expect(notificacion.destinatarioId).toBe(ada.id);
-    expect(notificacion.envios).toEqual([
+    expect(notificacion.toJSON().envios).toEqual([
       { canal: "EMAIL", exito: true },
       { canal: "SMS", exito: true },
     ]);
@@ -68,7 +68,7 @@ describe("NotificacionService", () => {
 
     const notificacion = await services.notificacionService.notificar(ada, AVISO);
 
-    expect(notificacion.envios).toEqual([
+    expect(notificacion.toJSON().envios).toEqual([
       { canal: "EMAIL", exito: false },
       { canal: "WHATSAPP", exito: true },
     ]);
