@@ -1,3 +1,6 @@
+// Todos los ids son ObjectId de Mongo: 24 caracteres hexadecimales.
+const OBJECT_ID = { type: "string", pattern: "^[a-f0-9]{24}$", example: "6720f1c2a1b2c3d4e5f60718" };
+
 const PROBLEMA = {
   type: "object",
   properties: {
@@ -60,7 +63,7 @@ const paramColaboracionId = {
   name: "colaboracionId",
   in: "path",
   required: true,
-  schema: { type: "string", format: "uuid" },
+  schema: OBJECT_ID,
 };
 
 const paramCodigoHabilidad = {
@@ -75,7 +78,7 @@ const paramPerfilId = {
   name: "perfilId",
   in: "path",
   required: true,
-  schema: { type: "string", format: "uuid" },
+  schema: OBJECT_ID,
 };
 
 function arrayDe(nombreSchema, descripcion) {
@@ -110,7 +113,7 @@ const paramId = {
   name: "id",
   in: "path",
   required: true,
-  schema: { type: "string", format: "uuid" },
+  schema: OBJECT_ID,
 };
 
 function listado(nombreSchema) {
@@ -172,8 +175,9 @@ export const openapi = {
       "`POST /proyectos/{id}/finalizacion`.",
       "",
       "**Persistencia.** MongoDB. Colectivo es el agregado raiz: sus proyectos, perfiles y",
-      "colaboraciones van embebidos en el mismo documento; habilidades y colaboradores se",
-      "referencian por codigo e id.",
+      "colaboraciones van embebidos en el mismo documento; los colaboradores se referencian",
+      "por id (populate) y de cada habilidad se guarda una copia con su codigo y titulo.",
+      "Todos los ids son ObjectId (24 caracteres hexadecimales).",
       "",
       "**Segunda entrega.** Se suman perfiles, postulaciones con estado, contribuciones",
       "anonimas, medios de contacto (que nunca se muestran), notificaciones internas",
@@ -604,7 +608,7 @@ export const openapi = {
           name: "logroId",
           in: "path",
           required: true,
-          schema: { type: "string", format: "uuid" },
+          schema: OBJECT_ID,
         },
       ],
       get: {
@@ -672,7 +676,7 @@ export const openapi = {
           name: "avanceId",
           in: "path",
           required: true,
-          schema: { type: "string", format: "uuid" },
+          schema: OBJECT_ID,
         },
       ],
       get: {
@@ -982,7 +986,7 @@ export const openapi = {
                   items: {
                     type: "object",
                     properties: {
-                      proyectoId: { type: "string", format: "uuid" },
+                      proyectoId: OBJECT_ID,
                       colaboracion: { $ref: "#/components/schemas/Colaboracion" },
                     },
                   },
@@ -1160,6 +1164,16 @@ export const openapi = {
         },
       },
 
+      // La copia de una habilidad del catalogo que guardan los perfiles y las
+      // personas (desnormalizada): solo lo que se muestra.
+      HabilidadEmbebida: {
+        type: "object",
+        properties: {
+          codigo: { type: "string", example: "desarrollo_node" },
+          titulo: { type: "string", example: "Desarrollo Node" },
+        },
+      },
+
       RedSocial: {
         type: "object",
         required: ["nombre", "url"],
@@ -1188,7 +1202,7 @@ export const openapi = {
       Colectivo: {
         type: "object",
         properties: {
-          id: { type: "string", format: "uuid" },
+          id: OBJECT_ID,
           nombre: { type: "string" },
           descripcion: { type: "string", description: "Admite Markdown (req. 38)." },
           tipoColectivo: {
@@ -1216,7 +1230,7 @@ export const openapi = {
       Perfil: {
         type: "object",
         properties: {
-          id: { type: "string", format: "uuid" },
+          id: OBJECT_ID,
           descripcion: { type: "string" },
           compromiso: { $ref: "#/components/schemas/Compromiso" },
           modalidadColaboracion: {
@@ -1225,11 +1239,11 @@ export const openapi = {
           },
           habilidadesRequeridas: {
             type: "array",
-            items: { $ref: "#/components/schemas/Habilidad" },
+            items: { $ref: "#/components/schemas/HabilidadEmbebida" },
           },
           habilidadesOpcionales: {
             type: "array",
-            items: { $ref: "#/components/schemas/Habilidad" },
+            items: { $ref: "#/components/schemas/HabilidadEmbebida" },
           },
         },
       },
@@ -1237,7 +1251,7 @@ export const openapi = {
       Proyecto: {
         type: "object",
         properties: {
-          id: { type: "string", format: "uuid" },
+          id: OBJECT_ID,
           titulo: { type: "string" },
           descripcion: { type: "string", description: "Admite Markdown (req. 38)." },
           estado: { type: "string", enum: ["ABIERTO", "FINALIZADO"] },
@@ -1257,6 +1271,12 @@ export const openapi = {
             enum: ["TODO_SUMA", "HASTA_LLENAR_VACANTES", "REVISION_MANUAL"],
           },
           limiteVacantes: { type: "integer", nullable: true },
+          vacantesLibres: {
+            type: "integer",
+            nullable: true,
+            description:
+              "Calculado, no se guarda: limiteVacantes menos las aceptadas. null si no hay limite.",
+          },
           fechaCreacion: { type: "string", format: "date-time", nullable: true },
           fechaFinalizacion: { type: "string", format: "date-time", nullable: true },
           fechaCierre: {
@@ -1272,7 +1292,7 @@ export const openapi = {
       Logro: {
         type: "object",
         properties: {
-          id: { type: "string", format: "uuid" },
+          id: OBJECT_ID,
           titulo: { type: "string" },
           descripcion: { type: "string" },
           fecha: { type: "string", format: "date-time" },
@@ -1282,7 +1302,7 @@ export const openapi = {
       Avance: {
         type: "object",
         properties: {
-          id: { type: "string", format: "uuid" },
+          id: OBJECT_ID,
           porcentajeConcrecion: { type: "number", minimum: 0, maximum: 100 },
           urlSistema: { type: "string" },
           urlRepositorio: { type: "string" },
@@ -1294,7 +1314,7 @@ export const openapi = {
         type: "object",
         description: "Los medios de contacto nunca forman parte de la respuesta.",
         properties: {
-          id: { type: "string", format: "uuid" },
+          id: OBJECT_ID,
           nombreFantasia: { type: "string", nullable: true },
           nombre: { type: "string", nullable: true },
           apellido: { type: "string", nullable: true },
@@ -1305,7 +1325,10 @@ export const openapi = {
             description: "Lista sin repetidos. Era un Set hasta la correccion C1.",
           },
           presentacion: { type: "string", nullable: true },
-          habilidades: { type: "array", items: { $ref: "#/components/schemas/Habilidad" } },
+          habilidades: {
+            type: "array",
+            items: { $ref: "#/components/schemas/HabilidadEmbebida" },
+          },
           recibeMensajeriaInterna: { type: "boolean" },
           redesSociales: { type: "array", items: { $ref: "#/components/schemas/RedSocial" } },
         },
@@ -1323,7 +1346,7 @@ export const openapi = {
       Colaboracion: {
         type: "object",
         properties: {
-          id: { type: "string", format: "uuid" },
+          id: OBJECT_ID,
           colaborador: {
             nullable: true,
             allOf: [{ $ref: "#/components/schemas/Colaborador" }],
@@ -1351,8 +1374,8 @@ export const openapi = {
       Notificacion: {
         type: "object",
         properties: {
-          id: { type: "string", format: "uuid" },
-          destinatarioId: { type: "string", format: "uuid" },
+          id: OBJECT_ID,
+          destinatarioId: OBJECT_ID,
           tipo: {
             type: "string",
             enum: [
