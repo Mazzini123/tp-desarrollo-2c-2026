@@ -16,7 +16,11 @@ const envioSchema = new mongoose.Schema(
 const notificacionSchema = new mongoose.Schema(
   {
     // Referencia al colaborador destinatario (vive en su propia coleccion).
-    destinatarioId: { type: mongoose.Schema.Types.ObjectId, ref: "Colaborador", required: true },
+    destinatarioId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Colaborador",
+      required: true,
+    },
     tipo: { type: String, required: true },
     asunto: { type: String, required: true },
     contenido: { type: String, required: true },

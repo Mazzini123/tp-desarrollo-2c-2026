@@ -26,11 +26,11 @@ export class AvisoAutomaticoService {
 
     const candidatas = new Map();
     for (const perfil of proyecto.perfiles) {
-      const codigos = perfil.habilidadesRequeridas.map((h) => h.codigo);
-      const encontradas = await this.colaboradorRepository.buscarPorHabilidades(codigos);
-      encontradas
-        .filter((colaborador) => perfil.cumpleHabilidadesRequeridas(colaborador))
-        .forEach((colaborador) => candidatas.set(colaborador.id, colaborador));
+      // La base ya devuelve solo las que tienen todas las requeridas ($all).
+      const encontradas = await this.colaboradorRepository.buscarPorHabilidades(
+        perfil.codigosRequeridos(),
+      );
+      encontradas.forEach((colaborador) => candidatas.set(colaborador.id, colaborador));
     }
 
     const avisos = [...candidatas.values()].map((colaborador) =>
@@ -47,22 +47,22 @@ export class AvisoAutomaticoService {
 
   // Una persona nueva: se le avisa que proyectos abiertos le sirven.
   async avisarPorColaboradorNuevo(colaborador) {
-    const proyectos = await this.colectivoRepository.listarProyectos();
-    const compatibles = proyectos.filter(
-      (proyecto) =>
-        proyecto.aceptaPostulaciones() &&
-        proyecto.cumpleAlgunPerfil(colaborador) &&
-        !proyecto.yaColaboraron(colaborador),
-    );
+    // La misma consulta que la busqueda de proyectos potenciales: la primera
+    // pagina trae los destacados y el total, sin cargar todos los proyectos.
+    const { items: destacados, total } =
+      await this.colectivoRepository.buscarProyectosCompatibles(
+        colaborador,
+        1,
+        MAXIMO_DE_PROYECTOS_EN_UN_AVISO,
+      );
 
-    if (compatibles.length === 0) {
+    if (total === 0) {
       return [];
     }
 
-    const destacados = compatibles.slice(0, MAXIMO_DE_PROYECTOS_EN_UN_AVISO);
     const aviso = this.notificacionService.notificar(colaborador, {
       tipo: TIPO_NOTIFICACION.PROYECTOS_COMPATIBLES,
-      asunto: `Hay ${compatibles.length} proyecto(s) que coinciden con tus habilidades`,
+      asunto: `Hay ${total} proyecto(s) que coinciden con tus habilidades`,
       contenido: destacados.map((p) => `- ${p.titulo}`).join("\n"),
       referencias: { proyectoIds: destacados.map((p) => p.id) },
     });

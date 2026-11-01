@@ -17,7 +17,9 @@ export class Proyecto {
   }
 
   cumpleAlgunPerfil(colaborador) {
-    return this.perfiles.some((perfil) => perfil.cumpleHabilidadesRequeridas(colaborador));
+    return this.perfiles.some((perfil) =>
+      perfil.cumpleHabilidadesRequeridas(colaborador),
+    );
   }
 
   // Los agregar* reciben los datos y devuelven el subdocumento creado.
@@ -61,7 +63,9 @@ export class Proyecto {
 
   // Las pendientes en el orden en que llegaron: se resuelven en ese orden.
   colaboracionesPendientes() {
-    return this.colaboraciones.filter((c) => c.estaPendiente()).sort((a, b) => a.fecha - b.fecha);
+    return this.colaboraciones
+      .filter((c) => c.estaPendiente())
+      .sort((a, b) => a.fecha - b.fecha);
   }
 
   cantidadAceptadas() {
@@ -75,7 +79,9 @@ export class Proyecto {
   // El cupo se calcula, no se guarda: asi nunca queda desincronizado con las
   // colaboraciones reales.
   cupoCompleto() {
-    return this.tieneLimiteDeVacantes() && this.cantidadAceptadas() >= this.limiteVacantes;
+    return (
+      this.tieneLimiteDeVacantes() && this.cantidadAceptadas() >= this.limiteVacantes
+    );
   }
 
   // Un getter de la clase se vuelve un VIRTUAL de Mongoose: se calcula cada

@@ -9,7 +9,7 @@
 //
 // Asi el conteo lo hace la base y a la API solo le llega el resultado.
 
-import mongoose from "mongoose";
+import { aObjectId } from "./ids.js";
 
 // Dado de baja = tiene una fecha en fechaBaja. $type distingue sin ambiguedad
 // una fecha ("date") de un null ("null") o de un campo que no existe
@@ -93,9 +93,8 @@ export function estadisticasDeColectivo(colectivoId) {
   const lista = (campo) => ({ $ifNull: [`$${campo}`, []] });
 
   return [
-    // A diferencia de find(), aggregate() no convierte los tipos: el id que
-    // llega como texto hay que pasarlo a ObjectId a mano.
-    { $match: { _id: new mongoose.Types.ObjectId(String(colectivoId)) } },
+    // aggregate() no convierte el id de texto a ObjectId: va a mano.
+    { $match: { _id: aObjectId(colectivoId) } },
     { $unwind: "$proyectos" },
     // De aca en adelante, cada documento ES un proyecto.
     { $replaceRoot: { newRoot: "$proyectos" } },

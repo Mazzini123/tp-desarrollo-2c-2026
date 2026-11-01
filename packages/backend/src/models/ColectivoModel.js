@@ -64,7 +64,11 @@ aplicarFormatoJSON(perfilSchema);
 
 const colaboracionSchema = new mongoose.Schema({
   // Referencia: el colaborador vive en su propia coleccion.
-  colaborador: { type: mongoose.Schema.Types.ObjectId, ref: "Colaborador", required: true },
+  colaborador: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Colaborador",
+    required: true,
+  },
   esPublica: { type: Boolean, default: true },
   fecha: { type: Date, default: Date.now },
   estado: {

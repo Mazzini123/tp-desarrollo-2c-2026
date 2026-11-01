@@ -47,11 +47,15 @@ export class Perfil {
   cumpleHabilidadesRequeridas(colaborador) {
     return (
       this.habilidadesRequeridas.length > 0 &&
-      this.habilidadesRequeridas.every((habilidad) => colaborador.tieneHabilidad(habilidad))
+      this.habilidadesRequeridas.every((habilidad) =>
+        colaborador.tieneHabilidad(habilidad),
+      )
     );
   }
 
   cumpleAlgunaHabilidadOpcional(colaborador) {
-    return this.habilidadesOpcionales.some((habilidad) => colaborador.tieneHabilidad(habilidad));
+    return this.habilidadesOpcionales.some((habilidad) =>
+      colaborador.tieneHabilidad(habilidad),
+    );
   }
 }

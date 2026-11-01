@@ -1,5 +1,5 @@
 import { ColectivoModel } from "../models/ColectivoModel.js";
-import { esIdValido } from "./ids.js";
+import { aObjectId, esIdValido } from "./ids.js";
 
 // Orden estable para paginar: primero por fecha de alta, y el _id desempata.
 const ORDEN = { createdAt: 1, _id: 1 };
@@ -8,6 +8,60 @@ const ORDEN = { createdAt: 1, _id: 1 };
 // reemplaza por el documento completo (un Colaborador con sus metodos) con
 // UNA consulta extra para toda la tanda, no una por colaboracion.
 const COLABORADORES = { path: "proyectos.colaboraciones.colaborador" };
+
+// --- Condiciones de buscarProyectosCompatibles (despues del $unwind, cada
+// documento tiene UN proyecto en "$proyectos") ---
+
+// $ifNull: si un documento viejo no tiene el array, cuenta como vacio en vez
+// de hacer fallar toda la consulta ($size de algo que no existe es un error).
+const lista = (campo) => ({ $ifNull: [campo, []] });
+
+// Proyecto.cupoCompleto() al reves: sin limite, o con menos aceptadas que el
+// limite.
+const TIENE_CUPO = {
+  $or: [
+    { $eq: [{ $ifNull: ["$proyectos.limiteVacantes", null] }, null] },
+    {
+      $lt: [
+        {
+          $size: {
+            $filter: {
+              input: lista("$proyectos.colaboraciones"),
+              cond: { $eq: ["$$this.estado", "ACEPTADA"] },
+            },
+          },
+        },
+        "$proyectos.limiteVacantes",
+      ],
+    },
+  ],
+};
+
+// Proyecto.cumpleAlgunPerfil(): algun perfil con requeridas, y todas ellas
+// ($setIsSubset) entre las habilidades de la persona.
+function algunPerfilQueCumple(codigosDeLaPersona) {
+  return {
+    $anyElementTrue: [
+      {
+        $map: {
+          input: lista("$proyectos.perfiles"),
+          as: "perfil",
+          in: {
+            $and: [
+              { $gt: [{ $size: lista("$$perfil.habilidadesRequeridas") }, 0] },
+              {
+                $setIsSubset: [
+                  lista("$$perfil.habilidadesRequeridas.codigo"),
+                  codigosDeLaPersona,
+                ],
+              },
+            ],
+          },
+        },
+      },
+    ],
+  };
+}
 
 // Sin traduccion dominio <-> documento: lo que devuelve Mongoose ya es un
 // Colectivo con sus proyectos, y cada proyecto ya es un Proyecto (loadClass).
@@ -51,11 +105,13 @@ export class MongoColectivoRepository {
       return null;
     }
 
-    const colectivo = await ColectivoModel.findOne({ "proyectos._id": proyectoId }).populate(
-      COLABORADORES,
-    );
+    const colectivo = await ColectivoModel.findOne({
+      "proyectos._id": proyectoId,
+    }).populate(COLABORADORES);
 
-    return colectivo ? { colectivo, proyecto: colectivo.buscarProyecto(proyectoId) } : null;
+    return colectivo
+      ? { colectivo, proyecto: colectivo.buscarProyecto(proyectoId) }
+      : null;
   }
 
   // Suma una visualizacion sin leer ni reescribir el colectivo: $inc lo hace
@@ -102,16 +158,51 @@ export class MongoColectivoRepository {
       .populate(COLABORADORES);
   }
 
-  async listarProyectos() {
-    const colectivos = await this.listar();
-    return colectivos.flatMap((colectivo) => colectivo.proyectos);
+  // Proyectos potenciales para una persona: abiertos, con cupo, con algun
+  // perfil cuyas habilidades requeridas tenga todas, y a los que no se
+  // postulo todavia. Es la misma regla que Proyecto.aceptaPostulaciones(),
+  // cumpleAlgunPerfil() y yaColaboraron(), escrita como consulta para que la
+  // base filtre y pagine en vez de traer todos los colectivos a memoria.
+  async buscarProyectosCompatibles(colaborador, numeroPagina, limitePorPagina) {
+    const salto = (numeroPagina - 1) * limitePorPagina;
+    const codigosDeLaPersona = colaborador.habilidades.map((h) => h.codigo);
+
+    const [resultado] = await ColectivoModel.aggregate([
+      { $sort: ORDEN },
+      // Un documento por proyecto.
+      { $unwind: "$proyectos" },
+      {
+        $match: {
+          // aceptaPostulaciones(): abierto...
+          "proyectos.estado": "ABIERTO",
+          // !yaColaboraron(): sobre un array, $ne exige que NINGUNA
+          // colaboracion sea de ella.
+          "proyectos.colaboraciones.colaborador": { $ne: aObjectId(colaborador) },
+          // ...y con cupo; cumpleAlgunPerfil().
+          $expr: { $and: [TIENE_CUPO, algunPerfilQueCumple(codigosDeLaPersona)] },
+        },
+      },
+      {
+        $facet: {
+          items: [{ $skip: salto }, { $limit: limitePorPagina }],
+          total: [{ $count: "cantidad" }],
+        },
+      },
+    ]);
+
+    return {
+      items: await proyectosDesdeAgregacion(resultado.items),
+      total: resultado.total[0]?.cantidad ?? 0,
+    };
   }
 
   async listarProyectosPaginado(numeroPagina, limitePorPagina, { etiqueta } = {}) {
     const salto = (numeroPagina - 1) * limitePorPagina;
     // Despues del $unwind cada documento es un proyecto: se filtra por las
     // etiquetas del proyecto, no por las del colectivo.
-    const filtroPorEtiqueta = etiqueta ? [{ $match: { "proyectos.etiquetas": etiqueta } }] : [];
+    const filtroPorEtiqueta = etiqueta
+      ? [{ $match: { "proyectos.etiquetas": etiqueta } }]
+      : [];
 
     // Los proyectos estan embebidos, asi que no se pueden paginar con un find.
     // $unwind "abre" cada colectivo en un documento por proyecto, y $facet

@@ -63,7 +63,9 @@ describe("Colaborador · habilidades", () => {
   test("tieneHabilidad compara por codigo, no por identidad", () => {
     const colaborador = new ColaboradorModel({ cuentaGit: "octocat" });
     colaborador.agregarHabilidad(node);
-    expect(colaborador.tieneHabilidad(new HabilidadModel({ titulo: "desarrollo node" }))).toBe(true);
+    expect(
+      colaborador.tieneHabilidad(new HabilidadModel({ titulo: "desarrollo node" })),
+    ).toBe(true);
   });
 });
 
@@ -83,7 +85,9 @@ describe("Colaborador · medios de contacto", () => {
     const colaborador = new ColaboradorModel({ cuentaGit: "octocat" });
     colaborador.agregarMedioDeContacto({ tipo: "SMS", valor: "1155551234" });
 
-    expect(JSON.parse(JSON.stringify(colaborador))).not.toHaveProperty("mediosDeContacto");
+    expect(JSON.parse(JSON.stringify(colaborador))).not.toHaveProperty(
+      "mediosDeContacto",
+    );
     expect(colaborador.mediosDeContacto).toHaveLength(1);
   });
 });
