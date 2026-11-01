@@ -1,6 +1,5 @@
-import { Colaborador } from "../../src/domain/Colaborador.js";
+import { ColaboradorModel } from "../../src/models/ColaboradorModel.js";
 import { HabilidadModel } from "../../src/models/HabilidadModel.js";
-import { MedioDeContacto } from "../../src/domain/MedioDeContacto.js";
 
 // Correccion C1: los pronombres son una lista y la unicidad la garantiza la
 // logica del dominio, no el tipo del atributo.
@@ -8,7 +7,7 @@ describe("Colaborador · pronombres", () => {
   let colaborador;
 
   beforeEach(() => {
-    colaborador = new Colaborador({ cuentaGit: "octocat" });
+    colaborador = new ColaboradorModel({ cuentaGit: "octocat" });
   });
 
   test("arranca con una lista vacia, no con un Set", () => {
@@ -55,14 +54,14 @@ describe("Colaborador · habilidades", () => {
   const node = new HabilidadModel({ titulo: "Desarrollo Node" });
 
   test("agregar la misma habilidad dos veces no la duplica", () => {
-    const colaborador = new Colaborador({ cuentaGit: "octocat" });
+    const colaborador = new ColaboradorModel({ cuentaGit: "octocat" });
     colaborador.agregarHabilidad(node);
     colaborador.agregarHabilidad(new HabilidadModel({ titulo: "Desarrollo Node" }));
     expect(colaborador.habilidades).toHaveLength(1);
   });
 
   test("tieneHabilidad compara por codigo, no por identidad", () => {
-    const colaborador = new Colaborador({ cuentaGit: "octocat" });
+    const colaborador = new ColaboradorModel({ cuentaGit: "octocat" });
     colaborador.agregarHabilidad(node);
     expect(colaborador.tieneHabilidad(new HabilidadModel({ titulo: "desarrollo node" }))).toBe(true);
   });
@@ -70,10 +69,10 @@ describe("Colaborador · habilidades", () => {
 
 describe("Colaborador · medios de contacto", () => {
   test("se comparan por tipo y valor, no por identidad", () => {
-    const colaborador = new Colaborador({ cuentaGit: "octocat" });
-    colaborador.agregarMedioDeContacto(new MedioDeContacto({ tipo: "EMAIL", valor: "a@b.com" }));
+    const colaborador = new ColaboradorModel({ cuentaGit: "octocat" });
+    colaborador.agregarMedioDeContacto({ tipo: "EMAIL", valor: "a@b.com" });
 
-    const igual = new MedioDeContacto({ tipo: "EMAIL", valor: "a@b.com" });
+    const igual = { tipo: "EMAIL", valor: "a@b.com" };
     expect(colaborador.tieneMedioDeContacto(igual)).toBe(true);
 
     colaborador.quitarMedioDeContacto(igual);
@@ -81,8 +80,8 @@ describe("Colaborador · medios de contacto", () => {
   });
 
   test("al serializar a JSON no aparecen, pero siguen en el objeto", () => {
-    const colaborador = new Colaborador({ cuentaGit: "octocat" });
-    colaborador.agregarMedioDeContacto(new MedioDeContacto({ tipo: "SMS", valor: "1155551234" }));
+    const colaborador = new ColaboradorModel({ cuentaGit: "octocat" });
+    colaborador.agregarMedioDeContacto({ tipo: "SMS", valor: "1155551234" });
 
     expect(JSON.parse(JSON.stringify(colaborador))).not.toHaveProperty("mediosDeContacto");
     expect(colaborador.mediosDeContacto).toHaveLength(1);

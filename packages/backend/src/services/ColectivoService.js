@@ -8,7 +8,7 @@ import { tieneContenido } from "../utils/validaciones.js";
 import { armarPaginado } from "../utils/paginacion.js";
 import { construirRedesSociales } from "../domain/RedSocial.js";
 import { normalizarEtiquetas } from "../domain/etiquetas.js";
-import { MedioDeContacto } from "../domain/MedioDeContacto.js";
+import { mismoMedioDeContacto } from "../domain/MedioDeContacto.js";
 import { ConflictError } from "../errors/ConflictError.js";
 import { cerrarProyecto, notificarResoluciones } from "./reglasDePostulacion.js";
 import { TIPO_EVENTO_TIMELINE } from "../domain/enums/TIPO_EVENTO_TIMELINE.js";
@@ -186,8 +186,10 @@ export class ColectivoService {
 
   construirMediosDeContacto(lista) {
     return lista
-      .map((datos) => new MedioDeContacto(datos))
-      .filter((medio, i, todos) => todos.findIndex((otro) => otro.equals(medio)) === i);
+      .map(({ tipo, valor }) => ({ tipo, valor }))
+      .filter(
+        (medio, i, todos) => todos.findIndex((otro) => mismoMedioDeContacto(otro, medio)) === i,
+      );
   }
 
   construirUbicacion(datos) {

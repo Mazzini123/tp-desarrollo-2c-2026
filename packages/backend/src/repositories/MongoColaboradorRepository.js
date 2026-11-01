@@ -1,110 +1,36 @@
 import { ColaboradorModel } from "../models/ColaboradorModel.js";
-import { Colaborador } from "../domain/Colaborador.js";
-import { MedioDeContacto } from "../domain/MedioDeContacto.js";
-import { RedSocial } from "../domain/RedSocial.js";
+import { esIdValido } from "./ids.js";
 
-function aDocumento(colaborador) {
-  return {
-    _id: colaborador.id,
-    nombreFantasia: colaborador.nombreFantasia,
-    nombre: colaborador.nombre,
-    apellido: colaborador.apellido,
-    cuentaGit: colaborador.cuentaGit,
-    presentacion: colaborador.presentacion,
-    pronombres: colaborador.pronombres,
-    recibeMensajeriaInterna: colaborador.recibeMensajeriaInterna,
-    mediosDeContacto: colaborador.mediosDeContacto.map((medio) => ({
-      tipo: medio.tipo,
-      valor: medio.valor,
-    })),
-    redesSociales: colaborador.redesSociales.map(({ nombre, url }) => ({ nombre, url })),
-    // Solo los codigos: las habilidades viven en su propia coleccion.
-    codigosHabilidades: colaborador.habilidades.map((habilidad) => habilidad.codigo),
-  };
-}
-
+// Sin traduccion dominio <-> documento: lo que devuelve Mongoose ya es un
+// Colaborador con sus metodos (loadClass). Las habilidades vienen adentro
+// (copia desnormalizada), asi que tampoco hay que ir a buscarlas.
 export class MongoColaboradorRepository {
-  // Necesita el repo de habilidades para reconstruir las referencias.
-  constructor({ habilidadRepository }) {
-    this.habilidadRepository = habilidadRepository;
-  }
-
-  // Es async porque tiene que ir a buscar las habilidades referenciadas.
-  async aDominio(documento) {
-    if (!documento) {
-      return null;
-    }
-
-    const colaborador = new Colaborador({
-      id: documento._id,
-      nombreFantasia: documento.nombreFantasia,
-      nombre: documento.nombre,
-      apellido: documento.apellido,
-      cuentaGit: documento.cuentaGit,
-      presentacion: documento.presentacion,
-      recibeMensajeriaInterna: documento.recibeMensajeriaInterna,
-    });
-
-    colaborador.pronombres = documento.pronombres ?? [];
-
-    colaborador.mediosDeContacto = (documento.mediosDeContacto ?? []).map(
-      (medio) => new MedioDeContacto(medio),
-    );
-
-    colaborador.redesSociales = (documento.redesSociales ?? []).map((red) => new RedSocial(red));
-
-    const habilidades = await Promise.all(
-      (documento.codigosHabilidades ?? []).map((codigo) =>
-        this.habilidadRepository.buscarPorCodigo(codigo),
-      ),
-    );
-
-    // filter(Boolean) descarta las que ya no existen en el catalogo.
-    colaborador.habilidades = habilidades.filter(Boolean);
-
-    return colaborador;
-  }
-
   async guardar(colaborador) {
-    await ColaboradorModel.updateOne(
-      { _id: colaborador.id },
-      { $set: aDocumento(colaborador) },
-      { upsert: true },
-    );
-
-    return colaborador;
+    return colaborador.save();
   }
 
   async buscarPorId(id) {
-    const documento = await ColaboradorModel.findById(id).lean();
-    return this.aDominio(documento);
+    return esIdValido(id) ? ColaboradorModel.findById(id) : null;
   }
 
   async listar() {
-    const documentos = await ColaboradorModel.find().lean();
-    return Promise.all(documentos.map((doc) => this.aDominio(doc)));
+    return ColaboradorModel.find().sort({ _id: 1 });
   }
 
-  // Las que tienen TODAS las habilidades pedidas: $all compara contra el
-  // array de codigos guardado, sin traer a memoria a las que no califican.
+  // Las que tienen TODAS las habilidades pedidas: $all compara contra los
+  // codigos guardados, sin traer a memoria a las que no califican.
   async buscarPorHabilidades(codigos) {
-    const documentos = await ColaboradorModel.find({ codigosHabilidades: { $all: codigos } })
-      .sort({ _id: 1 })
-      .lean();
-    return Promise.all(documentos.map((doc) => this.aDominio(doc)));
+    return ColaboradorModel.find({ "habilidades.codigo": { $all: codigos } }).sort({ _id: 1 });
   }
 
   async listarPaginado(numeroPagina, limitePorPagina) {
     const salto = (numeroPagina - 1) * limitePorPagina;
 
-    const [documentos, total] = await Promise.all([
-      ColaboradorModel.find().skip(salto).limit(limitePorPagina).lean(),
+    const [items, total] = await Promise.all([
+      ColaboradorModel.find().sort({ _id: 1 }).skip(salto).limit(limitePorPagina),
       ColaboradorModel.countDocuments(),
     ]);
 
-    return {
-      items: await Promise.all(documentos.map((doc) => this.aDominio(doc))),
-      total,
-    };
+    return { items, total };
   }
 }

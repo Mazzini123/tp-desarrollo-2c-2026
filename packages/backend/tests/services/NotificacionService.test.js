@@ -30,7 +30,7 @@ describe("NotificacionService", () => {
 
     const notificacion = await services.notificacionService.notificar(ada, AVISO);
 
-    expect(notificacion.destinatarioId).toBe(ada.id);
+    expect(notificacion.esPara(ada.id)).toBe(true);
     expect(notificacion.toJSON().envios).toEqual([
       { canal: "EMAIL", exito: true },
       { canal: "SMS", exito: true },

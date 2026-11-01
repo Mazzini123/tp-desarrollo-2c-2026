@@ -1,7 +1,7 @@
 import { Proyecto } from "../../src/domain/Proyecto.js";
 import { Perfil } from "../../src/domain/Perfil.js";
 import { Compromiso } from "../../src/domain/Compromiso.js";
-import { Colaborador } from "../../src/domain/Colaborador.js";
+import { ColaboradorModel } from "../../src/models/ColaboradorModel.js";
 import { HabilidadModel } from "../../src/models/HabilidadModel.js";
 import { PROYECTO_ESTADO } from "../../src/domain/enums/PROYECTO_ESTADO.js";
 
@@ -28,7 +28,7 @@ function proyectoAbierto(...perfiles) {
 }
 
 function colaboradorCon(...habilidades) {
-  const colaborador = new Colaborador({ cuentaGit: "octocat" });
+  const colaborador = new ColaboradorModel({ cuentaGit: "octocat" });
   habilidades.forEach((h) => colaborador.agregarHabilidad(h));
   return colaborador;
 }

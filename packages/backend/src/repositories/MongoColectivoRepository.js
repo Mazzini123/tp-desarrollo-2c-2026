@@ -7,9 +7,7 @@ import { Colaboracion } from "../domain/Colaboracion.js";
 import { Logro } from "../domain/Logro.js";
 import { Avance } from "../domain/Avance.js";
 import { Ubicacion } from "../domain/Ubicacion.js";
-import { RedSocial } from "../domain/RedSocial.js";
 import { Valoracion } from "../domain/Valoracion.js";
-import { MedioDeContacto } from "../domain/MedioDeContacto.js";
 import { COLABORACION_ESTADO } from "../domain/enums/COLABORACION_ESTADO.js";
 import { MODO_ACEPTACION } from "../domain/enums/MODO_ACEPTACION.js";
 
@@ -249,10 +247,14 @@ export class MongoColectivoRepository {
       fechaAlta: documento.fechaAlta ?? documento.createdAt ?? null,
       fechaBaja: documento.fechaBaja ?? null,
     });
-    colectivo.mediosDeContacto = (documento.mediosDeContacto ?? []).map(
-      (medio) => new MedioDeContacto(medio),
-    );
-    colectivo.redesSociales = (documento.redesSociales ?? []).map((red) => new RedSocial(red));
+    colectivo.mediosDeContacto = (documento.mediosDeContacto ?? []).map(({ tipo, valor }) => ({
+      tipo,
+      valor,
+    }));
+    colectivo.redesSociales = (documento.redesSociales ?? []).map(({ nombre, url }) => ({
+      nombre,
+      url,
+    }));
     colectivo.etiquetas = documento.etiquetas ?? [];
 
     colectivo.proyectos = await Promise.all(
