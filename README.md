@@ -360,6 +360,77 @@ La IP es de Oracle y puede cambiar si se recrea la instancia; conviene
 reservarla desde la consola. Para verificar la actual, desde la VM:
 `curl -s ifconfig.me`.
 
+### Conectarse a la VM
+
+| Dato | Valor |
+|---|---|
+| Instancia | `instance-20260907-2051` (Oracle Cloud, región São Paulo) |
+| IP pública | `147.15.102.156` |
+| Usuario | `ubuntu` (el que traen las imágenes Ubuntu de Oracle) |
+| Proyecto | `~/tp-desarrollo-2c-2026`, en la rama `main` |
+| Cuenta de Oracle | La de Lucio (creador de la instancia y de la consola web) |
+
+Se entra por SSH con un **archivo de clave privada**, no con contraseña. La VM
+acepta las claves públicas que estén en `~/.ssh/authorized_keys`, una por
+línea. Cada integrante tiene la suya:
+
+| Clave (comentario al final de la línea) | De quién |
+|---|---|
+| `ssh-key-2026-09-07` | Lucio: la generó Oracle al crear la instancia |
+| `mate-tp-dds` | Mateo |
+
+```powershell
+# Con la clave por defecto (~/.ssh/id_ed25519), SSH la encuentra solo:
+ssh ubuntu@147.15.102.156
+
+# Con un archivo de clave en otro lugar (por ejemplo, la que bajó Oracle):
+ssh -i "C:\Users\<usuario>\Downloads\ssh-key-2026-09-07.key" ubuntu@147.15.102.156
+```
+
+La primera vez pregunta `Are you sure you want to continue connecting?`:
+responder `yes`. Para salir de la VM: `exit`.
+
+**Atajo (opcional).** Con esto en `~/.ssh/config`, alcanza con `ssh cav-vm`:
+
+```
+Host cav-vm
+  HostName 147.15.102.156
+  User ubuntu
+  IdentityFile ~/.ssh/id_ed25519
+```
+
+**Sumar a alguien del grupo.**
+
+1. En su compu genera su par de claves (la privada no sale nunca de ahí):
+
+   ```powershell
+   ssh-keygen -t ed25519 -C "nombre-tp-dds"
+   Get-Content "$env:USERPROFILE\.ssh\id_ed25519.pub"   # una sola línea: ssh-ed25519 AAAA... nombre-tp-dds
+   ```
+
+2. Le pasa esa línea (la **pública**: se puede mandar por chat) a alguien que
+   ya tenga acceso, y esa persona la agrega desde la VM. Con `>>`, no `>`: uno
+   solo borraría las claves que ya están.
+
+   ```bash
+   echo "ssh-ed25519 AAAA... nombre-tp-dds" >> ~/.ssh/authorized_keys
+   ```
+
+3. La persona nueva prueba entrar **antes** de que la otra cierre su sesión.
+
+**Problemas comunes.**
+
+| Mensaje | Causa | Solución |
+|---|---|---|
+| `Permission denied (publickey)` | Esa clave no está en `authorized_keys`, o el usuario no es `ubuntu` | Revisar el usuario; que alguien con acceso agregue la clave pública |
+| `UNPROTECTED PRIVATE KEY FILE` | Windows le dio permisos de más al archivo de clave | `icacls "<archivo>" /inheritance:r` y `icacls "<archivo>" /grant:r "$($env:USERNAME):(R)"` |
+| `Connection timed out` | La VM está apagada o cambió la IP | Consola de Oracle → Compute → Instances |
+
+> Si se pierden **todas** las claves privadas no hay forma de entrar por SSH:
+> habría que recrear la instancia cargando claves nuevas. Por eso cada
+> integrante tiene la suya, y la cuenta de Oracle debería tener más de un
+> usuario administrador.
+
 ### Qué cambia respecto de desarrollo
 
 `docker-compose.prod.yml` es un archivo aparte, no un agregado al de desarrollo:
