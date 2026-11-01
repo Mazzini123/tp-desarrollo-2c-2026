@@ -1,15 +1,9 @@
-import { randomUUID } from "node:crypto";
-
+// Lo que un perfil de un proyecto SABE HACER. Vive embebido en el proyecto:
+// perfilSchema (models/ColectivoModel.js) carga esta clase con loadClass.
+//
+// Las habilidades se guardan como copia {codigo, titulo} y se comparan por
+// codigo (equals): da igual si llega la del catalogo o la copia.
 export class Perfil {
-  constructor({ id = randomUUID(), descripcion, compromiso, modalidadColaboracion }) {
-    this.id = id;
-    this.habilidadesRequeridas = [];
-    this.habilidadesOpcionales = [];
-    this.descripcion = descripcion;
-    this.compromiso = compromiso;
-    this.modalidadColaboracion = modalidadColaboracion;
-  }
-
   tieneHabilidad(lista, habilidad) {
     return lista.some((item) => item.equals(habilidad));
   }
@@ -40,6 +34,14 @@ export class Perfil {
     this.habilidadesRequeridas = this.habilidadesRequeridas.filter(
       (item) => !item.equals(habilidad),
     );
+  }
+
+  codigosRequeridos() {
+    return this.habilidadesRequeridas.map((h) => h.codigo);
+  }
+
+  codigosOpcionales() {
+    return this.habilidadesOpcionales.map((h) => h.codigo);
   }
 
   cumpleHabilidadesRequeridas(colaborador) {

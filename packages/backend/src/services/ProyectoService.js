@@ -1,4 +1,3 @@
-import { Proyecto } from "../domain/Proyecto.js";
 import { DomainError } from "../errors/DomainError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
 import { ConflictError } from "../errors/ConflictError.js";
@@ -52,18 +51,18 @@ export class ProyectoService {
     const perfilesConstruidos = await Promise.all(
       perfiles.map((datos) => this.perfilService.construirPerfil(datos)),
     );
-    const proyecto = new Proyecto({
+    // El proyecto se crea adentro del colectivo: es un subdocumento suyo.
+    const proyecto = colectivo.agregarProyecto({
       titulo,
       descripcion,
       modoAceptacion,
       limiteVacantes,
       fechaCierre,
       fechaCreacion: ahora,
+      etiquetas: normalizarEtiquetas(etiquetas),
     });
-    proyecto.etiquetas = normalizarEtiquetas(etiquetas);
 
     perfilesConstruidos.forEach((perfil) => proyecto.agregarPerfil(perfil));
-    colectivo.agregarProyecto(proyecto);
     await this.colectivoRepository.guardar(colectivo);
 
     // Req. adicional 9. Si los avisos fallan, el proyecto igual quedo creado.

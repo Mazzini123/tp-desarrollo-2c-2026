@@ -1,25 +1,30 @@
-import { Proyecto } from "../../src/domain/Proyecto.js";
-import { Perfil } from "../../src/domain/Perfil.js";
-import { Compromiso } from "../../src/domain/Compromiso.js";
-import { Colaborador } from "../../src/domain/Colaborador.js";
-import { Habilidad } from "../../src/domain/Habilidad.js";
+import { ColectivoModel } from "../../src/models/ColectivoModel.js";
+import { ColaboradorModel } from "../../src/models/ColaboradorModel.js";
+import { HabilidadModel } from "../../src/models/HabilidadModel.js";
 import { PROYECTO_ESTADO } from "../../src/domain/enums/PROYECTO_ESTADO.js";
 
-const node = new Habilidad({ titulo: "Desarrollo Node" });
-const react = new Habilidad({ titulo: "Desarrollo Web React" });
+const node = new HabilidadModel({ titulo: "Desarrollo Node" });
+const react = new HabilidadModel({ titulo: "Desarrollo Web React" });
 
+// Los datos de un perfil: el subdocumento lo crea proyecto.agregarPerfil().
 function perfilQueRequiere(...habilidades) {
-  const perfil = new Perfil({
+  return {
     descripcion: "Perfil de prueba",
-    compromiso: new Compromiso({ cantidadHoras: 5, periodo: "HS_MENSUALES" }),
+    compromiso: { cantidadHoras: 5, periodo: "HS_MENSUALES" },
     modalidadColaboracion: "GRATUITA",
-  });
-  habilidades.forEach((h) => perfil.agregarHabilidadRequerida(h));
-  return perfil;
+    habilidadesRequeridas: habilidades,
+  };
 }
 
+// Un proyecto no existe fuera de su colectivo: se crea adentro de uno. No
+// hace falta una base: new ColectivoModel() arma el documento en memoria.
 function proyectoAbierto(...perfiles) {
-  const proyecto = new Proyecto({
+  const colectivo = new ColectivoModel({
+    nombre: "Fundacion Ejemplo",
+    descripcion: "Colectivo de prueba",
+    tipoColectivo: "FUNDACION",
+  });
+  const proyecto = colectivo.agregarProyecto({
     titulo: "Sitio institucional",
     descripcion: "Proyecto de prueba",
   });
@@ -28,7 +33,7 @@ function proyectoAbierto(...perfiles) {
 }
 
 function colaboradorCon(...habilidades) {
-  const colaborador = new Colaborador({ cuentaGit: "octocat" });
+  const colaborador = new ColaboradorModel({ cuentaGit: "octocat" });
   habilidades.forEach((h) => colaborador.agregarHabilidad(h));
   return colaborador;
 }
@@ -65,22 +70,25 @@ describe("Proyecto · perfiles", () => {
   });
 
   test("quitarPerfil lo saca por id", () => {
-    const perfil = perfilQueRequiere(node);
-    const proyecto = proyectoAbierto(perfil, perfilQueRequiere(react));
-    proyecto.quitarPerfil(perfil);
-    expect(proyecto.perfiles).toHaveLength(1);
+    const proyecto = proyectoAbierto(perfilQueRequiere(node), perfilQueRequiere(react));
+    const [primero, segundo] = proyecto.perfiles;
+    proyecto.quitarPerfil(primero);
+    expect(proyecto.perfiles.map((p) => p.id)).toEqual([segundo.id]);
   });
 });
 
 describe("Habilidad · igualdad por codigo normalizado", () => {
   test("mismo titulo con distinta capitalizacion y acentos es la misma habilidad", () => {
-    const a = new Habilidad({ titulo: "Diseño UX UI" });
-    const b = new Habilidad({ titulo: "diseno ux ui" });
+    const a = new HabilidadModel({ titulo: "Diseño UX UI" });
+    const b = new HabilidadModel({ titulo: "diseno ux ui" });
     expect(a.codigo).toBe("diseno_ux_ui");
     expect(a.equals(b)).toBe(true);
   });
 
-  test("no se compara igual contra algo que no es una Habilidad", () => {
-    expect(node.equals({ codigo: "desarrollo_node" })).toBe(false);
+  // equals compara por codigo, no por clase: asi la habilidad del catalogo y
+  // la copia guardada dentro de un perfil o de una persona son la misma.
+  test("distinto codigo no es la misma habilidad", () => {
+    expect(node.equals(react)).toBe(false);
+    expect(node.equals(null)).toBe(false);
   });
 });

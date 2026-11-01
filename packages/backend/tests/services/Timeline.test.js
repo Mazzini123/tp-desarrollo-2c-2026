@@ -1,5 +1,4 @@
 import { armarServices, datosDePerfil, CODIGOS } from "../fixtures.js";
-import { Logro } from "../../src/domain/Logro.js";
 import { NotFoundError } from "../../src/errors/NotFoundError.js";
 
 // Requerimiento adicional 19: linea de tiempo de un colectivo.
@@ -42,7 +41,7 @@ describe("Timeline de un colectivo", () => {
       dia(3),
     );
     await services.colaboracionService.finalizar(proyecto.id, publica.id, dia(4));
-    proyecto.agregarLogro(new Logro({ titulo: "Primer mapa", descripcion: "...", fecha: dia(5) }));
+    proyecto.agregarLogro({ titulo: "Primer mapa", descripcion: "...", fecha: dia(5) });
     await services.proyectoService.finalizar(proyecto.id, dia(6));
 
     const eventos = await services.colectivoService.timeline(colectivo.id);

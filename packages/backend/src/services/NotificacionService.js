@@ -1,4 +1,4 @@
-import { NotificacionInterna } from "../domain/NotificacionInterna.js";
+import { NotificacionModel } from "../models/NotificacionModel.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
 import { armarPaginado } from "../utils/paginacion.js";
 
@@ -20,7 +20,7 @@ export class NotificacionService {
       return null;
     }
 
-    const notificacion = new NotificacionInterna({
+    const notificacion = new NotificacionModel({
       destinatarioId: colaborador.id,
       tipo,
       asunto,
@@ -81,7 +81,7 @@ export class NotificacionService {
 
     // Una notificacion ajena responde igual que una inexistente: no se confirma
     // que exista algo que no es tuyo.
-    if (!notificacion || notificacion.destinatarioId !== colaboradorId) {
+    if (!notificacion || !notificacion.esPara(colaboradorId)) {
       throw new NotFoundError(`No existe la notificacion "${notificacionId}" para ese colaborador`);
     }
 

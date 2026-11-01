@@ -32,10 +32,10 @@ El backend sigue una arquitectura de capas:
 
 | Capa | Responsabilidad |
 |---|---|
-| `src/domain` | Entidades, value objects y reglas de negocio |
+| `src/domain` | El comportamiento de cada entidad: clases con métodos (sin constructor) |
 | `src/services` | Casos de uso, orquestación entre dominio y persistencia |
 | `src/repositories` | Acceso a datos: MongoDB en la app, en memoria para los tests |
-| `src/models` | Schemas de Mongoose: la forma en que se **guarda** cada documento |
+| `src/models` | Schemas de Mongoose: cómo se **guarda** cada documento, + `loadClass` de su clase de dominio |
 | `src/controllers` | Traducción HTTP ↔ servicios |
 | `src/routes` | Definición de endpoints y middlewares por ruta |
 | `src/middlewares` | Validación, sanitización, límite de solicitudes, 404 y manejo de errores |
@@ -45,35 +45,84 @@ El backend sigue una arquitectura de capas:
 | `src/composicion.js` | Raíz de composición: el único lugar que elige implementaciones |
 
 La regla es que las dependencias apuntan siempre hacia adentro: los controllers
-conocen a los services, los services al dominio y a los repositories, y el dominio
-no conoce a nadie. Esto es lo que nos permite cambiar el almacenamiento en memoria
-por MongoDB en la segunda entrega tocando solo la capa de repositories.
+conocen a los services, los services a los modelos y a los repositories, y el
+dominio no conoce a nadie.
+
+Desde las correcciones de la segunda entrega, el modelo de Mongoose **es** la
+entidad de dominio (`loadClass`, ver Persistencia): los services crean entidades
+con el modelo (`new ColectivoModel(...)`) y los repositories solo consultan y
+guardan. Un documento de Mongoose se puede crear sin conexión a la base, por eso
+los tests con repositorios en memoria siguen sin necesitar Mongo.
 
 Ningún controller ni service importa del contenedor: las dependencias entran
 únicamente por constructor y se arman en `composicion.js`.
 
 ### Persistencia (MongoDB)
 
-Las entidades de dominio siguen siendo clases con métodos. Cada repositorio
-Mongo traduce en los dos sentidos: `aDocumento()` arma lo que se guarda y
-`aDominio()` reconstruye la clase al leer. Los services no saben que existe
-Mongo.
+Mongoose es un **ODM** (*Object Document Mapper*): mapea objetos a documentos
+(no a tablas, como un ORM).
 
-| Colección | Qué guarda | Referencias |
+**Una sola abstracción por entidad.** Cada schema de `src/models` carga su
+clase de `src/domain` con `schema.loadClass(Clase)`:
+
+```
+src/domain/Proyecto.js        →  lo que el proyecto SABE HACER (métodos)
+src/models/ColectivoModel.js  →  cómo se GUARDA (campos, defaults, índices)
+                                 + proyectoSchema.loadClass(Proyecto)
+```
+
+Lo que devuelve Mongoose ya es un `Proyecto` con sus métodos
+(`proyecto.aceptaPostulaciones()`), así que los repositorios no traducen nada:
+buscan con `find`/`findById` y guardan con `save()`. Las clases de dominio no
+tienen constructor (Mongoose no lo llama): los valores por defecto están en el
+schema. Las entidades se crean con el modelo (`new ColaboradorModel({...})`) o
+adentro de su contenedor (`colectivo.agregarProyecto(datos)`).
+
+| Colección | Qué guarda | Relaciones |
 |---|---|---|
-| `habilidads` | El catálogo. `_id` es el código (`desarrollo_node`) | — |
-| `colaboradors` | Colaboradores | `codigosHabilidades` |
-| `colectivos` | El colectivo **con sus proyectos, perfiles, colaboraciones, logros y avances embebidos** | `codigosHabilidades*` en perfiles, `colaboradorId` en colaboraciones |
-| `notificaciones` | Los mensajes internos de cada persona | `destinatarioId` |
+| `habilidads` | El catálogo | `codigo` único (`desarrollo_node`), aparte del `_id` |
+| `colaboradors` | Colaboradores | Copia `{codigo, titulo}` de sus habilidades |
+| `colectivos` | El colectivo **con sus proyectos, perfiles, colaboraciones, logros y avances embebidos** | Copia de habilidades en perfiles; `colaborador` por referencia (ObjectId) |
+| `notificaciones` | Los mensajes internos de cada persona | `destinatarioId` por referencia (ObjectId) |
 
-Colectivo es el agregado raíz: todo lo que le pertenece viaja dentro de su
-documento y se guarda entero. Habilidades y colaboradores son compartidos, así
-que se guardan por referencia y se rehidratan al leer. (Los nombres de colección
-en inglés "mal pluralizados" los pone Mongoose automáticamente.)
+(Los nombres en inglés "mal pluralizados" los pone Mongoose solo.)
 
-Las notificaciones van en su propia colección y no embebidas en el colaborador:
-crecen sin límite y se consultan paginadas, dos cosas que un array embebido hace
-mal.
+Decisiones:
+
+- **`_id` autogenerado.** Ningún schema pisa el `_id`: Mongoose genera un
+  ObjectId para cada documento y subdocumento, y el virtual `id` lo expone
+  como texto. Una clave de dominio va en otro campo con `unique` (el `codigo`
+  de la habilidad), y se busca por ese campo.
+- **Colectivo es el agregado raíz**: todo lo que le pertenece viaja dentro de
+  su documento y se guarda entero.
+- **Colaboradores por referencia + `populate`.** Son compartidos y cambian
+  (nombre, presentación): se guarda el ObjectId y el repositorio los trae con
+  `populate("proyectos.colaboraciones.colaborador")`, una consulta para toda la
+  tanda.
+- **Habilidades desnormalizadas.** Perfiles y personas guardan una copia
+  `{codigo, titulo}` de cada habilidad. El catálogo es precargado y una
+  habilidad no cambia de título, así que no hace falta ir a buscarla cada vez
+  (ni con un join a mano ni con `populate`), y las búsquedas filtran directo
+  por `habilidades.codigo`.
+- **Notificaciones en su propia colección**, no embebidas en el colaborador:
+  crecen sin límite y se consultan paginadas.
+- **Concurrencia optimista** (`__v` + `optimisticConcurrency`) en el colectivo:
+  si dos pedidos lo leen y lo guardan a la vez, el segundo `save()` falla con
+  `VersionError` (409) en vez de pisar al primero.
+- **`toJSON` por schema** (`models/formatoJSON.js`): `id` en vez de `_id`, sin
+  `__v`, sin los medios de contacto de las personas y sin el autor de una
+  contribución anónima.
+- **Campos calculados.** `vacantesLibres` es un getter de `Proyecto`, o sea un
+  *virtual*: se calcula y no se guarda. `porcentajeConcrecion`, `urlSistema` y
+  `urlRepositorio` del proyecto sí se guardan, pero los calcula un hook
+  `pre('validate')` a partir del último avance.
+- **Búsquedas en la base.** Las colaboradoras y los proyectos potenciales se
+  resuelven con el Aggregation Framework (filtrar, ordenar y paginar en Mongo),
+  no trayendo todo a memoria.
+
+Los repositorios en memoria guardan esos mismos documentos de Mongoose y
+llaman a `validate()` antes de guardar: los tests unitarios pasan por los
+schemas igual que la app.
 
 ## Segunda entrega: qué hace la API
 
@@ -164,6 +213,8 @@ throw DomainError     ──▶  err.status                        ──▶  40
 throw BadRequestError ──▶  err.status                        ──▶  400
 throw NotFoundError   ──▶  err.status                        ──▶  404
 throw ConflictError   ──▶  err.status                        ──▶  409
+Mongoose ValidationError / CastError                         ──▶  400
+Mongoose VersionError (otro pedido guardó antes)             ──▶  409
 cualquier otra cosa   ──▶  console.error + genérico          ──▶  500
 ```
 
@@ -238,7 +289,8 @@ arrancar carga el catálogo de habilidades semilla si la colección está vacía
 |---|---|
 | `npm run dev:backend` | Backend con recarga automática (`node --watch`) |
 | `npm run start:backend` | Backend sin recarga (es el que corre dentro del contenedor) |
-| `npm test` | Tests unitarios de dominio y servicios (Jest) |
+| `npm test` | Tests unitarios de dominio, servicios y rutas (Jest, sin base) |
+| `npm run test:integracion` | Tests de integración contra Mongo (ver abajo) |
 | `npm run lint` | ESLint sobre todo el repo |
 | `npm run format` | Prettier sobre todo el repo |
 | `npm run start:frontend` | *Pendiente: se habilita en la 3ra entrega* |
@@ -268,21 +320,30 @@ npm test                                     # todo
 npm test --workspace=backend -- --watch      # en watch
 ```
 
-Por eso las implementaciones en memoria **no se borran** cuando llegue MongoDB:
-son el doble de test que hace posible correr estos tests sin levantar una base.
+Por eso las implementaciones en memoria **no se borran** con MongoDB: son el
+doble de test que hace posible correr estos tests sin levantar una base.
 
-### Probar las estadísticas contra Mongo
+### Tests de integración (contra Mongo)
 
-Los pipelines del Aggregation Framework (`src/repositories/pipelinesDeEstadisticas.js`)
-solo corren en Mongo: el repositorio en memoria calcula lo mismo en JavaScript
-para los tests del service. Para verlos andar de verdad, con Docker levantado:
+`tests/integracion/` usa los repositorios de Mongo de verdad, sobre una base
+aparte del mismo motor: `codigo-a-voluntad-test`. Antes de cada test la base se
+dropea, se recrean los índices y se siembra el catálogo, así que cada test
+arranca de cero. Se niegan a correr si la base no termina en `-test`.
 
 ```bash
-docker compose up -d --build
-# cargar algunos datos (colectivos, proyectos, postulaciones) y después:
-curl http://localhost:8000/estadisticas
-curl http://localhost:8000/colectivos/<id>/estadisticas
+docker compose up -d mongo     # Mongo local en 127.0.0.1:27017
+npm run test:integracion
 ```
+
+| Archivo | Qué prueba |
+|---|---|
+| `persistencia.test.js` | Cada entidad vuelve de la base con **todos** sus campos (Mongoose descarta en silencio lo que no está en el schema) |
+| `busquedas.test.js` | Los pipelines de colaboradoras y proyectos potenciales, contra los métodos de dominio |
+| `estadisticas.test.js` | Los pipelines de estadísticas dan lo mismo que el cálculo en memoria |
+| `concurrencia.test.js` | El `VersionError` cuando dos pedidos guardan el mismo colectivo |
+| `api.test.js` | La app Express entera contra Mongo (test de integración de controladores) |
+
+Otra base: `MONGO_URI_TEST=mongodb://.../otra-base-test npm run test:integracion`.
 
 ## Despliegue
 
@@ -304,12 +365,10 @@ reservarla desde la consola. Para verificar la actual, desde la VM:
 `docker-compose.prod.yml` es un archivo aparte, no un agregado al de desarrollo:
 
 - **Mongo no publica ningún puerto.** La API le habla por la red interna de
-  Compose. Un puerto publicado por Docker se saltea el firewall de Ubuntu, así
-  que la única forma segura es no publicarlo.
+  Compose (el host `mongo`). Ver "Puertos" más abajo.
 - **Mongo tiene usuario y contraseña**, que se leen del archivo `.env` de la raíz
   del repo (no se commitea; la plantilla es `.env.prod.example`).
-- La cache de Mongo está limitada a 256 MB y la de Node a 256 MB, para que
-  entren en 1 GB.
+- **Límites de memoria**, uno por proceso (ver "Memoria" más abajo).
 - La API espera a que Mongo esté sano (healthcheck) antes de arrancar.
 - `restart: unless-stopped`: Docker levanta los contenedores solo después de un
   reinicio de la VM. Reemplaza a PM2, que es lo que mantenía viva la API en la
@@ -356,6 +415,38 @@ API no se puede conectar. En ese caso, hay que borrar el volumen (y con él los
 datos) con `docker compose -f docker-compose.prod.yml down -v`, o cambiar la
 contraseña desde `mongosh`.
 
+### Puertos
+
+Para que un puerto de un contenedor llegue a internet hacen falta tres cosas:
+
+```
+contenedor ──"ports" del compose──▶ VM ──firewall de la VM──▶ Security List de Oracle ──▶ internet
+```
+
+| Pieza | Dónde | Qué hace |
+|---|---|---|
+| `EXPOSE 8000` | `Dockerfile` | Nada en la red: documenta en qué puerto escucha la app |
+| `ports: "8000:8000"` | compose | Enlaza `puerto_de_la_VM:puerto_del_contenedor` (podría ser `"9000:8000"`) |
+| Firewall de Ubuntu | la VM | Filtro de la máquina. Ojo: los puertos que publica Docker se lo saltean |
+| Security List | consola de Oracle → VCN | El firewall de la nube: sin una regla de entrada para el puerto, no llega nada |
+
+El 8000 de la API está abierto en la Security List (por eso se llega desde el
+navegador). Para exponer Mongo habría que publicar el 27017 **y** abrirlo en
+Oracle; como no se publica, aunque se abriera en Oracle por error no habría
+nada escuchando.
+
+### Memoria
+
+Son dos límites distintos, y cada uno limita a un proceso:
+
+| Configuración | Limita a | Qué es |
+|---|---|---|
+| `--wiredTigerCacheSizeGB 0.25` | Mongo | La caché de su motor de almacenamiento. El proceso entero usa algo más |
+| `NODE_OPTIONS=--max-old-space-size=256` | La API | El heap de V8, en MB. Node usa más que eso en total (~350-400 MB) |
+| `mem_limit` | Cada contenedor | Techo duro (cgroups de Linux): si se pasa, el kernel mata el proceso y Docker lo reinicia |
+
+El consumo real se mira con `docker stats --no-stream`.
+
 ### Actualizar después de un cambio
 
 ```bash
@@ -364,6 +455,12 @@ git pull
 docker compose -f docker-compose.prod.yml up -d --build
 docker image prune -f        # borra las imágenes viejas (el disco es chico)
 ```
+
+> **Al desplegar las correcciones de la segunda entrega** (`_id` autogenerado,
+> habilidades copiadas en vez de referenciadas) los datos viejos dejan de ser
+> compatibles. Antes de levantar, hacer un backup (ver abajo) y vaciar la
+> base: `docker compose -f docker-compose.prod.yml down -v`. Al arrancar, la
+> API vuelve a sembrar el catálogo de habilidades.
 
 ### Operación
 
@@ -374,6 +471,29 @@ docker image prune -f        # borra las imágenes viejas (el disco es chico)
 | `docker compose -f docker-compose.prod.yml restart api` | Reiniciar la api |
 | `docker stats --no-stream` | Consumo de memoria de cada contenedor |
 | `docker exec -it cav-mongo mongosh -u <usuario> -p --authenticationDatabase admin codigo-a-voluntad` | Consola de Mongo (pide la contraseña) |
+
+### Dónde están los datos y cómo hacer backup
+
+`mongo-data` es un **volumen con nombre**: Docker lo guarda en su propia
+carpeta de la VM, no en la del proyecto. Es como un pendrive que se monta en
+`/data/db` del contenedor: si el contenedor muere, la carpeta sigue en la VM.
+
+```bash
+docker volume ls                                   # el nombre lleva el prefijo del proyecto
+docker volume inspect <nombre> --format '{{ .Mountpoint }}'
+# → /var/lib/docker/volumes/<proyecto>_mongo-data/_data
+```
+
+Para un backup no se copian esos archivos con Mongo andando: se usa
+`mongodump`, que saca una copia consistente.
+
+```bash
+# Backup (queda en la carpeta actual de la VM)
+docker exec cav-mongo sh -c 'mongodump -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --db codigo-a-voluntad --archive --gzip' > backup-$(date +%F).gz
+
+# Restaurar
+docker exec -i cav-mongo sh -c 'mongorestore -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --archive --gzip' < backup-AAAA-MM-DD.gz
+```
 
 ## Git Flow
 

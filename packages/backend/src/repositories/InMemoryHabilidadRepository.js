@@ -5,6 +5,10 @@ export class InMemoryHabilidadRepository extends InMemoryRepository {
     return entidad.codigo;
   }
 
+  buscarPorCodigo(codigo) {
+    return this.buscarPorId(codigo);
+  }
+
   existeCodigo(codigo) {
     return this.buscarPorId(codigo) !== null;
   }

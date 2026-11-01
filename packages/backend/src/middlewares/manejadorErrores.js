@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { ZodError } from "zod";
 import { AppError } from "../errors/AppError.js";
 
@@ -14,6 +15,30 @@ export function manejadorErrores(err, _req, res, _next) {
 
   if (err instanceof AppError) {
     res.status(err.status).json({ message: err.message });
+    return;
+  }
+
+  // El schema de Mongoose rechazo el documento (un required, un enum...). Zod
+  // y los services validan antes, asi que llegar aca es raro, pero no es un
+  // error del servidor: son datos invalidos.
+  if (err instanceof mongoose.Error.ValidationError) {
+    res.status(400).json({ message: "Datos invalidos", detalle: err.message });
+    return;
+  }
+
+  // Un id con formato invalido que llego hasta una consulta.
+  if (err instanceof mongoose.Error.CastError) {
+    res.status(400).json({ message: `Identificador invalido: "${err.value}"` });
+    return;
+  }
+
+  // Concurrencia optimista (__v): otro pedido modifico el mismo documento
+  // entre que este lo leyo y lo quiso guardar. Guardar igual pisaria ese
+  // cambio, asi que se rechaza y el cliente puede reintentar.
+  if (err instanceof mongoose.Error.VersionError) {
+    res.status(409).json({
+      message: "El recurso fue modificado por otro pedido al mismo tiempo. Reintenta.",
+    });
     return;
   }
 
