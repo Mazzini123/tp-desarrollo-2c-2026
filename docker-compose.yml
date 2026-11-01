@@ -1,11 +1,26 @@
+# Compose de DESARROLLO (en la compu de cada uno). Para la VM de Oracle se usa
+# docker-compose.prod.yml.
+#
+# Sobre "ports": "A:B" enlaza el puerto A de la maquina donde corre Docker con
+# el puerto B del contenedor. NO hace publico nada en internet por si solo:
+# que se llegue desde afuera depende del firewall de esa maquina y, en la
+# nube, de las reglas de red del proveedor (en Oracle, la Security List).
+
 services:
   mongo:
     image: mongo:7
     container_name: cav-mongo
     restart: unless-stopped
     ports:
-      - "27017:27017"
+      # 127.0.0.1: solo se puede conectar desde esta misma maquina (Compass,
+      # mongosh, los tests de integracion). Este Mongo no tiene usuario ni
+      # contraseña: si alguien levantara este compose en un servidor, no queda
+      # escuchando para toda la red.
+      - "127.0.0.1:27017:27017"
     volumes:
+      # Volumen con nombre: Docker lo guarda en su propia carpeta
+      # (/var/lib/docker/volumes/...), no en la del proyecto. Sobrevive a
+      # "docker compose down"; "down -v" lo borra.
       - mongo-data:/data/db
 
   api:
@@ -13,9 +28,12 @@ services:
     container_name: cav-api
     restart: unless-stopped
     ports:
+      # Puerto 8000 de la maquina -> puerto 8000 del contenedor.
       - "8000:8000"
     environment:
       SERVER_PORT: 8000
+      # "mongo" es el nombre del servicio: dentro de la red interna de
+      # compose, cada servicio se encuentra por su nombre.
       MONGO_URI: mongodb://mongo:27017/codigo-a-voluntad
     depends_on:
       - mongo
