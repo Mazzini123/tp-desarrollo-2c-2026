@@ -1,14 +1,14 @@
 @startuml
 
 ' Todas las entidades (Colectivo, Proyecto, Perfil, Colaboracion, Logro,
-' Avance, Colaborador, NotificacionInterna) tienen un id: string (uuid) que
-' se omite para no repetirlo en cada clase. Habilidad se identifica por su
-' codigo. Ubicacion, Compromiso, MedioDeContacto, RedSocial y Valoracion son
+' Avance, Colaborador, NotificacionInterna) tienen un id: el ObjectId que
+' genera Mongo (_id), que se omite para no repetirlo en cada clase. Habilidad
+' tambien lo tiene, pero se busca por su codigo (unico). Ubicacion, Compromiso, MedioDeContacto, RedSocial y Valoracion son
 ' objetos de valor: no tienen id.
 
 legend top left
-  Todas las entidades tienen <b>id: string</b> (uuid), omitido en el diagrama.
-  Habilidad se identifica por su <b>codigo</b>.
+  Todas las entidades tienen <b>id</b> (el ObjectId que genera Mongo), omitido en el diagrama.
+  Habilidad se busca por su <b>codigo</b> (unico).
 endlegend
 
 ' ───────────────────────── Colectivo y Ubicación ─────────────────────────
@@ -297,7 +297,7 @@ MedioDeContacto --> TIPOS_MEDIOS_CONTACTO
 ' ───────────────────────── Notificaciones ─────────────────────────
 
 class NotificacionInterna {
-  -destinatarioId: string
+  -destinatarioId: ObjectId
   -tipo: TIPO_NOTIFICACION
   -asunto: string
   -contenido: string

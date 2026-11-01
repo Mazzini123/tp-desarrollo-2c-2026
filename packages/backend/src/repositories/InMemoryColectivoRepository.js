@@ -3,7 +3,7 @@ import { InMemoryRepository } from "./InMemoryRepository.js";
 export class InMemoryColectivoRepository extends InMemoryRepository {
   buscarProyecto(proyectoId) {
     for (const colectivo of this.listar()) {
-      const proyecto = colectivo.proyectos.find((p) => p.id === proyectoId) ?? null;
+      const proyecto = colectivo.buscarProyecto(proyectoId);
       if (proyecto) {
         return { colectivo, proyecto };
       }
@@ -26,7 +26,7 @@ export class InMemoryColectivoRepository extends InMemoryRepository {
     }
 
     const { colectivo, proyecto } = proyectoConColectivo;
-    const perfil = proyecto.perfiles.find((p) => p.id === perfilId) ?? null;
+    const perfil = proyecto.buscarPerfil(perfilId);
 
     if (!perfil) {
       return null;
@@ -36,7 +36,9 @@ export class InMemoryColectivoRepository extends InMemoryRepository {
   }
 
   listarPaginado(numeroPagina, limitePorPagina, { etiqueta } = {}) {
-    const todos = this.listar().filter((c) => !etiqueta || c.etiquetas.includes(etiqueta));
+    const todos = this.listar().filter(
+      (c) => !etiqueta || c.etiquetas.includes(etiqueta),
+    );
     const inicio = (numeroPagina - 1) * limitePorPagina;
 
     return { items: todos.slice(inicio, inicio + limitePorPagina), total: todos.length };
@@ -48,12 +50,29 @@ export class InMemoryColectivoRepository extends InMemoryRepository {
 
   buscarColectivosDeColaborador(colaboradorId) {
     return this.listar().filter((colectivo) =>
-      colectivo.proyectos.some((p) => p.colaboraciones.some((c) => c.colaborador.id === colaboradorId)),
+      colectivo.proyectos.some((p) =>
+        p.colaboraciones.some((c) => c.esDe(colaboradorId)),
+      ),
     );
   }
 
   listarProyectos() {
     return this.listar().flatMap((colectivo) => colectivo.proyectos);
+  }
+
+  // La version de referencia de la regla: usa los metodos de dominio. La de
+  // Mongo es la misma regla escrita como consulta (y el test de integracion
+  // chequea que coincidan).
+  buscarProyectosCompatibles(colaborador, numeroPagina, limitePorPagina) {
+    const todos = this.listarProyectos().filter(
+      (proyecto) =>
+        proyecto.aceptaPostulaciones() &&
+        proyecto.cumpleAlgunPerfil(colaborador) &&
+        !proyecto.yaColaboraron(colaborador),
+    );
+    const inicio = (numeroPagina - 1) * limitePorPagina;
+
+    return { items: todos.slice(inicio, inicio + limitePorPagina), total: todos.length };
   }
 
   listarProyectosPaginado(numeroPagina, limitePorPagina, { etiqueta } = {}) {

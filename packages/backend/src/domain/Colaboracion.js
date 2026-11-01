@@ -1,34 +1,12 @@
-import { randomUUID } from "node:crypto";
 import { COLABORACION_ESTADO } from "./enums/COLABORACION_ESTADO.js";
 
 // Una colaboracion arranca como postulacion (PENDIENTE) y el proyecto la
 // acepta o la rechaza, a mano o automaticamente segun su modo de aceptacion.
+//
+// Vive embebida en el proyecto: colaboracionSchema (models/ColectivoModel.js)
+// carga esta clase con loadClass. El colaborador se guarda por referencia
+// (ObjectId) y el repositorio lo trae con populate.
 export class Colaboracion {
-  constructor({
-    id = randomUUID(),
-    colaborador,
-    esPublica = true,
-    fecha = new Date(),
-    estado = COLABORACION_ESTADO.PENDIENTE,
-    fechaResolucion = null,
-    fechaFin = null,
-    valoracionDelColectivo = null,
-    valoracionDelColaborador = null,
-  }) {
-    this.id = id;
-    this.colaborador = colaborador;
-    this.fecha = fecha;
-    this.esPublica = esPublica;
-    this.estado = estado;
-    // Cuando se acepto o se rechazo.
-    this.fechaResolucion = fechaResolucion;
-    this.fechaFin = fechaFin;
-    // Requerimiento adicional 39: lo que el colectivo opina de la persona, y
-    // lo que la persona opina del colectivo.
-    this.valoracionDelColectivo = valoracionDelColectivo;
-    this.valoracionDelColaborador = valoracionDelColaborador;
-  }
-
   estaPendiente() {
     return this.estado === COLABORACION_ESTADO.PENDIENTE;
   }
@@ -56,11 +34,15 @@ export class Colaboracion {
     this.fechaFin = fecha;
   }
 
-  // Contribucion anonima: "figurara efectivamente en la plataforma como de
-  // costumbre, pero no indicara quien la realizo" — enunciado, 2da entrega.
-  // El colaborador sigue en el objeto (el sistema lo necesita para evitar que
-  // se anote dos veces); solo se oculta al serializar la respuesta.
-  toJSON() {
-    return { ...this, colaborador: this.esPublica ? this.colaborador : null };
+  // Si la hizo esa persona. Acepta el colaborador o su id, y funciona tanto
+  // con el colaborador poblado (un documento) como sin poblar (un ObjectId).
+  esDe(colaboradorOId) {
+    return idComoTexto(this.colaborador) === idComoTexto(colaboradorOId);
   }
+}
+
+// Un documento y un ObjectId tienen _id (Mongoose se lo agrega al ObjectId);
+// un id que llega de la URL es un string.
+function idComoTexto(valor) {
+  return String(valor?._id ?? valor);
 }

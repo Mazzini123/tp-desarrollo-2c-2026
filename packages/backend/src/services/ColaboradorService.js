@@ -1,5 +1,4 @@
-import { Colaborador } from "../domain/Colaborador.js";
-import { MedioDeContacto } from "../domain/MedioDeContacto.js";
+import { ColaboradorModel } from "../models/ColaboradorModel.js";
 import { construirRedesSociales } from "../domain/RedSocial.js";
 import { esTipoMedioContactoValido } from "../domain/enums/TIPOS_MEDIOS_CONTACTO.js";
 import { DomainError } from "../errors/DomainError.js";
@@ -28,7 +27,7 @@ export class ColaboradorService {
   }) {
     this.validarIdentificacion({ nombreFantasia, nombre, apellido, cuentaGit });
 
-    const colaborador = new Colaborador({
+    const colaborador = new ColaboradorModel({
       nombreFantasia,
       nombre,
       apellido,
@@ -135,8 +134,8 @@ export class ColaboradorService {
     return this.colaboradorRepository.guardar(colaborador);
   }
 
-  // Los medios de contacto se registran pero no se muestran (ver
-  // Colaborador.toJSON): por eso el alta devuelve solo el medio cargado.
+  // Los medios de contacto se registran pero no se muestran (ver el toJSON
+  // de ColaboradorModel): por eso el alta devuelve solo el medio cargado.
   async agregarMedioDeContacto(id, datos) {
     const colaborador = await this.buscarPorId(id);
     const medio = this.construirMedioDeContacto(datos);
@@ -169,7 +168,7 @@ export class ColaboradorService {
     if (typeof valor !== "string" || valor.trim().length === 0) {
       throw new DomainError("El valor del medio de contacto es obligatorio");
     }
-    return new MedioDeContacto({ tipo, valor: valor.trim() });
+    return { tipo, valor: valor.trim() };
   }
 
   validarIdentificacion({ nombreFantasia, nombre, apellido, cuentaGit }) {

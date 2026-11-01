@@ -1,69 +1,34 @@
 import { HabilidadModel } from "../models/HabilidadModel.js";
-import { Habilidad } from "../domain/Habilidad.js";
 
-// --- Traduccion dominio -> documento ---
-function aDocumento(habilidad) {
-  return {
-    _id: habilidad.codigo,
-    titulo: habilidad.titulo,
-    descripcion: habilidad.descripcion,
-    fechaCreacion: habilidad.fechaCreacion,
-    usuario: habilidad.usuario,
-    activo: habilidad.activo,
-  };
-}
-
-// --- Traduccion documento -> dominio ---
-// Reconstruye la CLASE, para que vuelvan los metodos (equals, activar...).
-function aDominio(documento) {
-  if (!documento) {
-    return null;
-  }
-
-  return new Habilidad({
-    titulo: documento.titulo,
-    descripcion: documento.descripcion,
-    fechaCreacion: documento.fechaCreacion,
-    usuario: documento.usuario,
-    activo: documento.activo,
-  });
-}
-
+// Sin traduccion dominio <-> documento: lo que devuelve Mongoose ya es una
+// Habilidad con sus metodos (loadClass), y lo que se guarda es ese mismo
+// documento.
 export class MongoHabilidadRepository {
   async guardar(habilidad) {
-    // upsert: si existe lo actualiza, si no lo crea.
-    await HabilidadModel.updateOne(
-      { _id: habilidad.codigo },
-      { $set: aDocumento(habilidad) },
-      { upsert: true },
-    );
-
-    return habilidad;
+    return habilidad.save();
   }
 
-  async buscarPorId(codigo) {
-    const documento = await HabilidadModel.findById(codigo).lean();
-    return aDominio(documento);
+  async buscarPorCodigo(codigo) {
+    return HabilidadModel.findOne({ codigo });
   }
 
   async listar() {
-    const documentos = await HabilidadModel.find().lean();
-    return documentos.map(aDominio);
+    return HabilidadModel.find().sort({ _id: 1 });
   }
 
   async listarPaginado(numeroPagina, limitePorPagina) {
     const salto = (numeroPagina - 1) * limitePorPagina;
 
     // Las dos consultas son independientes: las lanzamos en paralelo.
-    const [documentos, total] = await Promise.all([
-      HabilidadModel.find().skip(salto).limit(limitePorPagina).lean(),
+    const [items, total] = await Promise.all([
+      HabilidadModel.find().sort({ _id: 1 }).skip(salto).limit(limitePorPagina),
       HabilidadModel.countDocuments(),
     ]);
 
-    return { items: documentos.map(aDominio), total };
+    return { items, total };
   }
 
   async existeCodigo(codigo) {
-    return (await HabilidadModel.exists({ _id: codigo })) !== null;
+    return (await HabilidadModel.exists({ codigo })) !== null;
   }
 }

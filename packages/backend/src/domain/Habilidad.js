@@ -3,27 +3,18 @@ export function normalizarASnakeCase(titulo) {
     .trim()
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // saca acentos
+    .replace(/[̀-ͯ]/g, "") // saca acentos
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
 }
 
+// Lo que una habilidad SABE HACER. Los datos y como se guardan los declara el
+// schema (models/HabilidadModel.js), que carga esta clase con loadClass: un
+// documento de Mongoose ES una Habilidad, con estos metodos.
+//
+// No tiene constructor porque Mongoose no lo llama: los valores por defecto
+// estan en el schema.
 export class Habilidad {
-  constructor({
-    titulo,
-    descripcion = "",
-    fechaCreacion = new Date(),
-    usuario = "admin",
-    activo = true,
-  }) {
-    this.titulo = titulo;
-    this.codigo = normalizarASnakeCase(titulo);
-    this.descripcion = descripcion;
-    this.fechaCreacion = fechaCreacion;
-    this.usuario = usuario;
-    this.activo = activo;
-  }
-
   desactivar() {
     this.activo = false;
   }
@@ -32,7 +23,9 @@ export class Habilidad {
     this.activo = true;
   }
 
+  // Dos habilidades son la misma si tienen el mismo codigo, aunque sean
+  // objetos distintos (la del catalogo y la copia guardada en un perfil).
   equals(otra) {
-    return otra instanceof Habilidad && otra.codigo === this.codigo;
+    return Boolean(otra) && otra.codigo === this.codigo;
   }
 }
