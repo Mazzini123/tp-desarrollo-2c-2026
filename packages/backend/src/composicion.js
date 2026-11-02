@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import twilio from "twilio";
 
 import { InMemoryColectivoRepository } from "./repositories/InMemoryColectivoRepository.js";
 import { InMemoryHabilidadRepository } from "./repositories/InMemoryHabilidadRepository.js";
@@ -12,6 +13,7 @@ import { MongoEstadisticaRepository } from "./repositories/MongoEstadisticaRepos
 import { InMemoryEstadisticaRepository } from "./repositories/InMemoryEstadisticaRepository.js";
 
 import { CanalEmail } from "./canales/CanalEmail.js";
+import { CanalWhatsApp } from "./canales/CanalWhatsApp.js";
 import { CanalSimulado } from "./canales/CanalSimulado.js";
 import { CanalEnMemoria } from "./canales/CanalEnMemoria.js";
 
@@ -81,8 +83,15 @@ export function crearCanales(entorno = process.env) {
         remitente: entorno.SMTP_REMITENTE || "Codigo a Voluntad <no-responder@localhost>",
       })
     : new CanalSimulado("EMAIL");
+      
+    const whatsapp = (entorno.TWILIO_ACCOUNT_SID && entorno.TWILIO_AUTH_TOKEN)
+    ? new CanalWhatsApp({
+        cliente: twilio(entorno.TWILIO_ACCOUNT_SID, entorno.TWILIO_AUTH_TOKEN),
+        remitente: entorno.TWILIO_WHATSAPP_REMITENTE || "whatsapp:+14155238886",
+      })
+    : new CanalSimulado("WHATSAPP");
 
-  return { EMAIL: email, WHATSAPP: new CanalSimulado("WHATSAPP"), SMS: new CanalSimulado("SMS") };
+  return { EMAIL: email, WHATSAPP: whatsapp, SMS: new CanalSimulado("SMS") };
 }
 
 // Dobles de test: guardan lo que "envian" para poder revisarlo.
