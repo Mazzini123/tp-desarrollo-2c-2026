@@ -67,6 +67,11 @@ services:
       # Opcionales: sin SMTP_URL los emails se simulan (ver .env.prod.example).
       SMTP_URL: ${SMTP_URL:-}
       SMTP_REMITENTE: ${SMTP_REMITENTE:-}
+
+      # Twilio
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      
     # Techo del contenedor de la api (cgroups). Por encima del heap: deja
     # lugar para lo que Node usa fuera de el.
     mem_limit: 512m
