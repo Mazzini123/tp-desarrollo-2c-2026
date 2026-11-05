@@ -1,7 +1,9 @@
 import { DomainError } from "../errors/DomainError.js";
 import { ConflictError } from "../errors/ConflictError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
+import { ForbiddenError } from "../errors/ForbiddenError.js";
 import { AUTOR_VALORACION } from "../domain/enums/AUTOR_VALORACION.js";
+import { TIPO_NOTIFICACION } from "../domain/enums/TIPO_NOTIFICACION.js";
 import { aplicarModoDeAceptacion, notificarResoluciones } from "./reglasDePostulacion.js";
 
 export class ColaboracionService {
@@ -19,14 +21,14 @@ export class ColaboracionService {
     this.notificacionService = notificacionService;
   }
 
-  // Anotarse a un proyecto es postularse. Segun el modo de aceptacion del
-  // proyecto, la postulacion queda pendiente o se resuelve en el momento.
-  async registrar({ proyectoId, colaboradorId, esPublica = true }, ahora = new Date()) {
-    const { colectivo, proyecto } = await this.proyectoService.buscarProyectoConColectivo(proyectoId);
+  async registrar(
+    { proyectoId, perfilId, colaboradorId, esPublica = true },
+    ahora = new Date(),
+  ) {
+    const { colectivo, proyecto } =
+      await this.proyectoService.buscarProyectoConColectivo(proyectoId);
     const colaborador = await this.colaboradorService.buscarPorId(colaboradorId);
 
-    // Si la fecha de cierre ya paso pero el job todavia no lo cerro, se
-    // cierra ahora: nadie puede postularse despues de la fecha limite.
     if (proyecto.cierreVencido(ahora)) {
       await this.proyectoService.cerrar(colectivo, [proyecto], ahora);
     }
@@ -35,25 +37,37 @@ export class ColaboracionService {
       throw new ConflictError("No se puede anotar a un proyecto que ya está finalizado");
     }
 
-    if (proyecto.cupoCompleto()) {
-      throw new ConflictError("El proyecto ya completo sus vacantes: la postulacion esta cerrada");
+    const perfil = proyecto.buscarPerfil(perfilId);
+    if (!perfil) {
+      throw new NotFoundError(
+        `No existe el perfil "${perfilId}" en el proyecto "${proyectoId}"`,
+      );
     }
 
-    if (!proyecto.cumpleAlgunPerfil(colaborador)) {
-      throw new DomainError("El colaborador debe cumplir todas las habilidades requeridas de al menos un perfil");
+    if (!perfil.aceptaPostulaciones(ahora)) {
+      throw new ConflictError("La búsqueda de este perfil está cerrada");
+    }
+
+    if (!perfil.cumpleHabilidadesRequeridas(colaborador)) {
+      throw new DomainError(
+        "El colaborador debe cumplir todas las habilidades requeridas del perfil",
+      );
     }
 
     if (this.yaEstaAnotado(colaborador, proyecto)) {
       throw new ConflictError("El colaborador ya está anotado en este proyecto");
     }
 
-    const colaboracion = proyecto.agregarColaboracion({ colaborador, esPublica, fecha: ahora });
+    const colaboracion = proyecto.agregarColaboracion({
+      colaborador,
+      perfil: perfil.id,
+      esPublica,
+      fecha: ahora,
+    });
 
-    const cambios = aplicarModoDeAceptacion(proyecto, ahora);
+    const cambios = aplicarModoDeAceptacion(proyecto, perfil, ahora);
     await this.colectivoRepository.guardar(colectivo);
 
-    // A quien se acaba de postular no se le avisa: la respuesta ya le dice
-    // como quedo. Si su postulacion lleno el cupo, al resto si.
     await notificarResoluciones(this.notificacionService, proyecto, {
       aceptadas: cambios.aceptadas.filter((c) => c !== colaboracion),
       rechazadas: cambios.rechazadas.filter((c) => c !== colaboracion),
@@ -67,7 +81,8 @@ export class ColaboracionService {
   }
 
   async buscarColaboracion(proyectoId, colaboracionId) {
-    const { colectivo, proyecto } = await this.proyectoService.buscarProyectoConColectivo(proyectoId);
+    const { colectivo, proyecto } =
+      await this.proyectoService.buscarProyectoConColectivo(proyectoId);
     const colaboracion = proyecto.buscarColaboracion(colaboracionId);
 
     if (!colaboracion) {
@@ -79,7 +94,6 @@ export class ColaboracionService {
     return { colectivo, proyecto, colaboracion };
   }
 
-  // Aceptacion manual: tiene "los mismos efectos" que la automatica.
   async aceptar(proyectoId, colaboracionId, ahora = new Date()) {
     const { colectivo, proyecto, colaboracion } = await this.buscarColaboracion(
       proyectoId,
@@ -92,14 +106,15 @@ export class ColaboracionService {
 
     this.verificarPendiente(proyecto, colaboracion, "aceptar");
 
-    if (proyecto.cupoCompleto()) {
-      throw new ConflictError("El proyecto ya completo sus vacantes");
+    const perfil = proyecto.buscarPerfil(colaboracion.perfil);
+
+    if (perfil.limiteAlcanzado(proyecto.cantidadAceptadas(perfil))) {
+      throw new ConflictError("El perfil ya alcanzó su límite de colaboraciones");
     }
 
     colaboracion.aceptar(ahora);
-    // Si esta aceptacion lleno el cupo, en los modos automaticos se rechazan
-    // las pendientes que quedaban.
-    const cambios = aplicarModoDeAceptacion(proyecto, ahora);
+
+    const cambios = aplicarModoDeAceptacion(proyecto, perfil, ahora);
     await this.colectivoRepository.guardar(colectivo);
 
     await notificarResoluciones(this.notificacionService, proyecto, {
@@ -129,8 +144,6 @@ export class ColaboracionService {
     return colaboracion;
   }
 
-  // La persona deja el proyecto (o termina su parte) antes de que el proyecto
-  // se cierre. Desde ahi, las dos partes pueden valorarse.
   async finalizar(proyectoId, colaboracionId, ahora = new Date()) {
     const { colectivo, proyecto, colaboracion } = await this.buscarColaboracion(
       proyectoId,
@@ -152,11 +165,65 @@ export class ColaboracionService {
     return colaboracion;
   }
 
+  async desvincular(proyectoId, colaboracionId, ahora = new Date()) {
+    const { colectivo, colaboracion } = await this.buscarColaboracion(
+      proyectoId,
+      colaboracionId,
+    );
+
+    if (!colaboracion.estaAceptada()) {
+      throw new ConflictError(
+        `Solo se puede desvincular una colaboracion aceptada (esta esta ${colaboracion.estado})`,
+      );
+    }
+
+    colaboracion.desvincular(ahora);
+    await this.colectivoRepository.guardar(colectivo);
+    await this.notificarDesvinculacion(proyectoId, colaboracion);
+
+    return colaboracion;
+  }
+
+  async datosDeContacto(proyectoId, colaboradorId) {
+    const { proyecto } =
+      await this.proyectoService.buscarProyectoConColectivo(proyectoId);
+    const colaborador = await this.colaboradorService.buscarPorId(colaboradorId);
+
+    if (!proyecto.puedeVerContactoDe(colaborador)) {
+      throw new ForbiddenError(
+        "Los datos de contacto solo se comparten con una postulacion aceptada",
+      );
+    }
+
+    return colaborador.mediosDeContacto.map(({ tipo, valor }) => ({ tipo, valor }));
+  }
+
+  async notificarDesvinculacion(proyectoId, colaboracion) {
+    try {
+      await this.notificacionService.notificar(colaboracion.colaborador, {
+        tipo: TIPO_NOTIFICACION.DESVINCULACION,
+        asunto: "Ya no formás parte de un proyecto",
+        contenido: "Tu colaboración en el proyecto terminó por una desvinculación.",
+        referencias: { proyectoId, colaboracionId: colaboracion.id },
+      });
+    } catch (error) {
+      console.error("No se pudo notificar la desvinculacion:", error.message);
+    }
+  }
+
   // Requerimiento adicional 39: "Al finalizar una colaboracion, tanto el
   // colectivo como la colaboradora pueden calificarse mutuamente (puntaje +
   // comentario breve)". Cada parte, una sola vez.
-  async valorar(proyectoId, colaboracionId, { autor, puntaje, comentario }, ahora = new Date()) {
-    const { colectivo, colaboracion } = await this.buscarColaboracion(proyectoId, colaboracionId);
+  async valorar(
+    proyectoId,
+    colaboracionId,
+    { autor, puntaje, comentario },
+    ahora = new Date(),
+  ) {
+    const { colectivo, colaboracion } = await this.buscarColaboracion(
+      proyectoId,
+      colaboracionId,
+    );
 
     if (!colaboracion.estaFinalizada()) {
       throw new ConflictError("Solo se puede valorar una colaboracion finalizada");
@@ -167,7 +234,9 @@ export class ColaboracionService {
     }
 
     const campo =
-      autor === AUTOR_VALORACION.COLECTIVO ? "valoracionDelColectivo" : "valoracionDelColaborador";
+      autor === AUTOR_VALORACION.COLECTIVO
+        ? "valoracionDelColectivo"
+        : "valoracionDelColaborador";
 
     if (colaboracion[campo] !== null) {
       throw new ConflictError("Esa parte ya valoro esta colaboracion");
@@ -179,25 +248,18 @@ export class ColaboracionService {
     return colaboracion[campo];
   }
 
-  // "...visible en el historial publico de ambos".
-  // Lo que los colectivos opinaron de la persona. Las colaboraciones anonimas
-  // no aparecen: mostrarlas diria justamente quien las hizo.
   async listarValoracionesDeColaborador(colaboradorId) {
     await this.colaboradorService.buscarPorId(colaboradorId);
-    const colectivos = await this.colectivoRepository.buscarColectivosDeColaborador(colaboradorId);
+    const colectivos =
+      await this.colectivoRepository.buscarColectivosDeColaborador(colaboradorId);
 
     const valoraciones = colectivos.flatMap((colectivo) =>
       colectivo.proyectos.flatMap((proyecto) =>
         proyecto.colaboraciones
-          .filter(
-            (c) =>
-              c.esDe(colaboradorId) && c.esPublica && c.valoracionDelColectivo,
-          )
+          .filter((c) => c.esDe(colaboradorId) && c.esPublica && c.valoracionDelColectivo)
           .map((c) => ({
             colectivo: { id: colectivo.id, nombre: colectivo.nombre },
             proyecto: { id: proyecto.id, titulo: proyecto.titulo },
-            // toObject: un subdocumento esparcido con ... traeria los
-            // internos de Mongoose, no solo puntaje, comentario y fecha.
             ...c.valoracionDelColectivo.toObject(),
           })),
       ),
@@ -206,8 +268,6 @@ export class ColaboracionService {
     return resumirValoraciones(valoraciones);
   }
 
-  // Lo que las personas opinaron del colectivo. Si la colaboracion fue
-  // anonima, la opinion aparece sin autor.
   async listarValoracionesDeColectivo(colectivoId) {
     const colectivo = await this.colectivoService.buscarPorId(colectivoId);
 
@@ -226,7 +286,9 @@ export class ColaboracionService {
 
   verificarPendiente(proyecto, colaboracion, accion) {
     if (!proyecto.estaAbierto()) {
-      throw new ConflictError(`No se puede ${accion} una postulacion de un proyecto finalizado`);
+      throw new ConflictError(
+        `No se puede ${accion} una postulacion de un proyecto finalizado`,
+      );
     }
     if (!colaboracion.estaPendiente()) {
       throw new ConflictError(
@@ -239,12 +301,10 @@ export class ColaboracionService {
     return (await this.proyectoService.buscarPorId(proyectoId)).colaboraciones;
   }
 
-  // Es el historial publico de la persona: las contribuciones anonimas no
-  // aparecen, porque listarlas aca diria justamente quien las hizo.
   async listarPorColaborador(colaboradorId) {
     const colaborador = await this.colaboradorService.buscarPorId(colaboradorId);
-    // Solo los colectivos donde participo, no toda la base.
-    const colectivos = await this.colectivoRepository.buscarColectivosDeColaborador(colaboradorId);
+    const colectivos =
+      await this.colectivoRepository.buscarColectivosDeColaborador(colaboradorId);
     const proyectos = colectivos.flatMap((colectivo) => colectivo.proyectos);
 
     return proyectos.flatMap((proyecto) =>
@@ -261,7 +321,6 @@ function resumirValoraciones(valoraciones) {
 
   return {
     cantidad,
-    // Un decimal; null si todavia no hay ninguna.
     promedio: cantidad === 0 ? null : Math.round((suma / cantidad) * 10) / 10,
     valoraciones: valoraciones.sort((a, b) => b.fecha - a.fecha),
   };

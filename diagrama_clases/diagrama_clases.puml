@@ -1,16 +1,5 @@
 @startuml
 
-' Todas las entidades (Colectivo, Proyecto, Perfil, Colaboracion, Logro,
-' Avance, Colaborador, NotificacionInterna) tienen un id: el ObjectId que
-' genera Mongo (_id), que se omite para no repetirlo en cada clase. Habilidad
-' tambien lo tiene, pero se busca por su codigo (unico). Ubicacion, Compromiso, MedioDeContacto, RedSocial y Valoracion son
-' objetos de valor: no tienen id.
-
-legend top left
-  Todas las entidades tienen <b>id</b> (el ObjectId que genera Mongo), omitido en el diagrama.
-  Habilidad se busca por su <b>codigo</b> (unico).
-endlegend
-
 ' ───────────────────────── Colectivo y Ubicación ─────────────────────────
 
 class Colectivo {
@@ -57,7 +46,7 @@ class RedSocial {
 }
 
 Colectivo --> TIPO_COLECTIVO
-Colectivo *-- "*" Proyecto
+Colectivo --> "*" Proyecto
 Colectivo --> "0..1" Ubicacion
 Colectivo --> "*" RedSocial
 Colectivo --> "*" MedioDeContacto
@@ -77,8 +66,6 @@ class Proyecto {
   -logros: Array<Logro>
   -avances: Array<Avance>
   -etiquetas: Array<string>
-  -modoAceptacion: MODO_ACEPTACION
-  -limiteVacantes: number
   -fechaCreacion: Date
   -fechaFinalizacion: Date
   -fechaCierre: Date
@@ -95,24 +82,17 @@ class Proyecto {
   +quitarColaboracion(colaboracion: Colaboracion): void
   +buscarColaboracion(colaboracionId: string): Colaboracion
   +colaboracionesPendientes(): Array<Colaboracion>
-  +cantidadAceptadas(): number
-  +tieneLimiteDeVacantes(): boolean
-  +cupoCompleto(): boolean
+  +cantidadAceptadas(perfil: Perfil): number
   +aceptaPostulaciones(): boolean
   +agregarLogro(logro: Logro): void
   +quitarLogro(logro: Logro): void
   +agregarAvance(avance: Avance): void
+  +puedeVerContactoDe(colaborador: Colaborador): boolean
 }
 
 enum PROYECTO_ESTADO {
   ABIERTO
   FINALIZADO
-}
-
-enum MODO_ACEPTACION {
-  REVISION_MANUAL
-  TODO_SUMA
-  HASTA_LLENAR_VACANTES
 }
 
 class Logro {
@@ -128,29 +108,26 @@ class Avance {
   -fecha: Date
 }
 
-note right of Avance
-  Historial del porcentaje de concreción
-  y los enlaces: solo se agregan, nunca
-  se editan ni se borran. El Proyecto
-  guarda los valores del último.
-end note
-
 Proyecto --> PROYECTO_ESTADO
-Proyecto --> MODO_ACEPTACION
-Proyecto *-- "1..*" Perfil
-Proyecto *-- "*" Colaboracion
-Proyecto *-- "*" Logro
-Proyecto *-- "*" Avance
+Proyecto --> "1..*" Perfil
+Proyecto --> "*" Colaboracion
+Proyecto --> "*" Logro
+Proyecto --> "*" Avance
 
 ' ───────────────────────── Perfil y Compromiso ─────────────────────────
 
 class Perfil {
+  -busquedaAbierta: boolean
   -descripcion: string
+  -fechaCierreBusqueda: Date
   -habilidadesRequeridas: Array<Habilidad>
   -habilidadesOpcionales: Array<Habilidad>
   -compromiso: Compromiso
+  -limiteColaboraciones: number
   -modalidadColaboracion: MODALIDAD_COLABORACION
+  -modoAceptacion: MODO_ACEPTACION
 
+  +aceptaPostulaciones(ahora: Date): boolean
   +tieneHabilidadRequerida(habilidad: Habilidad): boolean
   +tieneHabilidadOpcional(habilidad: Habilidad): boolean
   +agregarHabilidadRequerida(habilidad: Habilidad): void
@@ -159,6 +136,8 @@ class Perfil {
   +quitarHabilidadOpcional(habilidad: Habilidad): void
   +cumpleHabilidadesRequeridas(colaborador: Colaborador): boolean
   +cumpleAlgunaHabilidadOpcional(colaborador: Colaborador): boolean
+  +tieneLimite(): boolean
+  +limiteAlcanzado(cantidadAceptadas: number): boolean
 }
 
 class Compromiso {
@@ -178,6 +157,12 @@ enum MODALIDAD_COLABORACION {
   EXISTE_POSIBILIDAD_DE_CONTRATACION
 }
 
+enum MODO_ACEPTACION {
+  REVISION_MANUAL
+  TODO_SUMA
+  HASTA_LLENAR_VACANTES
+}
+
 class Habilidad {
   -titulo: string
   -codigo: string
@@ -193,6 +178,7 @@ class Habilidad {
 
 Perfil --> Compromiso
 Perfil --> MODALIDAD_COLABORACION
+Perfil --> MODO_ACEPTACION
 Perfil --> "1..*" Habilidad : requeridas
 Perfil --> "*" Habilidad : opcionales
 Compromiso --> PERIODO_COMPROMISO
@@ -201,6 +187,7 @@ Compromiso --> PERIODO_COMPROMISO
 
 class Colaboracion {
   -colaborador: Colaborador
+  -perfil: Perfil
   -esPublica: boolean
   -fecha: Date
   -estado: COLABORACION_ESTADO
@@ -212,23 +199,20 @@ class Colaboracion {
   +estaPendiente(): boolean
   +estaAceptada(): boolean
   +estaFinalizada(): boolean
+  +estaDesvinculada(): boolean
   +aceptar(fecha: Date): void
   +rechazar(fecha: Date): void
   +finalizar(fecha: Date): void
+  +desvincular(fecha: Date): void
   +toJSON(): object
 }
-
-note right of Colaboracion
-  Si esPublica es false, toJSON()
-  oculta al colaborador
-  (contribución anónima).
-end note
 
 enum COLABORACION_ESTADO {
   PENDIENTE
   ACEPTADA
   RECHAZADA
   FINALIZADA
+  DESVINCULADA
 }
 
 class Valoracion {
@@ -238,6 +222,7 @@ class Valoracion {
 }
 
 Colaboracion --> Colaborador
+Colaboracion --> Perfil
 Colaboracion --> COLABORACION_ESTADO
 Colaboracion --> "0..1" Valoracion : delColectivo
 Colaboracion --> "0..1" Valoracion : delColaborador
@@ -270,12 +255,6 @@ class Colaborador {
   +toJSON(): object
 }
 
-note right of Colaborador
-  toJSON() nunca incluye
-  los medios de contacto:
-  se registran pero no se muestran.
-end note
-
 class MedioDeContacto {
   -tipo: TIPOS_MEDIOS_CONTACTO
   -valor: string
@@ -297,7 +276,7 @@ MedioDeContacto --> TIPOS_MEDIOS_CONTACTO
 ' ───────────────────────── Notificaciones ─────────────────────────
 
 class NotificacionInterna {
-  -destinatarioId: ObjectId
+  -destinatario: Usuario
   -tipo: TIPO_NOTIFICACION
   -asunto: string
   -contenido: string
@@ -315,9 +294,34 @@ enum TIPO_NOTIFICACION {
   POSTULACION_ACEPTADA
   POSTULACION_RECHAZADA
   COLABORACION_FINALIZADA
+  NUEVA_POSTULACION
+  DESVINCULACION
 }
 
 NotificacionInterna --> TIPO_NOTIFICACION
-NotificacionInterna ..> Colaborador : destinatarioId
+NotificacionInterna --> Usuario
+
+' ───────────────────────── Usuarios ─────────────────────────
+
+class Usuario {
+  -email: string
+  -passwordHash: string
+  -rol: ROL
+  -colectivo: Colectivo
+  -colaborador: Colaborador
+  -fechaAlta: Date
+
+  +esColectivo(): boolean
+  +esColaborador(): boolean
+}
+
+enum ROL {
+  COLECTIVO
+  COLABORADOR
+}
+
+Usuario --> ROL
+Usuario --> "0..1" Colectivo
+Usuario --> "0..1" Colaborador
 
 @enduml

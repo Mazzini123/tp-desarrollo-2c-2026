@@ -1,31 +1,28 @@
 import { DomainError } from "../errors/DomainError.js";
-import { MODO_ACEPTACION, esModoAceptacionValido } from "../domain/enums/MODO_ACEPTACION.js";
+import {
+  MODO_ACEPTACION,
+  esModoAceptacionValido,
+} from "../domain/enums/MODO_ACEPTACION.js";
 import { TIPO_NOTIFICACION } from "../domain/enums/TIPO_NOTIFICACION.js";
 
-// Reglas de postulacion que usan varios services (ColaboracionService y
-// ProyectoService). Viven aca, como funciones, para que ningun service tenga
-// que depender del otro: ProyectoService no puede conocer a
-// ColaboracionService porque ColaboracionService ya depende de el.
-
 // Requerimiento adicional 8. Resuelve las postulaciones pendientes segun el
-// modo del proyecto y devuelve que cambio, para poder avisarle a cada persona.
-export function aplicarModoDeAceptacion(proyecto, fecha) {
+// modo del perfil y devuelve que cambio, para poder avisarle a cada persona.
+export function aplicarModoDeAceptacion(proyecto, perfil, fecha) {
   const aceptadas = [];
   const rechazadas = [];
-  const pendientes = proyecto.colaboracionesPendientes();
+  const pendientes = pendientesDelPerfil(proyecto, perfil);
 
-  if (proyecto.modoAceptacion === MODO_ACEPTACION.TODO_SUMA) {
+  if (perfil.modoAceptacion === MODO_ACEPTACION.TODO_SUMA) {
     pendientes.forEach((c) => {
       c.aceptar(fecha);
       aceptadas.push(c);
     });
   }
 
-  if (proyecto.modoAceptacion === MODO_ACEPTACION.HASTA_LLENAR_VACANTES) {
-    const vacantesLibres = proyecto.limiteVacantes - proyecto.cantidadAceptadas();
+  if (perfil.modoAceptacion === MODO_ACEPTACION.HASTA_LLENAR_VACANTES) {
+    const vacantesLibres =
+      perfil.limiteColaboraciones - proyecto.cantidadAceptadas(perfil);
 
-    // "Una vez que se alcanza el limite, se aceptan todas": mientras no se
-    // junten suficientes postulaciones, quedan pendientes.
     if (pendientes.length >= vacantesLibres) {
       pendientes.slice(0, vacantesLibres).forEach((c) => {
         c.aceptar(fecha);
@@ -34,13 +31,25 @@ export function aplicarModoDeAceptacion(proyecto, fecha) {
     }
   }
 
-  // "...se cierra la postulacion y se rechazan las demas". En revision manual
-  // no: "no hay rechazos ni aceptaciones automaticas".
-  if (proyecto.cupoCompleto() && proyecto.modoAceptacion !== MODO_ACEPTACION.REVISION_MANUAL) {
-    rechazadas.push(...rechazarPendientes(proyecto, fecha));
+  const limiteAlcanzado = perfil.limiteAlcanzado(proyecto.cantidadAceptadas(perfil));
+  if (limiteAlcanzado && perfil.modoAceptacion !== MODO_ACEPTACION.REVISION_MANUAL) {
+    perfil.busquedaAbierta = false;
+    rechazadas.push(...rechazarPendientesDelPerfil(proyecto, perfil, fecha));
   }
 
   return { aceptadas, rechazadas };
+}
+
+function pendientesDelPerfil(proyecto, perfil) {
+  return proyecto
+    .colaboracionesPendientes()
+    .filter((c) => String(c.perfil) === String(perfil.id));
+}
+
+function rechazarPendientesDelPerfil(proyecto, perfil, fecha) {
+  const pendientes = pendientesDelPerfil(proyecto, perfil);
+  pendientes.forEach((c) => c.rechazar(fecha));
+  return pendientes;
 }
 
 // Requerimiento adicional 10: "El cierre automatico tendra las mismas
@@ -65,8 +74,11 @@ export function rechazarPendientes(proyecto, fecha) {
   return pendientes;
 }
 
-// Las combinaciones que el enunciado permite.
-export function validarModoDeAceptacion(modoAceptacion, limiteVacantes, aceptadasActuales = 0) {
+export function validarModoDeAceptacion(
+  modoAceptacion,
+  limiteVacantes,
+  aceptadasActuales = 0,
+) {
   if (!esModoAceptacionValido(modoAceptacion)) {
     throw new DomainError(`Modo de aceptacion invalido: ${modoAceptacion}`);
   }
@@ -80,7 +92,9 @@ export function validarModoDeAceptacion(modoAceptacion, limiteVacantes, aceptada
     throw new DomainError("TODO_SUMA solo se puede usar si no hay limite de vacantes");
   }
   if (modoAceptacion === MODO_ACEPTACION.HASTA_LLENAR_VACANTES && !hayLimite) {
-    throw new DomainError("HASTA_LLENAR_VACANTES solo se puede usar si hay limite de vacantes");
+    throw new DomainError(
+      "HASTA_LLENAR_VACANTES solo se puede usar si hay limite de vacantes",
+    );
   }
   if (hayLimite && limiteVacantes < aceptadasActuales) {
     throw new DomainError(
@@ -89,8 +103,6 @@ export function validarModoDeAceptacion(modoAceptacion, limiteVacantes, aceptada
   }
 }
 
-// Le avisa a cada persona como se resolvio su postulacion. Nunca hace fallar
-// la operacion que la resolvio: un aviso que no sale no deshace la aceptacion.
 export async function notificarResoluciones(
   notificacionService,
   proyecto,
@@ -98,8 +110,16 @@ export async function notificarResoluciones(
 ) {
   const titulo = `"${proyecto.titulo}"`;
   const avisos = [
-    ...aceptadas.map((c) => [c, TIPO_NOTIFICACION.POSTULACION_ACEPTADA, `Tu postulacion a ${titulo} fue aceptada`]),
-    ...rechazadas.map((c) => [c, TIPO_NOTIFICACION.POSTULACION_RECHAZADA, `Tu postulacion a ${titulo} fue rechazada`]),
+    ...aceptadas.map((c) => [
+      c,
+      TIPO_NOTIFICACION.POSTULACION_ACEPTADA,
+      `Tu postulacion a ${titulo} fue aceptada`,
+    ]),
+    ...rechazadas.map((c) => [
+      c,
+      TIPO_NOTIFICACION.POSTULACION_RECHAZADA,
+      `Tu postulacion a ${titulo} fue rechazada`,
+    ]),
     ...finalizadas.map((c) => [
       c,
       TIPO_NOTIFICACION.COLABORACION_FINALIZADA,
@@ -116,7 +136,10 @@ export async function notificarResoluciones(
         referencias: { proyectoId: proyecto.id, colaboracionId: colaboracion.id },
       });
     } catch (error) {
-      console.error("No se pudo notificar la resolucion de una postulacion:", error.message);
+      console.error(
+        "No se pudo notificar la resolucion de una postulacion:",
+        error.message,
+      );
     }
   }
 }

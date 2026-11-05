@@ -1,7 +1,15 @@
 import { z } from "zod";
 import { PERIODO_COMPROMISO } from "../domain/enums/PERIODO_COMPROMISO.js";
 import { MODALIDAD_COLABORACION } from "../domain/enums/MODALIDAD_COLABORACION.js";
+import { MODO_ACEPTACION } from "../domain/enums/MODO_ACEPTACION.js";
 import { tieneAlgunCampoDefinido } from "../utils/validaciones.js";
+
+const modoAceptacionSchema = z.enum(Object.values(MODO_ACEPTACION));
+const limiteColaboracionesSchema = z.int().positive().nullable();
+const fechaCierreBusquedaSchema = z
+  .union([z.iso.datetime({ offset: true }), z.iso.date()])
+  .transform((texto) => new Date(texto))
+  .nullable();
 
 export const compromisoSchema = z
   .object({
@@ -10,9 +18,7 @@ export const compromisoSchema = z
   })
   .strict();
 
-export const modalidadColaboracionSchema = z.enum(
-  Object.values(MODALIDAD_COLABORACION),
-);
+export const modalidadColaboracionSchema = z.enum(Object.values(MODALIDAD_COLABORACION));
 
 export const crearPerfilSchema = z
   .object({
@@ -23,6 +29,10 @@ export const crearPerfilSchema = z
     modalidadColaboracion: modalidadColaboracionSchema.default(
       MODALIDAD_COLABORACION.GRATUITA,
     ),
+    busquedaAbierta: z.boolean().default(true),
+    fechaCierreBusqueda: fechaCierreBusquedaSchema.optional(),
+    limiteColaboraciones: limiteColaboracionesSchema.optional(),
+    modoAceptacion: modoAceptacionSchema.optional(),
   })
   .strict();
 
@@ -31,6 +41,10 @@ export const actualizarPerfilSchema = z
     descripcion: z.string().trim().min(1).optional(),
     compromiso: compromisoSchema.optional(),
     modalidadColaboracion: modalidadColaboracionSchema.optional(),
+    busquedaAbierta: z.boolean().optional(),
+    fechaCierreBusqueda: fechaCierreBusquedaSchema.optional(),
+    limiteColaboraciones: limiteColaboracionesSchema.optional(),
+    modoAceptacion: modoAceptacionSchema.optional(),
   })
   .strict()
   .refine(tieneAlgunCampoDefinido, {

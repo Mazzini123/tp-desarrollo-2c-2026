@@ -10,19 +10,39 @@ export class PostulacionController extends BaseController {
   aceptar = async (req, res) => {
     res
       .status(200)
-      .json(await this.colaboracionService.aceptar(req.params.id, req.params.colaboracionId));
+      .json(
+        await this.colaboracionService.aceptar(req.params.id, req.params.colaboracionId),
+      );
   };
 
   rechazar = async (req, res) => {
     res
       .status(200)
-      .json(await this.colaboracionService.rechazar(req.params.id, req.params.colaboracionId));
+      .json(
+        await this.colaboracionService.rechazar(req.params.id, req.params.colaboracionId),
+      );
+  };
+
+  desvincular = async (req, res) => {
+    res
+      .status(200)
+      .json(
+        await this.colaboracionService.desvincular(
+          req.params.id,
+          req.params.colaboracionId,
+        ),
+      );
   };
 
   finalizar = async (req, res) => {
     res
       .status(200)
-      .json(await this.colaboracionService.finalizar(req.params.id, req.params.colaboracionId));
+      .json(
+        await this.colaboracionService.finalizar(
+          req.params.id,
+          req.params.colaboracionId,
+        ),
+      );
   };
 
   valorar = async (req, res) => {

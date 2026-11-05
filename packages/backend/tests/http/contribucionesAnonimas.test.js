@@ -4,6 +4,7 @@ import { datosDePerfil, CODIGOS } from "../fixtures.js";
 describe("HTTP · contribuciones anonimas", () => {
   let api;
   let proyectoId;
+  let perfilId;
   let colaboradorId;
 
   beforeEach(async () => {
@@ -17,6 +18,7 @@ describe("HTTP · contribuciones anonimas", () => {
       .send({ titulo: "Sitio", descripcion: "...", perfiles: [datosDePerfil()] })
       .expect(201);
     proyectoId = proyecto.body.id;
+    perfilId = proyecto.body.perfiles[0].id;
     const colaborador = await api
       .post("/colaboradores")
       .send({ cuentaGit: "ada", codigosHabilidades: [CODIGOS.node] })
@@ -27,7 +29,7 @@ describe("HTTP · contribuciones anonimas", () => {
   test("una contribucion anonima figura en el proyecto sin decir quien", async () => {
     const alta = await api
       .post(`/proyectos/${proyectoId}/colaboraciones`)
-      .send({ colaboradorId, esPublica: false })
+      .send({ colaboradorId, perfilId, esPublica: false })
       .expect(201);
     expect(alta.body.colaborador).toBeNull();
 
@@ -42,17 +44,19 @@ describe("HTTP · contribuciones anonimas", () => {
   test("tampoco aparece en el historial publico de la persona", async () => {
     await api
       .post(`/proyectos/${proyectoId}/colaboraciones`)
-      .send({ colaboradorId, esPublica: false })
+      .send({ colaboradorId, perfilId, esPublica: false })
       .expect(201);
 
-    const historial = await api.get(`/colaboradores/${colaboradorId}/colaboraciones`).expect(200);
+    const historial = await api
+      .get(`/colaboradores/${colaboradorId}/colaboraciones`)
+      .expect(200);
     expect(historial.body).toEqual([]);
   });
 
   test("por defecto la contribucion es publica", async () => {
     const alta = await api
       .post(`/proyectos/${proyectoId}/colaboraciones`)
-      .send({ colaboradorId })
+      .send({ colaboradorId, perfilId })
       .expect(201);
     expect(alta.body.esPublica).toBe(true);
     expect(alta.body.colaborador.id).toBe(colaboradorId);
@@ -61,8 +65,11 @@ describe("HTTP · contribuciones anonimas", () => {
   test("anotarse dos veces sigue dando 409 aunque la primera sea anonima", async () => {
     await api
       .post(`/proyectos/${proyectoId}/colaboraciones`)
-      .send({ colaboradorId, esPublica: false })
+      .send({ colaboradorId, perfilId, esPublica: false })
       .expect(201);
-    await api.post(`/proyectos/${proyectoId}/colaboraciones`).send({ colaboradorId }).expect(409);
+    await api
+      .post(`/proyectos/${proyectoId}/colaboraciones`)
+      .send({ colaboradorId, perfilId })
+      .expect(409);
   });
 });

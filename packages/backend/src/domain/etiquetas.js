@@ -1,8 +1,6 @@
 // Requerimiento adicional 34: etiquetas en proyectos y organizaciones para
 // optimizar las busquedas.
-//
-// Se normalizan para que "Educación Popular", "educacion popular" y
-// " EDUCACION   POPULAR " sean la misma etiqueta: "educacion-popular".
+
 export function normalizarEtiqueta(texto) {
   return texto
     .trim()

@@ -5,9 +5,6 @@ export class InMemoryRepository {
     return entidad.id;
   }
 
-  // Valida contra el schema de Mongoose antes de guardar, como lo haria
-  // save() contra la base (incluye los hooks pre('validate')). Asi los tests
-  // en memoria ven las mismas reglas que produccion.
   async guardar(entidad) {
     await entidad.validate?.();
     this.entidades.set(this.obtenerId(entidad), entidad);

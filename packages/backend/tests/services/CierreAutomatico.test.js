@@ -1,4 +1,9 @@
-import { armarServices, crearColectivoDePrueba, datosDePerfil, CODIGOS } from "../fixtures.js";
+import {
+  armarServices,
+  crearColectivoDePrueba,
+  datosDePerfil,
+  CODIGOS,
+} from "../fixtures.js";
 import { DomainError } from "../../src/errors/DomainError.js";
 import { ConflictError } from "../../src/errors/ConflictError.js";
 
@@ -20,8 +25,12 @@ describe("Cierre automatico de proyectos", () => {
         colectivoId: colectivo.id,
         titulo: "Sitio",
         descripcion: "...",
-        perfiles: [datosDePerfil({ requeridas: [CODIGOS.node] })],
-        modoAceptacion: "REVISION_MANUAL",
+        perfiles: [
+          datosDePerfil({
+            requeridas: [CODIGOS.node],
+            modoAceptacion: "REVISION_MANUAL",
+          }),
+        ],
         fechaCierre: MANANA,
       },
       HOY,
@@ -31,7 +40,11 @@ describe("Cierre automatico de proyectos", () => {
       codigosHabilidades: [CODIGOS.node],
     });
     pendiente = await services.colaboracionService.registrar(
-      { proyectoId: proyecto.id, colaboradorId: ada.id },
+      {
+        proyectoId: proyecto.id,
+        perfilId: proyecto.perfiles[0].id,
+        colaboradorId: ada.id,
+      },
       HOY,
     );
   });
@@ -59,7 +72,11 @@ describe("Cierre automatico de proyectos", () => {
 
     await expect(
       services.colaboracionService.registrar(
-        { proyectoId: proyecto.id, colaboradorId: grace.id },
+        {
+          proyectoId: proyecto.id,
+          perfilId: proyecto.perfiles[0].id,
+          colaboradorId: grace.id,
+        },
         PASADO,
       ),
     ).rejects.toThrow(ConflictError);

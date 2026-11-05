@@ -38,12 +38,18 @@ test("un colectivo con todo su agregado vuelve completo", async () => {
     colectivoId: colectivo.id,
     titulo: "Sitio institucional",
     descripcion: "Un sitio para la fundacion",
-    modoAceptacion: "REVISION_MANUAL",
-    limiteVacantes: 3,
     fechaCierre: new Date("2030-01-01T00:00:00Z"),
     etiquetas: ["web"],
     perfiles: [
-      datosDePerfil({ requeridas: [CODIGOS.node], opcionales: [CODIGOS.react] }),
+      {
+        ...datosDePerfil({
+          requeridas: [CODIGOS.node],
+          opcionales: [CODIGOS.react],
+          modoAceptacion: "REVISION_MANUAL",
+          limiteColaboraciones: 3,
+        }),
+        fechaCierreBusqueda: new Date("2029-06-01T00:00:00Z"),
+      },
     ],
   });
 
@@ -58,6 +64,7 @@ test("un colectivo con todo su agregado vuelve completo", async () => {
 
   const colaboracion = await s.colaboracionService.registrar({
     proyectoId: proyecto.id,
+    perfilId: proyecto.perfiles[0].id,
     colaboradorId: ada.id,
     esPublica: false,
   });
@@ -100,8 +107,6 @@ test("un colectivo con todo su agregado vuelve completo", async () => {
 
   const p = leido.proyectos[0];
   expect(p.id).toBe(proyecto.id);
-  expect(p.modoAceptacion).toBe("REVISION_MANUAL");
-  expect(p.limiteVacantes).toBe(3);
   expect(p.fechaCierre).toEqual(new Date("2030-01-01T00:00:00Z"));
   expect(lista(p.etiquetas)).toEqual(["web"]);
   // Los metodos de dominio estan en lo que vuelve de la base (loadClass).
@@ -117,9 +122,14 @@ test("un colectivo con todo su agregado vuelve completo", async () => {
     periodo: "HS_MENSUALES",
   });
   expect(perfil.modalidadColaboracion).toBe("GRATUITA");
+  expect(perfil.modoAceptacion).toBe("REVISION_MANUAL");
+  expect(perfil.limiteColaboraciones).toBe(3);
+  expect(perfil.busquedaAbierta).toBe(true);
+  expect(perfil.fechaCierreBusqueda).toEqual(new Date("2029-06-01T00:00:00Z"));
 
   const c = p.colaboraciones[0];
   expect(c.estado).toBe("FINALIZADA");
+  expect(String(c.perfil)).toBe(perfil.id);
   expect(c.esPublica).toBe(false);
   expect(c.colaborador.cuentaGit).toBe("ada"); // poblado
   expect(c.fechaResolucion).toBeInstanceOf(Date);

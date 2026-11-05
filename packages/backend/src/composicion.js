@@ -39,14 +39,10 @@ import { NotificacionController } from "./controllers/NotificacionController.js"
 import { ReclutamientoController } from "./controllers/ReclutamientoController.js";
 import { PostulacionController } from "./controllers/PostulacionController.js";
 import { EstadisticaController } from "./controllers/EstadisticaController.js";
-import { LogroController} from "./controllers/LogroController.js"
+import { LogroController } from "./controllers/LogroController.js";
 import { AvanceController } from "./controllers/AvanceController.js";
 
-// Los repositorios de verdad: los que usa la app levantada.
 export function crearRepositoriosMongo() {
-  // Ya no se necesitan entre si: con loadClass no hay que reconstruir
-  // referencias a mano (las habilidades vienen copiadas y los colaboradores
-  // se traen con populate).
   return {
     habilidadRepository: new MongoHabilidadRepository(),
     colaboradorRepository: new MongoColaboradorRepository(),
@@ -56,7 +52,6 @@ export function crearRepositoriosMongo() {
   };
 }
 
-// Los dobles de test: permiten correr los tests de services sin una base.
 export function crearRepositoriosEnMemoria() {
   const colaboradorRepository = new InMemoryColaboradorRepository();
   const colectivoRepository = new InMemoryColectivoRepository();
@@ -73,9 +68,6 @@ export function crearRepositoriosEnMemoria() {
   };
 }
 
-// Un canal por tipo de medio de contacto. El email es real si hay un servidor
-// SMTP configurado (SMTP_URL); si no, y siempre para WhatsApp y SMS, se usa
-// el canal simulado, que solo deja constancia en el log.
 export function crearCanales(entorno = process.env) {
   const email = entorno.SMTP_URL
     ? new CanalEmail({
@@ -83,20 +75,24 @@ export function crearCanales(entorno = process.env) {
         remitente: entorno.SMTP_REMITENTE || "Codigo a Voluntad <no-responder@localhost>",
       })
     : new CanalSimulado("EMAIL");
-      
-    const whatsapp = (entorno.TWILIO_ACCOUNT_SID && entorno.TWILIO_AUTH_TOKEN)
-    ? new CanalWhatsApp({
-        cliente: twilio(entorno.TWILIO_ACCOUNT_SID, entorno.TWILIO_AUTH_TOKEN),
-        remitente: entorno.TWILIO_WHATSAPP_REMITENTE || "whatsapp:+14155238886",
-      })
-    : new CanalSimulado("WHATSAPP");
+
+  const whatsapp =
+    entorno.TWILIO_ACCOUNT_SID && entorno.TWILIO_AUTH_TOKEN
+      ? new CanalWhatsApp({
+          cliente: twilio(entorno.TWILIO_ACCOUNT_SID, entorno.TWILIO_AUTH_TOKEN),
+          remitente: entorno.TWILIO_WHATSAPP_REMITENTE || "whatsapp:+14155238886",
+        })
+      : new CanalSimulado("WHATSAPP");
 
   return { EMAIL: email, WHATSAPP: whatsapp, SMS: new CanalSimulado("SMS") };
 }
 
-// Dobles de test: guardan lo que "envian" para poder revisarlo.
 export function crearCanalesEnMemoria() {
-  return { EMAIL: new CanalEnMemoria(), WHATSAPP: new CanalEnMemoria(), SMS: new CanalEnMemoria() };
+  return {
+    EMAIL: new CanalEnMemoria(),
+    WHATSAPP: new CanalEnMemoria(),
+    SMS: new CanalEnMemoria(),
+  };
 }
 
 export function componerApp({
@@ -113,16 +109,16 @@ export function componerApp({
 
   const habilidadService = new HabilidadService({ habilidadRepository });
 
-
-  const perfilService = new PerfilService({
-    colectivoRepository,
-    habilidadService,
-  });
-
   const notificacionService = new NotificacionService({
     notificacionRepository,
     colaboradorRepository,
     canales,
+  });
+
+  const perfilService = new PerfilService({
+    colectivoRepository,
+    habilidadService,
+    notificacionService,
   });
 
   const avisoAutomaticoService = new AvisoAutomaticoService({
@@ -137,7 +133,10 @@ export function componerApp({
     avisoAutomaticoService,
   });
 
-  const colectivoService = new ColectivoService({ colectivoRepository, notificacionService });
+  const colectivoService = new ColectivoService({
+    colectivoRepository,
+    notificacionService,
+  });
 
   const proyectoService = new ProyectoService({
     colectivoRepository,
@@ -163,14 +162,21 @@ export function componerApp({
     notificacionService,
   });
 
-  const estadisticaService = new EstadisticaService({ estadisticaRepository, colectivoService });
+  const estadisticaService = new EstadisticaService({
+    estadisticaRepository,
+    colectivoService,
+  });
 
   const logroService = new LogroService({ colectivoRepository });
 
   const avanceService = new AvanceService({ colectivoRepository });
 
   const controllers = {
-    colectivo: new ColectivoController({ colectivoService, proyectoService, colaboracionService }),
+    colectivo: new ColectivoController({
+      colectivoService,
+      proyectoService,
+      colaboracionService,
+    }),
     proyecto: new ProyectoController({ proyectoService, colaboracionService }),
     perfil: new PerfilController({ perfilService }),
     habilidad: new HabilidadController({ habilidadService }),
@@ -180,7 +186,7 @@ export function componerApp({
     postulacion: new PostulacionController({ colaboracionService }),
     estadistica: new EstadisticaController({ estadisticaService }),
     logro: new LogroController({ logroService }),
-    avance: new AvanceController({ avanceService })
+    avance: new AvanceController({ avanceService }),
   };
 
   const services = {
@@ -195,7 +201,7 @@ export function componerApp({
     avisoAutomaticoService,
     estadisticaService,
     logroService,
-    avanceService
+    avanceService,
   };
 
   return { controllers, services };

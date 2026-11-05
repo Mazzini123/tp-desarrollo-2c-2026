@@ -10,7 +10,10 @@ export class ProyectoController extends BaseController {
   listar = async (req, res) => {
     const paginacion = this.aPaginacionDeDominio(req.paginacion);
     const { etiqueta } = req.paginacion;
-    this.responderPaginado(res, await this.proyectoService.listar({ ...paginacion, etiqueta }));
+    this.responderPaginado(
+      res,
+      await this.proyectoService.listar({ ...paginacion, etiqueta }),
+    );
   };
 
   obtenerPorId = async (req, res) => {
@@ -25,9 +28,21 @@ export class ProyectoController extends BaseController {
     res.status(200).json(await this.proyectoService.finalizar(req.params.id));
   };
 
+  datosDeContacto = async (req, res) => {
+    res
+      .status(200)
+      .json(
+        await this.colaboracionService.datosDeContacto(
+          req.params.id,
+          req.params.colaboradorId,
+        ),
+      );
+  };
+
   anotarColaborador = async (req, res) => {
     const colaboracion = await this.colaboracionService.registrar({
       proyectoId: req.params.id,
+      perfilId: req.body.perfilId,
       colaboradorId: req.body.colaboradorId,
       esPublica: req.body.esPublica,
     });

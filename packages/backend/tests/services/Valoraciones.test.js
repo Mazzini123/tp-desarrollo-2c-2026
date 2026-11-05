@@ -1,4 +1,9 @@
-import { armarServices, crearColectivoDePrueba, datosDePerfil, CODIGOS } from "../fixtures.js";
+import {
+  armarServices,
+  crearColectivoDePrueba,
+  datosDePerfil,
+  CODIGOS,
+} from "../fixtures.js";
 import { DomainError } from "../../src/errors/DomainError.js";
 import { ConflictError } from "../../src/errors/ConflictError.js";
 
@@ -27,6 +32,7 @@ describe("Valoraciones mutuas", () => {
   const anotar = (datos = {}) =>
     services.colaboracionService.registrar({
       proyectoId: proyecto.id,
+      perfilId: proyecto.perfiles[0].id,
       colaboradorId: ada.id,
       ...datos,
     });
@@ -36,9 +42,9 @@ describe("Valoraciones mutuas", () => {
 
   test("mientras la colaboracion sigue en curso no se puede valorar", async () => {
     const colaboracion = await anotar();
-    await expect(valorar(colaboracion, { autor: "COLECTIVO", puntaje: 5 })).rejects.toThrow(
-      ConflictError,
-    );
+    await expect(
+      valorar(colaboracion, { autor: "COLECTIVO", puntaje: 5 }),
+    ).rejects.toThrow(ConflictError);
   });
 
   test("finalizar el proyecto finaliza las colaboraciones en curso", async () => {
@@ -57,11 +63,13 @@ describe("Valoraciones mutuas", () => {
 
     await valorar(colaboracion, { autor: "COLECTIVO", puntaje: 5, comentario: "Genia" });
     await valorar(colaboracion, { autor: "COLABORADOR", puntaje: 4 });
-    await expect(valorar(colaboracion, { autor: "COLECTIVO", puntaje: 1 })).rejects.toThrow(
-      ConflictError,
-    );
+    await expect(
+      valorar(colaboracion, { autor: "COLECTIVO", puntaje: 1 }),
+    ).rejects.toThrow(ConflictError);
 
-    const deAda = await services.colaboracionService.listarValoracionesDeColaborador(ada.id);
+    const deAda = await services.colaboracionService.listarValoracionesDeColaborador(
+      ada.id,
+    );
     expect(deAda).toMatchObject({ cantidad: 1, promedio: 5 });
     expect(deAda.valoraciones[0]).toMatchObject({
       comentario: "Genia",
@@ -81,7 +89,9 @@ describe("Valoraciones mutuas", () => {
     await valorar(colaboracion, { autor: "COLECTIVO", puntaje: 5 });
     await valorar(colaboracion, { autor: "COLABORADOR", puntaje: 3 });
 
-    const deAda = await services.colaboracionService.listarValoracionesDeColaborador(ada.id);
+    const deAda = await services.colaboracionService.listarValoracionesDeColaborador(
+      ada.id,
+    );
     expect(deAda.cantidad).toBe(0);
 
     const delColectivo = await services.colaboracionService.listarValoracionesDeColectivo(
@@ -102,8 +112,8 @@ describe("Valoraciones mutuas", () => {
   test("el puntaje va de 1 a 5", async () => {
     const colaboracion = await anotar();
     await services.colaboracionService.finalizar(proyecto.id, colaboracion.id);
-    await expect(valorar(colaboracion, { autor: "COLECTIVO", puntaje: 6 })).rejects.toThrow(
-      DomainError,
-    );
+    await expect(
+      valorar(colaboracion, { autor: "COLECTIVO", puntaje: 6 }),
+    ).rejects.toThrow(DomainError);
   });
 });

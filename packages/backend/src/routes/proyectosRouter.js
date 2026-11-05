@@ -13,9 +13,7 @@ import {
 import { invitacionSchema } from "../schemas/reclutamientoSchema.js";
 import { listadoConEtiquetaSchema } from "../schemas/comunesSchema.js";
 import { valoracionSchema } from "../schemas/valoracionSchema.js";
-import { crearLogroSchema, 
-         actualizarLogroSchema
-} from "../schemas/logroSchema.js";
+import { crearLogroSchema, actualizarLogroSchema } from "../schemas/logroSchema.js";
 import { crearAvanceSchema } from "../schemas/avanceSchema.js";
 
 export function crearProyectosRouter(
@@ -24,7 +22,7 @@ export function crearProyectosRouter(
   reclutamientoController,
   postulacionController,
   logroController,
-  avanceController
+  avanceController,
 ) {
   const router = Router();
 
@@ -86,13 +84,24 @@ export function crearProyectosRouter(
     proyectoController.anotarColaborador,
   );
   router.get("/:id/colaboraciones", proyectoController.listarColaboraciones);
+  router.get(
+    "/:id/colaboradores/:colaboradorId/contacto",
+    proyectoController.datosDeContacto,
+  );
 
   // Resolucion manual de una postulacion (req. adicional 8).
   router.post(
     "/:id/colaboraciones/:colaboracionId/aceptacion",
     postulacionController.aceptar,
   );
-  router.post("/:id/colaboraciones/:colaboracionId/rechazo", postulacionController.rechazar);
+  router.post(
+    "/:id/colaboraciones/:colaboracionId/rechazo",
+    postulacionController.rechazar,
+  );
+  router.post(
+    "/:id/colaboraciones/:colaboracionId/desvinculacion",
+    postulacionController.desvincular,
+  );
 
   // Fin de una colaboracion y valoraciones mutuas (req. adicional 39).
   router.post(
@@ -109,46 +118,31 @@ export function crearProyectosRouter(
   router.post(
     "/:id/logros",
     validarBody(crearLogroSchema),
-    logroController.crearParaProyecto
+    logroController.crearParaProyecto,
   );
 
-  router.get(
-    "/:id/logros",
-    logroController.conseguirTodosDeProyecto
-  )
+  router.get("/:id/logros", logroController.conseguirTodosDeProyecto);
 
-  router.get(
-    "/:id/logros/:logroId",
-    logroController.conseguirPorIdParaProyecto
-  )
+  router.get("/:id/logros/:logroId", logroController.conseguirPorIdParaProyecto);
 
   router.put(
     "/:id/logros/:logroId",
     validarBody(actualizarLogroSchema),
-    logroController.actualizarParaProyecto
-  )
+    logroController.actualizarParaProyecto,
+  );
 
-  router.delete(
-    "/:id/logros/:logroId",
-    logroController.eliminarParaProyecto
-  )
+  router.delete("/:id/logros/:logroId", logroController.eliminarParaProyecto);
 
   // Avances
   router.post(
     "/:id/avances",
     validarBody(crearAvanceSchema),
-    avanceController.registrarAvanceParaProyecto
-  )
+    avanceController.registrarAvanceParaProyecto,
+  );
 
-  router.get(
-    "/:id/avances",
-    avanceController.listarParaProyecto
-  )
+  router.get("/:id/avances", avanceController.listarParaProyecto);
 
-  router.get(
-    "/:id/avances/:avanceId",
-    avanceController.buscarPorIdParaProyecto
-  )
+  router.get("/:id/avances/:avanceId", avanceController.buscarPorIdParaProyecto);
 
   return router;
 }

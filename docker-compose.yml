@@ -1,11 +1,3 @@
-# Compose de DESARROLLO (en la compu de cada uno). Para la VM de Oracle se usa
-# docker-compose.prod.yml.
-#
-# Sobre "ports": "A:B" enlaza el puerto A de la maquina donde corre Docker con
-# el puerto B del contenedor. NO hace publico nada en internet por si solo:
-# que se llegue desde afuera depende del firewall de esa maquina y, en la
-# nube, de las reglas de red del proveedor (en Oracle, la Security List).
-
 services:
   mongo:
     image: mongo:7

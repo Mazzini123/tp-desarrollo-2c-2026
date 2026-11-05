@@ -20,12 +20,12 @@ render en `diagrama_clases/diagrama_clases.png`.
 
 ## Estructura
 
-Monorepo con npm workspaces:
+Monorepo con npm workspaces. El frontend (React + Vite) vive en su propio
+repositorio: [codigo-a-voluntad-front](https://github.com/Mazzini123/codigo-a-voluntad-front).
 
 ```
 packages/
 ├── backend/     Node.js + Express (API JSON)
-└── frontend/    React (a partir de la tercera entrega)
 ```
 
 El backend sigue una arquitectura de capas:
@@ -112,9 +112,8 @@ Decisiones:
 - **`toJSON` por schema** (`models/formatoJSON.js`): `id` en vez de `_id`, sin
   `__v`, sin los medios de contacto de las personas y sin el autor de una
   contribución anónima.
-- **Campos calculados.** `vacantesLibres` es un getter de `Proyecto`, o sea un
-  *virtual*: se calcula y no se guarda. `porcentajeConcrecion`, `urlSistema` y
-  `urlRepositorio` del proyecto sí se guardan, pero los calcula un hook
+- **Campos calculados.** `porcentajeConcrecion`, `urlSistema` y
+  `urlRepositorio` del proyecto se guardan, pero los calcula un hook
   `pre('validate')` a partir del último avance.
 - **Búsquedas en la base.** Las colaboradoras y los proyectos potenciales se
   resuelven con el Aggregation Framework (filtrar, ordenar y paginar en Mongo),
@@ -147,7 +146,7 @@ mapa, con el requerimiento del enunciado que resuelve cada cosa.
 
 | # | Requerimiento | Cómo |
 |---|---|---|
-| 8 | Aceptación y rechazo automático de postulaciones | `modoAceptacion` y `limiteVacantes` en el proyecto; `POST .../colaboraciones/:colaboracionId/aceptacion` y `/rechazo` |
+| 8 | Aceptación y rechazo automático de postulaciones | `modoAceptacion` y `limiteColaboraciones` en cada perfil; `POST .../colaboraciones/:colaboracionId/aceptacion` y `/rechazo` |
 | 9 | Notificaciones automáticas | Al crear un proyecto se avisa a las personas compatibles; al crear una persona, se le avisa qué proyectos le sirven |
 | 10 | Cierre automático de proyectos | `fechaCierre` en el proyecto; `src/jobs/cierreAutomatico.js` revisa cada minuto |
 | 11 | Sanitización | `src/middlewares/sanitizar.js`: saca todo el HTML de los textos que entran |
@@ -158,7 +157,7 @@ mapa, con el requerimiento del enunciado que resuelve cada cosa.
 | 23 | Eliminación de colectivos | `POST /colectivos/:id/baja` |
 | 27 | Redes sociales | `redesSociales` en colectivos y colaboradores |
 | 34 | Etiquetas | `etiquetas` en colectivos y proyectos; filtro `?etiqueta=` en los listados |
-| 38 | Markdown (backend) | Las descripciones lo guardan intacto; el renderizado es del frontend (3ra entrega) |
+| 38 | Markdown (backend) | Las descripciones lo guardan intacto; el renderizado es del [frontend](https://github.com/Mazzini123/codigo-a-voluntad-front) |
 | 39 | Valoraciones mutuas | `POST .../colaboraciones/:colaboracionId/finalizacion` y `/valoraciones`; `GET /colaboradores/:id/valoraciones`, `GET /colectivos/:id/valoraciones` |
 
 Los adicionales 13, 18, 21, 29 y 35 quedan para la tercera entrega: todos
@@ -167,17 +166,30 @@ organización dueña del proyecto), y los usuarios llegan con la autenticación.
 
 ### Ciclo de una postulación
 
+Una persona se postula a un **perfil** del proyecto (`perfilId`), y solo si la
+búsqueda de ese perfil está abierta (`busquedaAbierta`) y no venció
+(`fechaCierreBusqueda`). Cada perfil tiene su propio límite de colaboraciones
+aceptadas (`limiteColaboraciones`, opcional) y su propio modo de aceptación.
+
 ```
-                ┌──────────▶ ACEPTADA ──────────▶ FINALIZADA ──▶ se pueden valorar
-  se postula ──▶ PENDIENTE
+                ┌──────────▶ ACEPTADA ──┬──────▶ FINALIZADA ───▶ se pueden valorar
+  se postula ──▶ PENDIENTE              └──────▶ DESVINCULADA
                 └──────────▶ RECHAZADA
 ```
 
 | Modo | Límite | Qué pasa |
 |---|---|---|
-| `TODO_SUMA` (por defecto) | no se permite | Se acepta en el momento |
-| `HASTA_LLENAR_VACANTES` | obligatorio | Espera hasta juntar tantas como vacantes; ahí se aceptan todas y se cierra |
-| `REVISION_MANUAL` | opcional | Nada automático |
+| `REVISION_MANUAL` (por defecto) | opcional | Nada automático: el colectivo acepta o rechaza. Alcanzado el límite, no se puede aceptar a nadie más |
+| `TODO_SUMA` | no se permite | Se acepta en el momento |
+| `HASTA_LLENAR_VACANTES` | obligatorio | Espera hasta juntar tantas como el límite; ahí se aceptan todas, se cierra la búsqueda del perfil y se rechazan las demás |
+
+Los datos de contacto de la persona quedan a disposición del colectivo recién
+cuando la postulación es aceptada.
+
+**Desanotar:** `POST .../colaboraciones/:colaboracionId/desvinculacion` pasa una
+colaboración aceptada a `DESVINCULADA`. La usan tanto el colectivo como la
+persona, y es permanente: queda en el historial y no se puede volver a postular
+al mismo proyecto.
 
 Cerrar un proyecto (a mano, por fecha o porque el colectivo se dio de baja)
 siempre tiene las mismas consecuencias: se rechazan las postulaciones pendientes
@@ -293,7 +305,6 @@ arrancar carga el catálogo de habilidades semilla si la colección está vacía
 | `npm run test:integracion` | Tests de integración contra Mongo (ver abajo) |
 | `npm run lint` | ESLint sobre todo el repo |
 | `npm run format` | Prettier sobre todo el repo |
-| `npm run start:frontend` | *Pendiente: se habilita en la 3ra entrega* |
 
 ## Tests
 
@@ -456,8 +467,6 @@ pm2 list                      # confirmar el nombre
 pm2 stop backend-cav
 pm2 delete backend-cav
 pm2 save                      # guarda la lista vacia: asi no revive al reiniciar la VM
-#    (Si en otra VM se hubiera instalado el unit de systemd de deploy/, en su
-#    lugar: sudo systemctl disable --now codigo-a-voluntad)
 
 # 2. Traer el código. La VM está parada en la rama main: primero hay que
 #    mergear develop en main con un PR (como el #16 de la primera entrega),

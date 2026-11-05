@@ -3,9 +3,6 @@ import { ConflictError } from "../errors/ConflictError.js";
 import { TIPO_NOTIFICACION } from "../domain/enums/TIPO_NOTIFICACION.js";
 import { armarPaginado } from "../utils/paginacion.js";
 
-// "Las organizaciones pueden buscar colaboradoras acordes a perfiles y
-// contactarlas: si la persona destinataria ha aceptado ser contactada, se
-// envia un mensaje interno dentro de la aplicacion" — enunciado, 2da entrega.
 export class ReclutamientoService {
   constructor({
     colaboradorRepository,
@@ -21,8 +18,6 @@ export class ReclutamientoService {
     this.notificacionService = notificacionService;
   }
 
-  // El service arma el pedido con la regla de negocio y el repositorio lo
-  // resuelve como consulta: la base filtra, ordena por opcionales y pagina.
   async buscarColaboradoras(
     proyectoId,
     perfilId,
@@ -37,7 +32,6 @@ export class ReclutamientoService {
       {
         requeridas: perfil.codigosRequeridos(),
         opcionales: perfil.codigosOpcionales(),
-        // Quien ya se postulo no es una colaboradora "potencial".
         excluirIds: proyecto.colaboraciones.map((c) => c.colaborador._id),
       },
       numeroPagina,
@@ -47,8 +41,6 @@ export class ReclutamientoService {
     return armarPaginado(pagina, numeroPagina, limitePorPagina);
   }
 
-  // "Las personas colaboradoras pueden buscar proyectos que encajen con sus
-  // habilidades" — enunciado, 2da entrega (requerimiento 3.d).
   async buscarProyectos(colaboradorId, { numeroPagina = 1, limitePorPagina = 10 } = {}) {
     const colaborador = await this.colaboradorService.buscarPorId(colaboradorId);
 

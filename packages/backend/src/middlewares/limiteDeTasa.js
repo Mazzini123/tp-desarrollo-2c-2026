@@ -12,10 +12,7 @@ const QUINCE_MINUTOS = 15 * 60 * 1000;
 const UN_MINUTO = 60 * 1000;
 
 export const LIMITES_POR_DEFECTO = Object.freeze({
-  // Todo el trafico: generoso, para no molestar a un uso normal del frontend.
   general: 300,
-  // Busquedas y estadisticas: son las consultas mas caras y las que un
-  // scraper recorreria.
   busquedas: 30,
 });
 
@@ -23,12 +20,9 @@ function crearLimitador({ ventanaMs, limite, mensaje }) {
   return rateLimit({
     windowMs: ventanaMs,
     limit: limite,
-    // Informa el cupo en la cabecera estandar RateLimit.
     standardHeaders: "draft-8",
     legacyHeaders: false,
-    // /health lo consultan los monitores: no cuenta.
     skip: (req) => req.path === "/health",
-    // Misma forma que el resto de los errores de la API: { message }.
     handler: (_req, res) => res.status(429).json({ message: mensaje }),
   });
 }

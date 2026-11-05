@@ -1,4 +1,9 @@
-import { armarServices, crearColectivoDePrueba, datosDePerfil, CODIGOS } from "../fixtures.js";
+import {
+  armarServices,
+  crearColectivoDePrueba,
+  datosDePerfil,
+  CODIGOS,
+} from "../fixtures.js";
 import { armarServicesConMongo, usarBaseDeTest } from "./baseDeTest.js";
 
 /**
@@ -24,10 +29,18 @@ async function escenario(s) {
     cuentaGit: "ada",
     codigosHabilidades: [CODIGOS.node, CODIGOS.react],
   });
-  await s.colaboradorService.crear({ cuentaGit: "grace", codigosHabilidades: [CODIGOS.react] });
-  await s.colaboracionService.registrar({ proyectoId: api.id, colaboradorId: ada.id });
+  await s.colaboradorService.crear({
+    cuentaGit: "grace",
+    codigosHabilidades: [CODIGOS.react],
+  });
+  await s.colaboracionService.registrar({
+    proyectoId: api.id,
+    perfilId: api.perfiles[0].id,
+    colaboradorId: ada.id,
+  });
   await s.colaboracionService.registrar({
     proyectoId: front.id,
+    perfilId: front.perfiles[0].id,
     colaboradorId: ada.id,
     esPublica: false,
   });

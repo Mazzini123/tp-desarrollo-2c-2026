@@ -22,7 +22,9 @@ export class ColaboradorController extends BaseController {
   };
 
   actualizar = async (req, res) => {
-    res.status(200).json(await this.colaboradorService.actualizar(req.params.id, req.body));
+    res
+      .status(200)
+      .json(await this.colaboradorService.actualizar(req.params.id, req.body));
   };
 
   agregarPronombre = async (req, res) => {
@@ -60,12 +62,12 @@ export class ColaboradorController extends BaseController {
   agregarMedioDeContacto = async (req, res) => {
     res
       .status(201)
-      .json(await this.colaboradorService.agregarMedioDeContacto(req.params.id, req.body));
+      .json(
+        await this.colaboradorService.agregarMedioDeContacto(req.params.id, req.body),
+      );
   };
 
   quitarMedioDeContacto = async (req, res) => {
-    // El medio viaja en la ruta: se normaliza con el mismo schema que el alta
-    // para que "Ana@Mail.com" encuentre al "ana@mail.com" guardado.
     const medio = medioDeContactoSchema.parse({
       tipo: req.params.tipo,
       valor: req.params.valor,
@@ -77,10 +79,14 @@ export class ColaboradorController extends BaseController {
   listarValoraciones = async (req, res) => {
     res
       .status(200)
-      .json(await this.colaboracionService.listarValoracionesDeColaborador(req.params.id));
+      .json(
+        await this.colaboracionService.listarValoracionesDeColaborador(req.params.id),
+      );
   };
 
   listarColaboraciones = async (req, res) => {
-    res.status(200).json(await this.colaboracionService.listarPorColaborador(req.params.id));
+    res
+      .status(200)
+      .json(await this.colaboracionService.listarPorColaborador(req.params.id));
   };
 }
