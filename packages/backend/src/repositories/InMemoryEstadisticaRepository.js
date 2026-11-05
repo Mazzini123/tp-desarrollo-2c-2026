@@ -1,6 +1,3 @@
-// Doble de test de MongoEstadisticaRepository: calcula lo mismo recorriendo
-// los objetos en memoria, con la misma forma de resultado. Lo que prueba es
-// el service; los pipelines se prueban contra Mongo (ver la guia del README).
 export class InMemoryEstadisticaRepository {
   constructor({ colectivoRepository, colaboradorRepository }) {
     this.colectivoRepository = colectivoRepository;
@@ -30,7 +27,9 @@ export class InMemoryEstadisticaRepository {
       colaboraciones: [...grupos.values()],
       colaboradores: colaboradores.length,
       habilidadesMasRequeridas: ranking(
-        proyectos.flatMap((p) => p.perfiles.flatMap((perfil) => perfil.habilidadesRequeridas)),
+        proyectos.flatMap((p) =>
+          p.perfiles.flatMap((perfil) => perfil.habilidadesRequeridas),
+        ),
       ),
       habilidadesMasOfrecidas: ranking(colaboradores.flatMap((c) => c.habilidades)),
     };

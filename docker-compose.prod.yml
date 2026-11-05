@@ -1,25 +1,3 @@
-# Compose para la VM de Oracle Cloud. Se usa con:
-#
-#   docker compose -f docker-compose.prod.yml up -d --build
-#
-# Diferencias con docker-compose.yml (el de desarrollo):
-#
-# - mongo NO publica puertos. La api le habla por la red interna de compose
-#   (host "mongo"), asi que no hace falta exponerlo.
-#
-#   Para que algo de la VM llegue a internet hacen falta TRES cosas: que el
-#   contenedor publique el puerto ("ports"), que el firewall de la VM lo deje
-#   pasar y que la Security List de Oracle tenga una regla de entrada para
-#   ese puerto. Con mongo falla la primera, asi que el 27017 no es alcanzable
-#   desde afuera aunque alguien lo abriera en Oracle por error: no hay nada
-#   escuchando (defensa en profundidad). Ojo: los puertos que
-#   publica Docker se saltean ufw (Docker escribe sus propias reglas de
-#   iptables), asi que el firewall de Ubuntu no protege un puerto publicado.
-# - mongo tiene usuario y contraseña, que salen del archivo .env de la raiz
-#   (ver .env.prod.example). Si falta alguna, compose se niega a arrancar.
-# - Limites de memoria pensados para una VM de 1 GB (+ 2 GB de swap). Hay
-#   DOS limites distintos, uno por proceso (ver cada servicio).
-
 services:
   mongo:
     image: mongo:7

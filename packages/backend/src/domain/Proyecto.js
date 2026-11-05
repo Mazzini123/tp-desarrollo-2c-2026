@@ -1,7 +1,5 @@
 import { PROYECTO_ESTADO } from "./enums/PROYECTO_ESTADO.js";
 
-// Lo que un proyecto SABE HACER. Vive embebido en el colectivo: el schema
-// (proyectoSchema en models/ColectivoModel.js) carga esta clase con loadClass.
 export class Proyecto {
   estaAbierto() {
     return this.estado === PROYECTO_ESTADO.ABIERTO;
@@ -22,7 +20,6 @@ export class Proyecto {
     );
   }
 
-  // Los agregar* reciben los datos y devuelven el subdocumento creado.
   agregarLogro(datos) {
     const logro = this.logros.create(datos);
     this.logros.push(logro);
@@ -61,41 +58,10 @@ export class Proyecto {
     return this.colaboraciones.find((c) => c.id === String(colaboracionId)) ?? null;
   }
 
-  // Las pendientes en el orden en que llegaron: se resuelven en ese orden.
   colaboracionesPendientes() {
     return this.colaboraciones
       .filter((c) => c.estaPendiente())
       .sort((a, b) => a.fecha - b.fecha);
-  }
-
-  cantidadAceptadas() {
-    return this.colaboraciones.filter((c) => c.estaAceptada()).length;
-  }
-
-  tieneLimiteDeVacantes() {
-    return this.limiteVacantes !== null && this.limiteVacantes !== undefined;
-  }
-
-  // El cupo se calcula, no se guarda: asi nunca queda desincronizado con las
-  // colaboraciones reales.
-  cupoCompleto() {
-    return (
-      this.tieneLimiteDeVacantes() && this.cantidadAceptadas() >= this.limiteVacantes
-    );
-  }
-
-  // Un getter de la clase se vuelve un VIRTUAL de Mongoose: se calcula cada
-  // vez, no se guarda en la base, y aparece en la respuesta JSON. null si el
-  // proyecto no tiene limite.
-  get vacantesLibres() {
-    if (!this.tieneLimiteDeVacantes()) {
-      return null;
-    }
-    return Math.max(this.limiteVacantes - this.cantidadAceptadas(), 0);
-  }
-
-  aceptaPostulaciones() {
-    return this.estaAbierto() && !this.cupoCompleto();
   }
 
   agregarAvance(datos) {
@@ -104,9 +70,21 @@ export class Proyecto {
     return avance;
   }
 
-  // El ultimo avance cargado: de ahi salen el porcentaje y los enlaces
-  // vigentes del proyecto (ver el hook pre('validate') de proyectoSchema).
   ultimoAvance() {
     return this.avances.at(-1) ?? null;
+  }
+
+  cantidadAceptadas(perfil) {
+    return this.colaboraciones.filter(
+      (c) => c.estaAceptada() && String(c.perfil) === String(perfil.id),
+    ).length;
+  }
+
+  aceptaPostulaciones(ahora = new Date()) {
+    return this.estaAbierto() && this.perfiles.some((p) => p.aceptaPostulaciones(ahora));
+  }
+
+  puedeVerContactoDe(colaborador) {
+    return this.colaboraciones.some((c) => c.esDe(colaborador) && c.estaAceptada());
   }
 }

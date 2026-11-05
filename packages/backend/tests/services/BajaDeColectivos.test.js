@@ -21,8 +21,9 @@ describe("Baja de un colectivo", () => {
       colectivoId: colectivo.id,
       titulo: "Mapa",
       descripcion: "...",
-      perfiles: [datosDePerfil({ requeridas: [CODIGOS.node] })],
-      modoAceptacion: "REVISION_MANUAL",
+      perfiles: [
+        datosDePerfil({ requeridas: [CODIGOS.node], modoAceptacion: "REVISION_MANUAL" }),
+      ],
     });
     const ada = await services.colaboradorService.crear({
       cuentaGit: "ada",
@@ -30,6 +31,7 @@ describe("Baja de un colectivo", () => {
     });
     postulacion = await services.colaboracionService.registrar({
       proyectoId: proyecto.id,
+      perfilId: proyecto.perfiles[0].id,
       colaboradorId: ada.id,
     });
   });
@@ -66,6 +68,8 @@ describe("Baja de un colectivo", () => {
     await expect(
       services.colectivoService.actualizar(colectivo.id, { nombre: "Nuevo" }),
     ).rejects.toThrow(ConflictError);
-    await expect(services.colectivoService.darDeBaja(colectivo.id)).rejects.toThrow(ConflictError);
+    await expect(services.colectivoService.darDeBaja(colectivo.id)).rejects.toThrow(
+      ConflictError,
+    );
   });
 });

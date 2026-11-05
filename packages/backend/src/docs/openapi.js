@@ -1,5 +1,9 @@
 // Todos los ids son ObjectId de Mongo: 24 caracteres hexadecimales.
-const OBJECT_ID = { type: "string", pattern: "^[a-f0-9]{24}$", example: "6720f1c2a1b2c3d4e5f60718" };
+const OBJECT_ID = {
+  type: "string",
+  pattern: "^[a-f0-9]{24}$",
+  example: "6720f1c2a1b2c3d4e5f60718",
+};
 
 const PROBLEMA = {
   type: "object",
@@ -28,18 +32,24 @@ const errores = {
     description:
       "Falla de forma: falto un campo obligatorio, sobro uno (los schemas son strict), " +
       "un tipo no coincide, o una regla de dominio rechazo el valor.",
-    content: { "application/json": { schema: { $ref: "#/components/schemas/Problema" } } },
+    content: {
+      "application/json": { schema: { $ref: "#/components/schemas/Problema" } },
+    },
   },
   404: {
     description: "No existe el recurso referenciado por el id o el codigo de la ruta.",
-    content: { "application/json": { schema: { $ref: "#/components/schemas/Problema" } } },
+    content: {
+      "application/json": { schema: { $ref: "#/components/schemas/Problema" } },
+    },
   },
   409: {
     description:
       "Conflicto con el estado actual: la operacion es valida pero el recurso no la admite " +
       "ahora (proyecto ya finalizado, colaborador ya anotado, pronombre repetido, " +
       "codigo de habilidad ya existente).",
-    content: { "application/json": { schema: { $ref: "#/components/schemas/Problema" } } },
+    content: {
+      "application/json": { schema: { $ref: "#/components/schemas/Problema" } },
+    },
   },
 };
 
@@ -66,6 +76,13 @@ const paramColaboracionId = {
   schema: OBJECT_ID,
 };
 
+const paramColaboradorId = {
+  name: "colaboradorId",
+  in: "path",
+  required: true,
+  schema: OBJECT_ID,
+};
+
 const paramCodigoHabilidad = {
   name: "codigoHabilidad",
   in: "path",
@@ -87,7 +104,10 @@ function arrayDe(nombreSchema, descripcion) {
       description: descripcion,
       content: {
         "application/json": {
-          schema: { type: "array", items: { $ref: `#/components/schemas/${nombreSchema}` } },
+          schema: {
+            type: "array",
+            items: { $ref: `#/components/schemas/${nombreSchema}` },
+          },
         },
       },
     },
@@ -125,7 +145,10 @@ function listado(nombreSchema) {
           schema: {
             type: "object",
             properties: {
-              data: { type: "array", items: { $ref: `#/components/schemas/${nombreSchema}` } },
+              data: {
+                type: "array",
+                items: { $ref: `#/components/schemas/${nombreSchema}` },
+              },
               meta: { $ref: "#/components/schemas/MetaPaginacion" },
             },
           },
@@ -214,8 +237,9 @@ export const openapi = {
     {
       name: "Postulaciones",
       description:
-        "Anotarse a un proyecto es postularse. Segun el modo de aceptacion del proyecto, la " +
-        "postulacion se resuelve sola o queda pendiente (req. adicional 8). Al terminar, las " +
+        "Las personas se postulan a un perfil del proyecto. Segun el modo de aceptacion del " +
+        "perfil, la postulacion se resuelve sola o queda pendiente (req. adicional 8). Una " +
+        "colaboracion aceptada se puede desvincular, de forma permanente. Al terminar, las " +
         "dos partes pueden valorarse (req. adicional 39).",
     },
     {
@@ -249,7 +273,10 @@ export const openapi = {
                   type: "object",
                   properties: {
                     status: { type: "string", example: "ok" },
-                    uptime: { type: "number", description: "Segundos desde que arranco el proceso." },
+                    uptime: {
+                      type: "number",
+                      description: "Segundos desde que arranco el proceso.",
+                    },
                     timestamp: { type: "string", format: "date-time" },
                   },
                 },
@@ -271,7 +298,10 @@ export const openapi = {
           "Opcionales: `redesSociales` (req. 27, solo URLs http/https), `etiquetas` (req. 34, " +
           "se normalizan) y `mediosDeContacto` (publicos, a diferencia de los de las personas).",
         requestBody: body("CrearColectivo"),
-        responses: { ...recurso("Colectivo", 201, "Colectivo creado."), 400: errores[400] },
+        responses: {
+          ...recurso("Colectivo", 201, "Colectivo creado."),
+          400: errores[400],
+        },
       },
       get: {
         tags: ["Colectivos"],
@@ -312,10 +342,9 @@ export const openapi = {
         summary: "Crear proyecto del colectivo",
         description:
           "Necesita al menos un perfil, y cada perfil al menos una habilidad requerida (los " +
-          "codigos tienen que existir y estar activos, o 404). `modoAceptacion` y " +
-          "`limiteVacantes` definen como se resuelven las postulaciones (req. 8): TODO_SUMA " +
-          "(por defecto) solo sin limite, HASTA_LLENAR_VACANTES solo con limite, " +
-          "REVISION_MANUAL con o sin. `fechaCierre` (req. 10) tiene que ser futura. Al crearlo, " +
+          "codigos tienen que existir y estar activos, o 404). Cada perfil define su busqueda, " +
+          "su limite de colaboraciones y su modo de aceptacion (ver CrearPerfil). " +
+          "`fechaCierre` (req. 10) tiene que ser futura. Al crearlo, " +
           "se avisa a las personas compatibles (req. 9). Un colectivo dado de baja no puede " +
           "publicar proyectos (409).",
         requestBody: body("CrearProyecto"),
@@ -329,13 +358,17 @@ export const openapi = {
       get: {
         tags: ["Proyectos"],
         summary: "Listar proyectos del colectivo",
-        description: "Sin paginar: devuelve el array completo de proyectos del colectivo.",
+        description:
+          "Sin paginar: devuelve el array completo de proyectos del colectivo.",
         responses: {
           200: {
             description: "Proyectos del colectivo.",
             content: {
               "application/json": {
-                schema: { type: "array", items: { $ref: "#/components/schemas/Proyecto" } },
+                schema: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/Proyecto" },
+                },
               },
             },
           },
@@ -383,7 +416,10 @@ export const openapi = {
           "Req. adicional 19. Historial publico, de lo mas viejo a lo mas nuevo: alta y baja " +
           "del colectivo, proyectos creados y finalizados, logros, avances (porcentaje de " +
           "concrecion) y colaboraciones cerradas.",
-        responses: { ...arrayDe("EventoTimeline", "Eventos en orden cronologico."), 404: errores[404] },
+        responses: {
+          ...arrayDe("EventoTimeline", "Eventos en orden cronologico."),
+          404: errores[404],
+        },
       },
     },
 
@@ -436,9 +472,7 @@ export const openapi = {
         tags: ["Proyectos"],
         summary: "Actualizar proyecto",
         description:
-          "Todos los campos son opcionales. Cambiar `modoAceptacion` o `limiteVacantes` " +
-          "resuelve las postulaciones pendientes con las reglas nuevas; el limite no puede " +
-          "quedar por debajo de las ya aceptadas (400). `fechaCierre: null` saca la fecha " +
+          "Todos los campos son opcionales. `fechaCierre: null` saca la fecha " +
           "de cierre. Un proyecto finalizado no se puede modificar: responde 409.",
         requestBody: body("ActualizarProyecto"),
         responses: {
@@ -483,11 +517,13 @@ export const openapi = {
       },
       put: {
         tags: ["Perfiles"],
-        summary: "Actualizar descripcion, compromiso o modalidad",
+        summary: "Actualizar un perfil",
         description:
           "Actualizacion parcial: se manda solo lo que cambia, pero al menos un campo (400 si " +
-          "viene vacio). Las habilidades se cambian con sus propias rutas. Si el proyecto " +
-          "esta finalizado, 409.",
+          "viene vacio). Las habilidades se cambian con sus propias rutas. Cambiar " +
+          "`modoAceptacion` o `limiteColaboraciones` resuelve las postulaciones pendientes del " +
+          "perfil con las reglas nuevas; el limite no puede quedar por debajo de las ya " +
+          "aceptadas (400). Si el proyecto esta finalizado, 409.",
         requestBody: body("ActualizarPerfil"),
         responses: {
           ...recurso("Perfil"),
@@ -708,17 +744,52 @@ export const openapi = {
       },
     },
 
+    "/proyectos/{id}/colaboradores/{colaboradorId}/contacto": {
+      parameters: [paramId, paramColaboradorId],
+      get: {
+        tags: ["Postulaciones"],
+        summary: "Datos de contacto de una persona colaboradora",
+        description:
+          "Solo si la persona tiene una colaboracion ACEPTADA en el proyecto: recien ahi sus " +
+          "datos quedan a disposicion del colectivo. Si la postulacion esta pendiente, fue " +
+          "rechazada, se desvinculo o nunca se postulo, responde 403.",
+        responses: {
+          200: {
+            description: "Medios de contacto de la persona.",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/MedioDeContacto" },
+                },
+              },
+            },
+          },
+          403: {
+            description:
+              "No hay una colaboracion aceptada con esta persona en el proyecto.",
+            content: {
+              "application/json": { schema: { $ref: "#/components/schemas/Problema" } },
+            },
+          },
+          404: errores[404],
+        },
+      },
+    },
+
     "/proyectos/{id}/colaboraciones": {
       parameters: [paramId],
       post: {
         tags: ["Proyectos"],
         summary: "Postularse al proyecto",
         description:
-          "Validaciones, en este orden: el proyecto tiene que estar abierto y con vacantes " +
-          "(409 si no; si la fecha de cierre ya paso, se cierra en el momento), la persona " +
-          "tiene que tener **todas** las habilidades requeridas de al menos un perfil (400 si " +
-          "no), y no puede haberse postulado antes (409). La colaboracion queda PENDIENTE o se " +
-          "resuelve en el momento segun el `modoAceptacion` del proyecto. Con " +
+          "La persona se postula a un perfil (`perfilId`). Validaciones, en este orden: el " +
+          "proyecto tiene que estar abierto (409 si no; si la fecha de cierre ya paso, se " +
+          "cierra en el momento), el perfil tiene que existir (404) y tener la busqueda " +
+          "abierta y sin vencer (409), la persona tiene que tener **todas** las habilidades " +
+          "requeridas de ese perfil (400 si no), y no puede haberse postulado antes al " +
+          "proyecto (409). La colaboracion queda PENDIENTE o se resuelve en el momento segun " +
+          "el `modoAceptacion` del perfil. Con " +
           "`esPublica: false` la contribucion es anonima: figura, pero con `colaborador: null`.",
         requestBody: body("AnotarColaborador"),
         responses: {
@@ -731,13 +802,17 @@ export const openapi = {
       get: {
         tags: ["Proyectos"],
         summary: "Listar colaboraciones del proyecto",
-        description: "Todas, en cualquier estado. Las anonimas vienen con `colaborador: null`.",
+        description:
+          "Todas, en cualquier estado. Las anonimas vienen con `colaborador: null`.",
         responses: {
           200: {
             description: "Colaboraciones registradas.",
             content: {
               "application/json": {
-                schema: { type: "array", items: { $ref: "#/components/schemas/Colaboracion" } },
+                schema: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/Colaboracion" },
+                },
               },
             },
           },
@@ -770,6 +845,22 @@ export const openapi = {
         description: "Solo una PENDIENTE, de un proyecto abierto (409 si no).",
         responses: {
           ...recurso("Colaboracion", 200, "Postulacion rechazada."),
+          404: errores[404],
+          409: errores[409],
+        },
+      },
+    },
+
+    "/proyectos/{id}/colaboraciones/{colaboracionId}/desvinculacion": {
+      parameters: [paramId, paramColaboracionId],
+      post: {
+        tags: ["Postulaciones"],
+        summary: "Desvincular a una persona de un proyecto",
+        description:
+          "La usa tanto el colectivo como la persona colaboradora. Solo una ACEPTADA " +
+          "(409 si no). Es permanente: la colaboracion queda DESVINCULADA en el historial.",
+        responses: {
+          ...recurso("Colaboracion", 200, "Colaboracion desvinculada."),
           404: errores[404],
           409: errores[409],
         },
@@ -956,7 +1047,12 @@ export const openapi = {
     "/colaboradores/{id}/habilidades/{codigoHabilidad}": {
       parameters: [
         paramId,
-        { name: "codigoHabilidad", in: "path", required: true, schema: { type: "string" } },
+        {
+          name: "codigoHabilidad",
+          in: "path",
+          required: true,
+          schema: { type: "string" },
+        },
       ],
       delete: {
         tags: ["Colaboradores"],
@@ -978,7 +1074,8 @@ export const openapi = {
           "vive dentro del proyecto y por si sola no dice a cual pertenece.",
         responses: {
           200: {
-            description: "Colaboraciones del colaborador, con el proyecto al que pertenecen.",
+            description:
+              "Colaboraciones del colaborador, con el proyecto al que pertenecen.",
             content: {
               "application/json": {
                 schema: {
@@ -1049,14 +1146,19 @@ export const openapi = {
           name: "valor",
           in: "path",
           required: true,
-          description: "Se normaliza igual que en el alta (mayusculas, espacios, guiones).",
+          description:
+            "Se normaliza igual que en el alta (mayusculas, espacios, guiones).",
           schema: { type: "string" },
         },
       ],
       delete: {
         tags: ["Colaboradores"],
         summary: "Quitar un medio de contacto",
-        responses: { 204: { description: "Medio quitado." }, 400: errores[400], 404: errores[404] },
+        responses: {
+          204: { description: "Medio quitado." },
+          400: errores[400],
+          404: errores[404],
+        },
       },
     },
 
@@ -1086,12 +1188,18 @@ export const openapi = {
     "/colaboradores/{id}/notificaciones/{notificacionId}/lectura": {
       parameters: [
         paramId,
-        { name: "notificacionId", in: "path", required: true, schema: { type: "string" } },
+        {
+          name: "notificacionId",
+          in: "path",
+          required: true,
+          schema: { type: "string" },
+        },
       ],
       post: {
         tags: ["Notificaciones"],
         summary: "Marcar una notificacion como leida",
-        description: "Una notificacion de otra persona responde 404, igual que una inexistente.",
+        description:
+          "Una notificacion de otra persona responde 404, igual que una inexistente.",
         responses: { ...recurso("Notificacion"), 404: errores[404] },
       },
     },
@@ -1102,8 +1210,8 @@ export const openapi = {
         summary: "Crear habilidad",
         description:
           "Solo el administrador carga el catalogo. El `codigo` no se manda: se deriva del " +
-          "`titulo` normalizado a snake_case sin acentos, asi que \"Diseno UX UI\" y " +
-          "\"diseño ux ui\" colisionan y la segunda responde 409.",
+          '`titulo` normalizado a snake_case sin acentos, asi que "Diseno UX UI" y ' +
+          '"diseño ux ui" colisionan y la segunda responde 409.',
         requestBody: body("CrearHabilidad"),
         responses: {
           ...recurso("Habilidad", 201, "Habilidad creada."),
@@ -1209,9 +1317,14 @@ export const openapi = {
             type: "string",
             enum: ["FUNDACION", "ASOCIACION_BARRIAL", "ONG", "ASAMBLEA"],
           },
-          ubicacion: { oneOf: [{ $ref: "#/components/schemas/Ubicacion" }, { type: "null" }] },
+          ubicacion: {
+            oneOf: [{ $ref: "#/components/schemas/Ubicacion" }, { type: "null" }],
+          },
           proyectos: { type: "array", items: { $ref: "#/components/schemas/Proyecto" } },
-          redesSociales: { type: "array", items: { $ref: "#/components/schemas/RedSocial" } },
+          redesSociales: {
+            type: "array",
+            items: { $ref: "#/components/schemas/RedSocial" },
+          },
           etiquetas: { type: "array", items: { type: "string" }, example: ["ambiente"] },
           mediosDeContacto: {
             type: "array",
@@ -1235,7 +1348,11 @@ export const openapi = {
           compromiso: { $ref: "#/components/schemas/Compromiso" },
           modalidadColaboracion: {
             type: "string",
-            enum: ["GRATUITA", "OFRECE_INCENTIVO_ECONOMICO", "EXISTE_POSIBILIDAD_DE_CONTRATACION"],
+            enum: [
+              "GRATUITA",
+              "OFRECE_INCENTIVO_ECONOMICO",
+              "EXISTE_POSIBILIDAD_DE_CONTRATACION",
+            ],
           },
           habilidadesRequeridas: {
             type: "array",
@@ -1244,6 +1361,17 @@ export const openapi = {
           habilidadesOpcionales: {
             type: "array",
             items: { $ref: "#/components/schemas/HabilidadEmbebida" },
+          },
+          busquedaAbierta: { type: "boolean" },
+          fechaCierreBusqueda: { type: "string", format: "date-time", nullable: true },
+          limiteColaboraciones: {
+            type: "integer",
+            nullable: true,
+            description: "null = sin limite.",
+          },
+          modoAceptacion: {
+            type: "string",
+            enum: ["TODO_SUMA", "HASTA_LLENAR_VACANTES", "REVISION_MANUAL"],
           },
         },
       },
@@ -1266,17 +1394,6 @@ export const openapi = {
           urlSistema: { type: "string", nullable: true },
           urlRepositorio: { type: "string", nullable: true },
           etiquetas: { type: "array", items: { type: "string" } },
-          modoAceptacion: {
-            type: "string",
-            enum: ["TODO_SUMA", "HASTA_LLENAR_VACANTES", "REVISION_MANUAL"],
-          },
-          limiteVacantes: { type: "integer", nullable: true },
-          vacantesLibres: {
-            type: "integer",
-            nullable: true,
-            description:
-              "Calculado, no se guarda: limiteVacantes menos las aceptadas. null si no hay limite.",
-          },
           fechaCreacion: { type: "string", format: "date-time", nullable: true },
           fechaFinalizacion: { type: "string", format: "date-time", nullable: true },
           fechaCierre: {
@@ -1330,7 +1447,10 @@ export const openapi = {
             items: { $ref: "#/components/schemas/HabilidadEmbebida" },
           },
           recibeMensajeriaInterna: { type: "boolean" },
-          redesSociales: { type: "array", items: { $ref: "#/components/schemas/RedSocial" } },
+          redesSociales: {
+            type: "array",
+            items: { $ref: "#/components/schemas/RedSocial" },
+          },
         },
       },
 
@@ -1353,7 +1473,11 @@ export const openapi = {
             description: "null si la contribucion es anonima.",
           },
           esPublica: { type: "boolean" },
-          fecha: { type: "string", format: "date-time", description: "Cuando se postulo." },
+          fecha: {
+            type: "string",
+            format: "date-time",
+            description: "Cuando se postulo.",
+          },
           estado: {
             type: "string",
             enum: ["PENDIENTE", "ACEPTADA", "RECHAZADA", "FINALIZADA"],
@@ -1556,7 +1680,10 @@ export const openapi = {
           },
           colaboraciones: { type: "object" },
           visualizaciones: { type: "integer" },
-          avancePromedio: { type: "number", description: "Porcentaje de concrecion promedio." },
+          avancePromedio: {
+            type: "number",
+            description: "Porcentaje de concrecion promedio.",
+          },
           logros: { type: "integer" },
           porProyecto: { type: "array", items: { type: "object" } },
           generadoEn: { type: "string", format: "date-time" },
@@ -1574,13 +1701,19 @@ export const openapi = {
             type: "string",
             enum: ["FUNDACION", "ASOCIACION_BARRIAL", "ONG", "ASAMBLEA"],
           },
-          ubicacion: { oneOf: [{ $ref: "#/components/schemas/Ubicacion" }, { type: "null" }] },
+          ubicacion: {
+            oneOf: [{ $ref: "#/components/schemas/Ubicacion" }, { type: "null" }],
+          },
           redesSociales: {
             type: "array",
             maxItems: 10,
             items: { $ref: "#/components/schemas/RedSocial" },
           },
-          etiquetas: { type: "array", maxItems: 10, items: { type: "string", maxLength: 30 } },
+          etiquetas: {
+            type: "array",
+            maxItems: 10,
+            items: { type: "string", maxLength: 30 },
+          },
           mediosDeContacto: {
             type: "array",
             maxItems: 10,
@@ -1595,8 +1728,13 @@ export const openapi = {
         properties: {
           nombre: { type: "string", minLength: 1 },
           descripcion: { type: "string", minLength: 1 },
-          ubicacion: { oneOf: [{ $ref: "#/components/schemas/Ubicacion" }, { type: "null" }] },
-          redesSociales: { type: "array", items: { $ref: "#/components/schemas/RedSocial" } },
+          ubicacion: {
+            oneOf: [{ $ref: "#/components/schemas/Ubicacion" }, { type: "null" }],
+          },
+          redesSociales: {
+            type: "array",
+            items: { $ref: "#/components/schemas/RedSocial" },
+          },
           etiquetas: { type: "array", items: { type: "string" } },
           mediosDeContacto: {
             type: "array",
@@ -1621,8 +1759,28 @@ export const openapi = {
           compromiso: { $ref: "#/components/schemas/Compromiso" },
           modalidadColaboracion: {
             type: "string",
-            enum: ["GRATUITA", "OFRECE_INCENTIVO_ECONOMICO", "EXISTE_POSIBILIDAD_DE_CONTRATACION"],
+            enum: [
+              "GRATUITA",
+              "OFRECE_INCENTIVO_ECONOMICO",
+              "EXISTE_POSIBILIDAD_DE_CONTRATACION",
+            ],
             default: "GRATUITA",
+          },
+          busquedaAbierta: { type: "boolean", default: true },
+          fechaCierreBusqueda: {
+            type: "string",
+            format: "date-time",
+            nullable: true,
+            example: "2026-12-01T18:00:00-03:00",
+          },
+          limiteColaboraciones: { type: "integer", minimum: 1, nullable: true },
+          modoAceptacion: {
+            type: "string",
+            enum: ["TODO_SUMA", "HASTA_LLENAR_VACANTES", "REVISION_MANUAL"],
+            default: "REVISION_MANUAL",
+            description:
+              "TODO_SUMA solo sin limite, HASTA_LLENAR_VACANTES solo con limite, " +
+              "REVISION_MANUAL con o sin.",
           },
         },
       },
@@ -1636,7 +1794,18 @@ export const openapi = {
           compromiso: { $ref: "#/components/schemas/Compromiso" },
           modalidadColaboracion: {
             type: "string",
-            enum: ["GRATUITA", "OFRECE_INCENTIVO_ECONOMICO", "EXISTE_POSIBILIDAD_DE_CONTRATACION"],
+            enum: [
+              "GRATUITA",
+              "OFRECE_INCENTIVO_ECONOMICO",
+              "EXISTE_POSIBILIDAD_DE_CONTRATACION",
+            ],
+          },
+          busquedaAbierta: { type: "boolean" },
+          fechaCierreBusqueda: { type: "string", format: "date-time", nullable: true },
+          limiteColaboraciones: { type: "integer", minimum: 1, nullable: true },
+          modoAceptacion: {
+            type: "string",
+            enum: ["TODO_SUMA", "HASTA_LLENAR_VACANTES", "REVISION_MANUAL"],
           },
         },
       },
@@ -1645,7 +1814,9 @@ export const openapi = {
         type: "object",
         required: ["codigoHabilidad"],
         additionalProperties: false,
-        properties: { codigoHabilidad: { type: "string", example: "testing_e2e_con_cypress" } },
+        properties: {
+          codigoHabilidad: { type: "string", example: "testing_e2e_con_cypress" },
+        },
       },
 
       CrearProyecto: {
@@ -1660,13 +1831,11 @@ export const openapi = {
             minItems: 1,
             items: { $ref: "#/components/schemas/CrearPerfil" },
           },
-          etiquetas: { type: "array", maxItems: 10, items: { type: "string", maxLength: 30 } },
-          modoAceptacion: {
-            type: "string",
-            enum: ["TODO_SUMA", "HASTA_LLENAR_VACANTES", "REVISION_MANUAL"],
-            default: "TODO_SUMA",
+          etiquetas: {
+            type: "array",
+            maxItems: 10,
+            items: { type: "string", maxLength: 30 },
           },
-          limiteVacantes: { type: "integer", minimum: 1, nullable: true },
           fechaCierre: {
             type: "string",
             format: "date-time",
@@ -1683,11 +1852,6 @@ export const openapi = {
           titulo: { type: "string", minLength: 1 },
           descripcion: { type: "string", minLength: 1 },
           etiquetas: { type: "array", items: { type: "string" } },
-          modoAceptacion: {
-            type: "string",
-            enum: ["TODO_SUMA", "HASTA_LLENAR_VACANTES", "REVISION_MANUAL"],
-          },
-          limiteVacantes: { type: "integer", minimum: 1, nullable: true },
           fechaCierre: { type: "string", format: "date-time", nullable: true },
         },
       },
@@ -1765,7 +1929,10 @@ export const openapi = {
           pronombres: { type: "array", items: { type: "string", minLength: 1 } },
           presentacion: { type: "string", nullable: true },
           recibeMensajeriaInterna: { type: "boolean" },
-          redesSociales: { type: "array", items: { $ref: "#/components/schemas/RedSocial" } },
+          redesSociales: {
+            type: "array",
+            items: { $ref: "#/components/schemas/RedSocial" },
+          },
         },
       },
 
@@ -1787,10 +1954,15 @@ export const openapi = {
 
       AnotarColaborador: {
         type: "object",
-        required: ["colaboradorId"],
+        required: ["colaboradorId", "perfilId"],
         additionalProperties: false,
         properties: {
           colaboradorId: { type: "string", minLength: 1 },
+          perfilId: {
+            type: "string",
+            minLength: 1,
+            description: "Perfil al que se postula.",
+          },
           esPublica: {
             type: "boolean",
             default: true,

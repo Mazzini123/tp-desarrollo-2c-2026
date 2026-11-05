@@ -11,9 +11,6 @@
 
 import { aObjectId } from "./ids.js";
 
-// Dado de baja = tiene una fecha en fechaBaja. $type distingue sin ambiguedad
-// una fecha ("date") de un null ("null") o de un campo que no existe
-// ("missing", en los colectivos guardados antes de esta entrega).
 const estaDadoDeBaja = { $eq: [{ $type: "$fechaBaja" }, "date"] };
 
 export function colectivosPorEstado() {
@@ -35,8 +32,6 @@ export function proyectosPorEstado() {
   ];
 }
 
-// Agrupa por estado y por si es publica o anonima a la vez: con un solo
-// recorrido salen los dos numeros.
 export function colaboracionesPorEstado() {
   return [
     { $unwind: "$proyectos" },
@@ -53,7 +48,6 @@ export function colaboracionesPorEstado() {
   ];
 }
 
-// La demanda: que habilidades piden mas los perfiles de los proyectos.
 export function habilidadesMasRequeridas(limite) {
   return [
     { $unwind: "$proyectos" },
@@ -65,14 +59,11 @@ export function habilidadesMasRequeridas(limite) {
         cantidad: { $sum: 1 },
       },
     },
-    // El _id desempata, para que el orden sea siempre el mismo.
     { $sort: { cantidad: -1, _id: 1 } },
     { $limit: limite },
   ];
 }
 
-// La oferta: que habilidades tienen mas personas (sobre la coleccion de
-// colaboradores).
 export function habilidadesMasOfrecidas(limite) {
   return [
     { $unwind: "$habilidades" },
@@ -93,10 +84,8 @@ export function estadisticasDeColectivo(colectivoId) {
   const lista = (campo) => ({ $ifNull: [`$${campo}`, []] });
 
   return [
-    // aggregate() no convierte el id de texto a ObjectId: va a mano.
     { $match: { _id: aObjectId(colectivoId) } },
     { $unwind: "$proyectos" },
-    // De aca en adelante, cada documento ES un proyecto.
     { $replaceRoot: { newRoot: "$proyectos" } },
     {
       $facet: {

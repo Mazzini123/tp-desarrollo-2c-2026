@@ -74,6 +74,7 @@ describe("colaboradoras potenciales segun un perfil", () => {
     const completa = (await buscar()).items[0].colaborador;
     await s.colaboracionService.registrar({
       proyectoId: proyecto.id,
+      perfilId: proyecto.perfiles[0].id,
       colaboradorId: completa.id,
     });
 
@@ -82,41 +83,66 @@ describe("colaboradoras potenciales segun un perfil", () => {
 });
 
 describe("proyectos potenciales segun las habilidades de una persona", () => {
-  test("coincide con aceptaPostulaciones, cumpleAlgunPerfil y !yaColaboraron", async () => {
+  test("coincide con la regla de dominio, perfil por perfil", async () => {
     const colectivo = await s.colectivoService.crear({
       nombre: "Fundacion",
       descripcion: "...",
       tipoColectivo: "FUNDACION",
     });
-    const crear = (titulo, perfiles, extra = {}) =>
+    const crear = (titulo, perfiles) =>
       s.proyectoService.crear({
         colectivoId: colectivo.id,
         titulo,
         descripcion: "...",
-        perfiles: perfiles.map((requeridas) => datosDePerfil({ requeridas })),
-        ...extra,
+        perfiles: perfiles.map(({ requeridas, ...extra }) => ({
+          ...datosDePerfil({ requeridas }),
+          ...extra,
+        })),
       });
+    const nodo = [CODIGOS.node];
 
-    await crear("A: pide node", [[CODIGOS.node]]);
-    await crear("B: pide node y react", [[CODIGOS.node, CODIGOS.react]]);
-    const c = await crear("C: finalizado", [[CODIGOS.node]]);
-    const d = await crear("D: cupo lleno", [[CODIGOS.node]], {
-      modoAceptacion: "HASTA_LLENAR_VACANTES",
-      limiteVacantes: 1,
-    });
-    const e = await crear("E: ya se postulo", [[CODIGOS.node]]);
+    await crear("A: pide node", [{ requeridas: nodo }]);
+    await crear("B: pide node y react", [{ requeridas: [CODIGOS.node, CODIGOS.react] }]);
+    const c = await crear("C: finalizado", [{ requeridas: nodo }]);
+    const d = await crear("D: limite alcanzado en modo automatico", [
+      {
+        requeridas: nodo,
+        modoAceptacion: "HASTA_LLENAR_VACANTES",
+        limiteColaboraciones: 1,
+      },
+    ]);
+    const e = await crear("E: ya se postulo", [{ requeridas: nodo }]);
     await crear("F: un perfil de react y otro de node", [
-      [CODIGOS.react],
-      [CODIGOS.node],
+      { requeridas: [CODIGOS.react] },
+      { requeridas: nodo },
+    ]);
+    await crear("G: busqueda cerrada", [{ requeridas: nodo, busquedaAbierta: false }]);
+    await crear("H: busqueda vencida", [
+      { requeridas: nodo, fechaCierreBusqueda: new Date("2000-01-01T00:00:00Z") },
+    ]);
+    const i = await crear("I: limite alcanzado en revision manual", [
+      { requeridas: nodo, modoAceptacion: "REVISION_MANUAL", limiteColaboraciones: 1 },
+    ]);
+    await crear("J: el perfil abierto pide react, el de node esta cerrado", [
+      { requeridas: [CODIGOS.react] },
+      { requeridas: nodo, busquedaAbierta: false },
     ]);
 
     await s.proyectoService.finalizar(c.id);
-    const otra = await crearPersona("otra", [CODIGOS.node]);
-    await s.colaboracionService.registrar({ proyectoId: d.id, colaboradorId: otra.id });
+    const otra = await crearPersona("otra", nodo);
+    await s.colaboracionService.registrar({
+      proyectoId: d.id,
+      perfilId: d.perfiles[0].id,
+      colaboradorId: otra.id,
+    });
+    const enI = await s.colaboracionService.registrar({
+      proyectoId: i.id,
+      perfilId: i.perfiles[0].id,
+      colaboradorId: otra.id,
+    });
+    await s.colaboracionService.aceptar(i.id, enI.id);
 
-    // Al darla de alta se le avisa cuantos proyectos le sirven (misma
-    // consulta): A, E y F. Todavia no se postulo a E.
-    const persona = await crearPersona("persona", [CODIGOS.node]);
+    const persona = await crearPersona("persona", nodo);
     const bandeja = await s.notificacionService.listar(persona.id);
     expect(bandeja.items[0].asunto).toBe(
       "Hay 3 proyecto(s) que coinciden con tus habilidades",
@@ -124,6 +150,7 @@ describe("proyectos potenciales segun las habilidades de una persona", () => {
 
     await s.colaboracionService.registrar({
       proyectoId: e.id,
+      perfilId: e.perfiles[0].id,
       colaboradorId: persona.id,
     });
 
@@ -134,14 +161,19 @@ describe("proyectos potenciales segun las habilidades de una persona", () => {
     ]);
     expect(pagina.total).toBe(2);
 
-    // Contra la regla de dominio, proyecto por proyecto.
     const titulosEncontrados = new Set(pagina.items.map((p) => p.titulo));
     const todos = (await s.colectivoService.buscarPorId(colectivo.id)).proyectos;
+    const ahora = new Date();
     for (const proyecto of todos) {
       const segunDominio =
-        proyecto.aceptaPostulaciones() &&
-        proyecto.cumpleAlgunPerfil(persona) &&
-        !proyecto.yaColaboraron(persona);
+        proyecto.estaAbierto() &&
+        !proyecto.yaColaboraron(persona) &&
+        proyecto.perfiles.some(
+          (perfil) =>
+            perfil.aceptaPostulaciones(ahora) &&
+            !perfil.limiteAlcanzado(proyecto.cantidadAceptadas(perfil)) &&
+            perfil.cumpleHabilidadesRequeridas(persona),
+        );
       expect([proyecto.titulo, titulosEncontrados.has(proyecto.titulo)]).toEqual([
         proyecto.titulo,
         segunDominio,

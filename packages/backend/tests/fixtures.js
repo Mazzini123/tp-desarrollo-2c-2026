@@ -36,12 +36,19 @@ export const CODIGOS = {
   cypress: "testing_e2e_con_cypress",
 };
 
-export function datosDePerfil({ requeridas = [CODIGOS.node], opcionales = [] } = {}) {
+export function datosDePerfil({
+  requeridas = [CODIGOS.node],
+  opcionales = [],
+  modoAceptacion = "TODO_SUMA",
+  limiteColaboraciones = null,
+} = {}) {
   return {
     descripcion: "Perfil de prueba",
     compromiso: { cantidadHoras: 5, periodo: "HS_MENSUALES" },
     codigosHabilidadesRequeridas: requeridas,
     codigosHabilidadesOpcionales: opcionales,
+    modoAceptacion,
+    limiteColaboraciones,
   };
 }
 

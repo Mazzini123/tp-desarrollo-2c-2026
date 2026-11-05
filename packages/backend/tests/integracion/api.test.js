@@ -58,7 +58,11 @@ test("una postulacion anonima no muestra quien la hizo", async () => {
 
   await api
     .post(`/proyectos/${proyecto.body.id}/colaboraciones`)
-    .send({ colaboradorId: ada.body.id, esPublica: false })
+    .send({
+      colaboradorId: ada.body.id,
+      perfilId: proyecto.body.perfiles[0].id,
+      esPublica: false,
+    })
     .expect(201);
 
   const colaboraciones = await api.get(`/proyectos/${proyecto.body.id}/colaboraciones`);

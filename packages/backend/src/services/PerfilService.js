@@ -6,11 +6,18 @@ import {
   MODALIDAD_COLABORACION,
   esModalidadColaboracionValida,
 } from "../domain/enums/MODALIDAD_COLABORACION.js";
+import { MODO_ACEPTACION } from "../domain/enums/MODO_ACEPTACION.js";
+import {
+  aplicarModoDeAceptacion,
+  notificarResoluciones,
+  validarModoDeAceptacion,
+} from "./reglasDePostulacion.js";
 
 export class PerfilService {
-  constructor({ colectivoRepository, habilidadService }) {
+  constructor({ colectivoRepository, habilidadService, notificacionService }) {
     this.colectivoRepository = colectivoRepository;
     this.habilidadService = habilidadService;
+    this.notificacionService = notificacionService;
   }
 
   async listar(proyectoId) {
@@ -31,7 +38,9 @@ export class PerfilService {
     const resultado = await this.colectivoRepository.buscarPerfil(proyectoId, perfilId);
 
     if (!resultado) {
-      throw new NotFoundError(`No existe un perfil con id "${perfilId}" en el proyecto "${proyectoId}"`);
+      throw new NotFoundError(
+        `No existe un perfil con id "${perfilId}" en el proyecto "${proyectoId}"`,
+      );
     }
 
     return resultado;
@@ -56,8 +65,24 @@ export class PerfilService {
     return perfil;
   }
 
-  async actualizar(proyectoId, perfilId, { descripcion, compromiso, modalidadColaboracion }) {
-    const { colectivo, proyecto, perfil } = await this.buscarPerfilConProyecto(proyectoId, perfilId);
+  async actualizar(
+    proyectoId,
+    perfilId,
+    {
+      descripcion,
+      compromiso,
+      modalidadColaboracion,
+      busquedaAbierta,
+      fechaCierreBusqueda,
+      limiteColaboraciones,
+      modoAceptacion,
+    },
+    ahora = new Date(),
+  ) {
+    const { colectivo, proyecto, perfil } = await this.buscarPerfilConProyecto(
+      proyectoId,
+      perfilId,
+    );
     this.verificarProyectoAbierto(proyecto, "modificar perfiles de");
 
     if (descripcion !== undefined) {
@@ -69,15 +94,42 @@ export class PerfilService {
     }
 
     if (modalidadColaboracion !== undefined) {
-      perfil.modalidadColaboracion = this.resolverModalidadColaboracion(modalidadColaboracion);
+      perfil.modalidadColaboracion =
+        this.resolverModalidadColaboracion(modalidadColaboracion);
+    }
+
+    if (busquedaAbierta !== undefined) {
+      perfil.busquedaAbierta = busquedaAbierta;
+    }
+
+    if (fechaCierreBusqueda !== undefined) {
+      perfil.fechaCierreBusqueda = fechaCierreBusqueda;
+    }
+
+    let cambios = { aceptadas: [], rechazadas: [] };
+    if (modoAceptacion !== undefined || limiteColaboraciones !== undefined) {
+      const nuevoModo = modoAceptacion ?? perfil.modoAceptacion;
+      const nuevoLimite =
+        limiteColaboraciones !== undefined
+          ? limiteColaboraciones
+          : perfil.limiteColaboraciones;
+      validarModoDeAceptacion(nuevoModo, nuevoLimite, proyecto.cantidadAceptadas(perfil));
+
+      perfil.modoAceptacion = nuevoModo;
+      perfil.limiteColaboraciones = nuevoLimite;
+      cambios = aplicarModoDeAceptacion(proyecto, perfil, ahora);
     }
 
     await this.colectivoRepository.guardar(colectivo);
+    await notificarResoluciones(this.notificacionService, proyecto, cambios);
     return perfil;
   }
 
   async eliminar(proyectoId, perfilId) {
-    const { colectivo, proyecto, perfil } = await this.buscarPerfilConProyecto(proyectoId, perfilId);
+    const { colectivo, proyecto, perfil } = await this.buscarPerfilConProyecto(
+      proyectoId,
+      perfilId,
+    );
     this.verificarProyectoAbierto(proyecto, "eliminar perfiles de");
 
     if (proyecto.perfiles.length <= 1) {
@@ -89,17 +141,24 @@ export class PerfilService {
   }
 
   async agregarHabilidadRequerida(proyectoId, perfilId, codigoHabilidad) {
-    const { colectivo, proyecto, perfil } = await this.buscarPerfilConProyecto(proyectoId, perfilId);
+    const { colectivo, proyecto, perfil } = await this.buscarPerfilConProyecto(
+      proyectoId,
+      perfilId,
+    );
     this.verificarProyectoAbierto(proyecto, "agregar habilidades a perfiles de");
 
     const [habilidad] = await this.habilidadService.resolverPorCodigos([codigoHabilidad]);
 
     if (perfil.tieneHabilidadOpcional(habilidad)) {
-      throw new ConflictError(`La habilidad "${codigoHabilidad}" ya es opcional en este perfil`);
+      throw new ConflictError(
+        `La habilidad "${codigoHabilidad}" ya es opcional en este perfil`,
+      );
     }
 
     if (perfil.tieneHabilidadRequerida(habilidad)) {
-      throw new ConflictError(`La habilidad "${codigoHabilidad}" ya es requerida en este perfil`);
+      throw new ConflictError(
+        `La habilidad "${codigoHabilidad}" ya es requerida en este perfil`,
+      );
     }
 
     perfil.agregarHabilidadRequerida(habilidad);
@@ -108,13 +167,20 @@ export class PerfilService {
   }
 
   async quitarHabilidadRequerida(proyectoId, perfilId, codigoHabilidad) {
-    const { colectivo, proyecto, perfil } = await this.buscarPerfilConProyecto(proyectoId, perfilId);
+    const { colectivo, proyecto, perfil } = await this.buscarPerfilConProyecto(
+      proyectoId,
+      perfilId,
+    );
     this.verificarProyectoAbierto(proyecto, "quitar habilidades de perfiles de");
 
-    const habilidad = perfil.habilidadesRequeridas.find((item) => item.codigo === codigoHabilidad);
+    const habilidad = perfil.habilidadesRequeridas.find(
+      (item) => item.codigo === codigoHabilidad,
+    );
 
     if (!habilidad) {
-      throw new NotFoundError(`La habilidad "${codigoHabilidad}" no es requerida por el perfil "${perfilId}"`);
+      throw new NotFoundError(
+        `La habilidad "${codigoHabilidad}" no es requerida por el perfil "${perfilId}"`,
+      );
     }
 
     if (perfil.habilidadesRequeridas.length <= 1) {
@@ -127,17 +193,24 @@ export class PerfilService {
   }
 
   async agregarHabilidadOpcional(proyectoId, perfilId, codigoHabilidad) {
-    const { colectivo, proyecto, perfil } = await this.buscarPerfilConProyecto(proyectoId, perfilId);
+    const { colectivo, proyecto, perfil } = await this.buscarPerfilConProyecto(
+      proyectoId,
+      perfilId,
+    );
     this.verificarProyectoAbierto(proyecto, "agregar habilidades a perfiles de");
 
     const [habilidad] = await this.habilidadService.resolverPorCodigos([codigoHabilidad]);
 
     if (perfil.tieneHabilidadRequerida(habilidad)) {
-      throw new ConflictError(`La habilidad "${codigoHabilidad}" ya es requerida en este perfil`);
+      throw new ConflictError(
+        `La habilidad "${codigoHabilidad}" ya es requerida en este perfil`,
+      );
     }
 
     if (perfil.tieneHabilidadOpcional(habilidad)) {
-      throw new ConflictError(`La habilidad "${codigoHabilidad}" ya es opcional en este perfil`);
+      throw new ConflictError(
+        `La habilidad "${codigoHabilidad}" ya es opcional en este perfil`,
+      );
     }
 
     perfil.agregarHabilidadOpcional(habilidad);
@@ -146,13 +219,20 @@ export class PerfilService {
   }
 
   async quitarHabilidadOpcional(proyectoId, perfilId, codigoHabilidad) {
-    const { colectivo, proyecto, perfil } = await this.buscarPerfilConProyecto(proyectoId, perfilId);
+    const { colectivo, proyecto, perfil } = await this.buscarPerfilConProyecto(
+      proyectoId,
+      perfilId,
+    );
     this.verificarProyectoAbierto(proyecto, "quitar habilidades de perfiles de");
 
-    const habilidad = perfil.habilidadesOpcionales.find((item) => item.codigo === codigoHabilidad);
+    const habilidad = perfil.habilidadesOpcionales.find(
+      (item) => item.codigo === codigoHabilidad,
+    );
 
     if (!habilidad) {
-      throw new NotFoundError(`La habilidad "${codigoHabilidad}" no es opcional en el perfil "${perfilId}"`);
+      throw new NotFoundError(
+        `La habilidad "${codigoHabilidad}" no es opcional en el perfil "${perfilId}"`,
+      );
     }
 
     perfil.quitarHabilidadOpcional(habilidad);
@@ -166,7 +246,9 @@ export class PerfilService {
     }
 
     if (!esModalidadColaboracionValida(modalidadColaboracion)) {
-      throw new DomainError(`Modalidad de colaboración inválida: ${modalidadColaboracion}`);
+      throw new DomainError(
+        `Modalidad de colaboración inválida: ${modalidadColaboracion}`,
+      );
     }
 
     return modalidadColaboracion;
@@ -192,8 +274,15 @@ export class PerfilService {
     modalidadColaboracion,
     codigosHabilidadesRequeridas,
     codigosHabilidadesOpcionales = [],
+    busquedaAbierta = true,
+    fechaCierreBusqueda = null,
+    limiteColaboraciones = null,
+    modoAceptacion = MODO_ACEPTACION.REVISION_MANUAL,
   }) {
-    if (!Array.isArray(codigosHabilidadesRequeridas) || codigosHabilidadesRequeridas.length === 0) {
+    if (
+      !Array.isArray(codigosHabilidadesRequeridas) ||
+      codigosHabilidadesRequeridas.length === 0
+    ) {
       throw new DomainError("El perfil debe tener al menos una habilidad requerida");
     }
 
@@ -207,8 +296,12 @@ export class PerfilService {
     const repetidasEntreListas = opcionales.filter((codigo) => requeridasSet.has(codigo));
 
     if (repetidasEntreListas.length > 0) {
-      throw new DomainError(`Una habilidad no puede ser requerida y opcional al mismo tiempo: ${repetidasEntreListas.join(", ")}`);
+      throw new DomainError(
+        `Una habilidad no puede ser requerida y opcional al mismo tiempo: ${repetidasEntreListas.join(", ")}`,
+      );
     }
+
+    validarModoDeAceptacion(modoAceptacion, limiteColaboraciones);
 
     // Devuelve los DATOS del perfil: quien lo use lo agrega al proyecto con
     // proyecto.agregarPerfil(), que crea el subdocumento. Las habilidades del
@@ -219,7 +312,13 @@ export class PerfilService {
       modalidadColaboracion: this.resolverModalidadColaboracion(modalidadColaboracion),
       habilidadesRequeridas: await this.habilidadService.resolverPorCodigos(requeridas),
       habilidadesOpcionales:
-        opcionales.length > 0 ? await this.habilidadService.resolverPorCodigos(opcionales) : [],
+        opcionales.length > 0
+          ? await this.habilidadService.resolverPorCodigos(opcionales)
+          : [],
+      busquedaAbierta,
+      fechaCierreBusqueda,
+      limiteColaboraciones,
+      modoAceptacion,
     };
   }
 }

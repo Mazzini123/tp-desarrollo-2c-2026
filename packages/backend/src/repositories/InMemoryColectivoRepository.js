@@ -60,15 +60,22 @@ export class InMemoryColectivoRepository extends InMemoryRepository {
     return this.listar().flatMap((colectivo) => colectivo.proyectos);
   }
 
-  // La version de referencia de la regla: usa los metodos de dominio. La de
-  // Mongo es la misma regla escrita como consulta (y el test de integracion
-  // chequea que coincidan).
-  buscarProyectosCompatibles(colaborador, numeroPagina, limitePorPagina) {
+  buscarProyectosCompatibles(
+    colaborador,
+    numeroPagina,
+    limitePorPagina,
+    ahora = new Date(),
+  ) {
     const todos = this.listarProyectos().filter(
       (proyecto) =>
-        proyecto.aceptaPostulaciones() &&
-        proyecto.cumpleAlgunPerfil(colaborador) &&
-        !proyecto.yaColaboraron(colaborador),
+        proyecto.estaAbierto() &&
+        !proyecto.yaColaboraron(colaborador) &&
+        proyecto.perfiles.some(
+          (perfil) =>
+            perfil.aceptaPostulaciones(ahora) &&
+            !perfil.limiteAlcanzado(proyecto.cantidadAceptadas(perfil)) &&
+            perfil.cumpleHabilidadesRequeridas(colaborador),
+        ),
     );
     const inicio = (numeroPagina - 1) * limitePorPagina;
 

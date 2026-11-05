@@ -1,10 +1,5 @@
 import { InMemoryRepository } from "./InMemoryRepository.js";
-
-// Doble de test de MongoColaboradorRepository: las mismas consultas, hechas
-// recorriendo la lista. Aca si se filtra en memoria; en produccion lo hace
-// la base (ver la version Mongo).
 export class InMemoryColaboradorRepository extends InMemoryRepository {
-  // Las que tienen TODAS las habilidades pedidas.
   buscarPorHabilidades(codigos) {
     return this.listar().filter((colaborador) => tieneTodas(colaborador, codigos));
   }
@@ -24,7 +19,6 @@ export class InMemoryColaboradorRepository extends InMemoryRepository {
           tiene(colaborador, codigo),
         ),
       }))
-      // sort es estable: a igual cantidad de opcionales, queda el orden de alta.
       .sort(
         (a, b) =>
           b.habilidadesOpcionalesQueTiene.length - a.habilidadesOpcionalesQueTiene.length,

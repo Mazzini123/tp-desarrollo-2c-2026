@@ -14,7 +14,8 @@ describe("ColaboracionService · anotar un colaborador", () => {
 
   beforeEach(async () => {
     services = await armarServices();
-    proyecto = (await crearProyectoDePrueba(services, { habilidades: [CODIGOS.node] })).proyecto;
+    proyecto = (await crearProyectoDePrueba(services, { habilidades: [CODIGOS.node] }))
+      .proyecto;
   });
 
   test("se anota si tiene la habilidad requerida", async () => {
@@ -24,11 +25,14 @@ describe("ColaboracionService · anotar un colaborador", () => {
 
     const colaboracion = await services.colaboracionService.registrar({
       proyectoId: proyecto.id,
+      perfilId: proyecto.perfiles[0].id,
       colaboradorId: colaborador.id,
     });
 
     expect(colaboracion.colaborador.id).toBe(colaborador.id);
-    expect(await services.colaboracionService.listarPorProyecto(proyecto.id)).toHaveLength(1);
+    expect(
+      await services.colaboracionService.listarPorProyecto(proyecto.id),
+    ).toHaveLength(1);
   });
 
   // El colaborador tiene que cumplir TODAS las habilidades requeridas de al
@@ -41,6 +45,7 @@ describe("ColaboracionService · anotar un colaborador", () => {
     await expect(
       services.colaboracionService.registrar({
         proyectoId: proyecto.id,
+        perfilId: proyecto.perfiles[0].id,
         colaboradorId: colaborador.id,
       }),
     ).rejects.toThrow(DomainError);
@@ -51,12 +56,15 @@ describe("ColaboracionService · anotar un colaborador", () => {
     const anotar = () =>
       services.colaboracionService.registrar({
         proyectoId: proyecto.id,
+        perfilId: proyecto.perfiles[0].id,
         colaboradorId: colaborador.id,
       });
 
     await anotar();
     await expect(anotar()).rejects.toThrow(ConflictError);
-    expect(await services.colaboracionService.listarPorProyecto(proyecto.id)).toHaveLength(1);
+    expect(
+      await services.colaboracionService.listarPorProyecto(proyecto.id),
+    ).toHaveLength(1);
   });
 
   // "Luego de esto, ya no se pueden anotar personas colaboradoras al mismo"
@@ -68,6 +76,7 @@ describe("ColaboracionService · anotar un colaborador", () => {
     await expect(
       services.colaboracionService.registrar({
         proyectoId: proyecto.id,
+        perfilId: proyecto.perfiles[0].id,
         colaboradorId: colaborador.id,
       }),
     ).rejects.toThrow(ConflictError);
@@ -95,11 +104,14 @@ describe("ColaboracionService · listar por colaborador", () => {
     for (const proyecto of [a, b]) {
       await services.colaboracionService.registrar({
         proyectoId: proyecto.id,
+        perfilId: proyecto.perfiles[0].id,
         colaboradorId: colaborador.id,
       });
     }
 
-    const resultado = await services.colaboracionService.listarPorColaborador(colaborador.id);
+    const resultado = await services.colaboracionService.listarPorColaborador(
+      colaborador.id,
+    );
     expect(resultado).toHaveLength(2);
     expect(resultado.map((r) => r.proyectoId).sort()).toEqual([a.id, b.id].sort());
   });

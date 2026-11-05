@@ -3,13 +3,7 @@ import { NotFoundError } from "../errors/NotFoundError.js";
 import { ConflictError } from "../errors/ConflictError.js";
 import { armarPaginado } from "../utils/paginacion.js";
 import { normalizarEtiquetas } from "../domain/etiquetas.js";
-import { MODO_ACEPTACION } from "../domain/enums/MODO_ACEPTACION.js";
-import {
-  aplicarModoDeAceptacion,
-  cerrarProyecto,
-  notificarResoluciones,
-  validarModoDeAceptacion,
-} from "./reglasDePostulacion.js";
+import { cerrarProyecto, notificarResoluciones } from "./reglasDePostulacion.js";
 
 export class ProyectoService {
   constructor({
@@ -26,37 +20,28 @@ export class ProyectoService {
     this.avisoAutomaticoService = avisoAutomaticoService;
   }
 
-  async crear({
-    colectivoId,
-    titulo,
-    descripcion,
-    perfiles,
-    etiquetas = [],
-    modoAceptacion = MODO_ACEPTACION.TODO_SUMA,
-    limiteVacantes = null,
-    fechaCierre = null,
-  }, ahora = new Date()) {
+  async crear(
+    { colectivoId, titulo, descripcion, perfiles, etiquetas = [], fechaCierre = null },
+    ahora = new Date(),
+  ) {
     if (!Array.isArray(perfiles) || perfiles.length === 0) {
       throw new DomainError("El proyecto debe tener al menos un perfil");
     }
 
-    validarModoDeAceptacion(modoAceptacion, limiteVacantes);
     this.validarFechaCierre(fechaCierre, ahora);
 
     const colectivo = await this.colectivoService.buscarPorId(colectivoId);
     if (colectivo.estaDadoDeBaja()) {
       throw new ConflictError("Un colectivo dado de baja no puede publicar proyectos");
     }
-    // construirPerfil es async (resuelve habilidades): Promise.all espera a todos.
+
     const perfilesConstruidos = await Promise.all(
       perfiles.map((datos) => this.perfilService.construirPerfil(datos)),
     );
-    // El proyecto se crea adentro del colectivo: es un subdocumento suyo.
+
     const proyecto = colectivo.agregarProyecto({
       titulo,
       descripcion,
-      modoAceptacion,
-      limiteVacantes,
       fechaCierre,
       fechaCreacion: ahora,
       etiquetas: normalizarEtiquetas(etiquetas),
@@ -77,9 +62,13 @@ export class ProyectoService {
 
   async listar({ numeroPagina = 1, limitePorPagina = 10, etiqueta } = {}) {
     return armarPaginado(
-      await this.colectivoRepository.listarProyectosPaginado(numeroPagina, limitePorPagina, {
-        etiqueta,
-      }),
+      await this.colectivoRepository.listarProyectosPaginado(
+        numeroPagina,
+        limitePorPagina,
+        {
+          etiqueta,
+        },
+      ),
       numeroPagina,
       limitePorPagina,
     );
@@ -105,7 +94,6 @@ export class ProyectoService {
     try {
       await this.colectivoRepository.registrarVisualizacion(proyectoId);
     } catch (error) {
-      // Un contador que no se pudo sumar no puede impedir ver el proyecto.
       console.error("No se pudo registrar la visualizacion:", error.message);
     }
     return this.buscarPorId(proyectoId);
@@ -123,7 +111,7 @@ export class ProyectoService {
 
   async actualizar(
     proyectoId,
-    { titulo, descripcion, etiquetas, modoAceptacion, limiteVacantes, fechaCierre },
+    { titulo, descripcion, etiquetas, fechaCierre },
     ahora = new Date(),
   ) {
     const { colectivo, proyecto } = await this.buscarProyectoConColectivo(proyectoId);
@@ -141,28 +129,12 @@ export class ProyectoService {
       proyecto.etiquetas = normalizarEtiquetas(etiquetas);
     }
 
-    // "En cualquier momento el colectivo podra indicar una fecha limite de
-    // cierre". null la saca.
     if (fechaCierre !== undefined) {
       this.validarFechaCierre(fechaCierre, ahora);
       proyecto.fechaCierre = fechaCierre;
     }
 
-    let cambios = { aceptadas: [], rechazadas: [] };
-    if (modoAceptacion !== undefined || limiteVacantes !== undefined) {
-      const nuevoModo = modoAceptacion ?? proyecto.modoAceptacion;
-      const nuevoLimite = limiteVacantes !== undefined ? limiteVacantes : proyecto.limiteVacantes;
-      validarModoDeAceptacion(nuevoModo, nuevoLimite, proyecto.cantidadAceptadas());
-
-      proyecto.modoAceptacion = nuevoModo;
-      proyecto.limiteVacantes = nuevoLimite;
-      // Con las reglas nuevas se resuelven las pendientes que ya habia (por
-      // ejemplo, pasar a TODO_SUMA acepta a todas).
-      cambios = aplicarModoDeAceptacion(proyecto, ahora);
-    }
-
     await this.colectivoRepository.guardar(colectivo);
-    await notificarResoluciones(this.notificacionService, proyecto, cambios);
     return proyecto;
   }
 
@@ -174,10 +146,11 @@ export class ProyectoService {
     return proyecto;
   }
 
-  // Cierre con todas sus consecuencias. Lo usan el cierre manual, el
-  // automatico y cualquier operacion que descubra un cierre vencido.
   async cerrar(colectivo, proyectos, ahora) {
-    const cambios = proyectos.map((proyecto) => [proyecto, cerrarProyecto(proyecto, ahora)]);
+    const cambios = proyectos.map((proyecto) => [
+      proyecto,
+      cerrarProyecto(proyecto, ahora),
+    ]);
     await this.colectivoRepository.guardar(colectivo);
 
     for (const [proyecto, cambiosDelProyecto] of cambios) {

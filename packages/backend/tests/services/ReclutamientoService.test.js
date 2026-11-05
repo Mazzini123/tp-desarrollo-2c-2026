@@ -1,4 +1,9 @@
-import { armarServices, crearColectivoDePrueba, datosDePerfil, CODIGOS } from "../fixtures.js";
+import {
+  armarServices,
+  crearColectivoDePrueba,
+  datosDePerfil,
+  CODIGOS,
+} from "../fixtures.js";
 import { DomainError } from "../../src/errors/DomainError.js";
 import { ConflictError } from "../../src/errors/ConflictError.js";
 import { NotFoundError } from "../../src/errors/NotFoundError.js";
@@ -60,7 +65,11 @@ describe("ReclutamientoService · buscar colaboradoras segun un perfil", () => {
 
   test("no incluye a quien ya se postulo al proyecto", async () => {
     const ada = await crear("ada", [CODIGOS.node]);
-    await services.colaboracionService.registrar({ proyectoId: proyecto.id, colaboradorId: ada.id });
+    await services.colaboracionService.registrar({
+      proyectoId: proyecto.id,
+      perfilId: proyecto.perfiles[0].id,
+      colaboradorId: ada.id,
+    });
 
     expect((await buscar()).total).toBe(0);
   });
@@ -75,10 +84,14 @@ describe("ReclutamientoService · buscar colaboradoras segun un perfil", () => {
     for (const nombre of ["a", "b", "c"]) {
       await crear(nombre, [CODIGOS.node]);
     }
-    const pagina = await services.reclutamientoService.buscarColaboradoras(proyecto.id, perfil.id, {
-      numeroPagina: 2,
-      limitePorPagina: 2,
-    });
+    const pagina = await services.reclutamientoService.buscarColaboradoras(
+      proyecto.id,
+      perfil.id,
+      {
+        numeroPagina: 2,
+        limitePorPagina: 2,
+      },
+    );
     expect(pagina.items).toHaveLength(1);
     expect(pagina.totalPaginas).toBe(2);
   });
@@ -93,14 +106,17 @@ describe("ReclutamientoService · buscar proyectos segun habilidades", () => {
     colectivo = await crearColectivoDePrueba(services.colectivoService);
   });
 
-  const crearProyecto = ({ titulo = "Proyecto", requeridas = [CODIGOS.node], modoAceptacion, limiteVacantes } = {}) =>
+  const crearProyecto = ({
+    titulo = "Proyecto",
+    requeridas = [CODIGOS.node],
+    modoAceptacion,
+    limiteColaboraciones,
+  } = {}) =>
     services.proyectoService.crear({
       colectivoId: colectivo.id,
       titulo,
       descripcion: "...",
-      perfiles: [datosDePerfil({ requeridas })],
-      modoAceptacion,
-      limiteVacantes,
+      perfiles: [datosDePerfil({ requeridas, modoAceptacion, limiteColaboraciones })],
     });
 
   const crearColaborador = (cuentaGit, habilidades) =>
@@ -111,7 +127,10 @@ describe("ReclutamientoService · buscar proyectos segun habilidades", () => {
   }
 
   test("devuelve solo los proyectos donde cumple algun perfil", async () => {
-    const compatible = await crearProyecto({ titulo: "Compatible", requeridas: [CODIGOS.node] });
+    const compatible = await crearProyecto({
+      titulo: "Compatible",
+      requeridas: [CODIGOS.node],
+    });
     await crearProyecto({ titulo: "No compatible", requeridas: [CODIGOS.react] });
 
     const ada = await crearColaborador("ada", [CODIGOS.node]);
@@ -129,13 +148,17 @@ describe("ReclutamientoService · buscar proyectos segun habilidades", () => {
     expect((await buscar(ada.id)).total).toBe(0);
   });
 
-  test("no incluye proyectos con el cupo de vacantes completo", async () => {
+  test("no incluye proyectos cuyo perfil alcanzo el limite de colaboraciones", async () => {
     const proyecto = await crearProyecto({
       modoAceptacion: "HASTA_LLENAR_VACANTES",
-      limiteVacantes: 1,
+      limiteColaboraciones: 1,
     });
     const grace = await crearColaborador("grace", [CODIGOS.node]);
-    await services.colaboracionService.registrar({ proyectoId: proyecto.id, colaboradorId: grace.id });
+    await services.colaboracionService.registrar({
+      proyectoId: proyecto.id,
+      perfilId: proyecto.perfiles[0].id,
+      colaboradorId: grace.id,
+    });
 
     const ada = await crearColaborador("ada", [CODIGOS.node]);
     expect((await buscar(ada.id)).total).toBe(0);
@@ -144,7 +167,11 @@ describe("ReclutamientoService · buscar proyectos segun habilidades", () => {
   test("no incluye un proyecto al que ya se postulo", async () => {
     const proyecto = await crearProyecto();
     const ada = await crearColaborador("ada", [CODIGOS.node]);
-    await services.colaboracionService.registrar({ proyectoId: proyecto.id, colaboradorId: ada.id });
+    await services.colaboracionService.registrar({
+      proyectoId: proyecto.id,
+      perfilId: proyecto.perfiles[0].id,
+      colaboradorId: ada.id,
+    });
 
     expect((await buscar(ada.id)).total).toBe(0);
   });
@@ -199,7 +226,10 @@ describe("ReclutamientoService · invitar", () => {
     const notificacion = await invitar(ada.id);
 
     expect(notificacion.tipo).toBe("INVITACION");
-    expect(notificacion.referencias).toMatchObject({ proyectoId: proyecto.id, perfilId: perfil.id });
+    expect(notificacion.referencias).toMatchObject({
+      proyectoId: proyecto.id,
+      perfilId: perfil.id,
+    });
     expect(notificacion.contenido).toContain("Nos encantaria contar con vos");
     // El aviso automatico del alta (req. 9) y la invitacion.
     expect(services.canales.EMAIL.enviados.map((m) => m.asunto)).toEqual([

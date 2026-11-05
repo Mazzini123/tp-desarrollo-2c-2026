@@ -1,8 +1,3 @@
-// Lo que un perfil de un proyecto SABE HACER. Vive embebido en el proyecto:
-// perfilSchema (models/ColectivoModel.js) carga esta clase con loadClass.
-//
-// Las habilidades se guardan como copia {codigo, titulo} y se comparan por
-// codigo (equals): da igual si llega la del catalogo o la copia.
 export class Perfil {
   tieneHabilidad(lista, habilidad) {
     return lista.some((item) => item.equals(habilidad));
@@ -57,5 +52,19 @@ export class Perfil {
     return this.habilidadesOpcionales.some((habilidad) =>
       colaborador.tieneHabilidad(habilidad),
     );
+  }
+
+  tieneLimite() {
+    return this.limiteColaboraciones !== null && this.limiteColaboraciones !== undefined;
+  }
+
+  limiteAlcanzado(cantidadAceptadas) {
+    return this.tieneLimite() && cantidadAceptadas >= this.limiteColaboraciones;
+  }
+
+  aceptaPostulaciones(ahora = new Date()) {
+    const vencida =
+      Boolean(this.fechaCierreBusqueda) && this.fechaCierreBusqueda <= ahora;
+    return this.busquedaAbierta && !vencida;
   }
 }

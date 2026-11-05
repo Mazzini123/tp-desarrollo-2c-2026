@@ -10,8 +10,6 @@ export async function cargarHabilidadesIniciales(habilidadService) {
   const existentes = await habilidadService.listarTodas();
   if (existentes.length > 0) return;
 
-  // for...of en vez de forEach: forEach NO espera a las promesas,
-  // dispararia las 5 cargas a la vez y seguiria de largo.
   for (const datos of HABILIDADES_INICIALES) {
     await habilidadService.crear({ ...datos, usuario: "seed" });
   }

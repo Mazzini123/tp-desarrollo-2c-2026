@@ -33,11 +33,20 @@ describe("Timeline de un colectivo", () => {
       codigosHabilidades: [CODIGOS.node],
     });
     const publica = await services.colaboracionService.registrar(
-      { proyectoId: proyecto.id, colaboradorId: ada.id },
+      {
+        proyectoId: proyecto.id,
+        perfilId: proyecto.perfiles[0].id,
+        colaboradorId: ada.id,
+      },
       dia(3),
     );
     await services.colaboracionService.registrar(
-      { proyectoId: proyecto.id, colaboradorId: grace.id, esPublica: false },
+      {
+        proyectoId: proyecto.id,
+        perfilId: proyecto.perfiles[0].id,
+        colaboradorId: grace.id,
+        esPublica: false,
+      },
       dia(3),
     );
     await services.colaboracionService.finalizar(proyecto.id, publica.id, dia(4));
@@ -97,6 +106,8 @@ describe("Timeline de un colectivo", () => {
 
   test("un colectivo que no existe tira NotFoundError", async () => {
     const services = await armarServices();
-    await expect(services.colectivoService.timeline("no-existe")).rejects.toThrow(NotFoundError);
+    await expect(services.colectivoService.timeline("no-existe")).rejects.toThrow(
+      NotFoundError,
+    );
   });
 });
