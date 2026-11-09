@@ -69,6 +69,7 @@ export class PerfilService {
     proyectoId,
     perfilId,
     {
+      titulo,
       descripcion,
       compromiso,
       modalidadColaboracion,
@@ -76,6 +77,9 @@ export class PerfilService {
       fechaCierreBusqueda,
       limiteColaboraciones,
       modoAceptacion,
+      codigosHabilidadesRequeridas,
+      codigosHabilidadesOpcionales,
+      versionEdicion,
     },
     ahora = new Date(),
   ) {
@@ -83,38 +87,59 @@ export class PerfilService {
       proyectoId,
       perfilId,
     );
-    this.verificarProyectoAbierto(proyecto, "modificar perfiles de");
+    this.verificarEdicion(proyecto, perfil, versionEdicion);
 
-    if (descripcion !== undefined) {
-      perfil.descripcion = descripcion;
+    let habilidades;
+    if (
+      codigosHabilidadesRequeridas !== undefined ||
+      codigosHabilidadesOpcionales !== undefined
+    ) {
+      if (
+        !versionEdicion ||
+        codigosHabilidadesRequeridas === undefined ||
+        codigosHabilidadesOpcionales === undefined
+      ) {
+        throw new DomainError(
+          "Para actualizar las habilidades se necesitan ambos grupos y la versión del perfil",
+        );
+      }
+      habilidades = await this.construirHabilidades(
+        codigosDeHabilidades(codigosHabilidadesRequeridas, codigosHabilidadesOpcionales),
+        perfil,
+      );
+      this.verificarEdicion(proyecto, perfil, versionEdicion);
     }
 
-    if (compromiso !== undefined) {
-      perfil.compromiso = this.construirCompromiso(compromiso);
-    }
-
-    if (modalidadColaboracion !== undefined) {
-      perfil.modalidadColaboracion =
-        this.resolverModalidadColaboracion(modalidadColaboracion);
-    }
-
-    if (busquedaAbierta !== undefined) {
-      perfil.busquedaAbierta = busquedaAbierta;
-    }
-
-    if (fechaCierreBusqueda !== undefined) {
-      perfil.fechaCierreBusqueda = fechaCierreBusqueda;
-    }
-
-    let cambios = { aceptadas: [], rechazadas: [] };
-    if (modoAceptacion !== undefined || limiteColaboraciones !== undefined) {
-      const nuevoModo = modoAceptacion ?? perfil.modoAceptacion;
-      const nuevoLimite =
-        limiteColaboraciones !== undefined
-          ? limiteColaboraciones
-          : perfil.limiteColaboraciones;
+    const nuevoCompromiso =
+      compromiso === undefined ? undefined : this.construirCompromiso(compromiso);
+    const nuevaModalidad =
+      modalidadColaboracion === undefined
+        ? undefined
+        : this.resolverModalidadColaboracion(modalidadColaboracion);
+    const cambiaAceptacion =
+      modoAceptacion !== undefined || limiteColaboraciones !== undefined;
+    const nuevoModo = modoAceptacion ?? perfil.modoAceptacion;
+    const nuevoLimite =
+      limiteColaboraciones === undefined
+        ? perfil.limiteColaboraciones
+        : limiteColaboraciones;
+    if (cambiaAceptacion) {
       validarModoDeAceptacion(nuevoModo, nuevoLimite, proyecto.cantidadAceptadas(perfil));
+    }
 
+    if (titulo !== undefined) perfil.titulo = titulo;
+    if (descripcion !== undefined) perfil.descripcion = descripcion;
+    if (nuevoCompromiso !== undefined) perfil.compromiso = nuevoCompromiso;
+    if (nuevaModalidad !== undefined) perfil.modalidadColaboracion = nuevaModalidad;
+    if (busquedaAbierta !== undefined) perfil.busquedaAbierta = busquedaAbierta;
+    if (fechaCierreBusqueda !== undefined)
+      perfil.fechaCierreBusqueda = fechaCierreBusqueda;
+    if (habilidades) {
+      perfil.habilidadesRequeridas = habilidades.habilidadesRequeridas;
+      perfil.habilidadesOpcionales = habilidades.habilidadesOpcionales;
+    }
+    let cambios = { aceptadas: [], rechazadas: [] };
+    if (cambiaAceptacion) {
       perfil.modoAceptacion = nuevoModo;
       perfil.limiteColaboraciones = nuevoLimite;
       cambios = aplicarModoDeAceptacion(proyecto, perfil, ahora);
@@ -123,6 +148,13 @@ export class PerfilService {
     await this.colectivoRepository.guardar(colectivo);
     await notificarResoluciones(this.notificacionService, proyecto, cambios);
     return perfil;
+  }
+
+  verificarEdicion(proyecto, perfil, versionEdicion) {
+    this.verificarProyectoAbierto(proyecto, "modificar perfiles de");
+    if (versionEdicion !== undefined && versionEdicion !== perfil.versionEdicion) {
+      throw new ConflictError("El perfil fue modificado desde que se abrió la edición");
+    }
   }
 
   async eliminar(proyectoId, perfilId) {
@@ -269,6 +301,7 @@ export class PerfilService {
   }
 
   async construirPerfil({
+    titulo = null,
     descripcion,
     compromiso,
     modalidadColaboracion,
@@ -279,46 +312,63 @@ export class PerfilService {
     limiteColaboraciones = null,
     modoAceptacion = MODO_ACEPTACION.REVISION_MANUAL,
   }) {
-    if (
-      !Array.isArray(codigosHabilidadesRequeridas) ||
-      codigosHabilidadesRequeridas.length === 0
-    ) {
-      throw new DomainError("El perfil debe tener al menos una habilidad requerida");
-    }
-
-    if (!Array.isArray(codigosHabilidadesOpcionales)) {
-      throw new DomainError("Las habilidades opcionales deben ser una lista");
-    }
-
-    const requeridas = [...new Set(codigosHabilidadesRequeridas)];
-    const opcionales = [...new Set(codigosHabilidadesOpcionales)];
-    const requeridasSet = new Set(requeridas);
-    const repetidasEntreListas = opcionales.filter((codigo) => requeridasSet.has(codigo));
-
-    if (repetidasEntreListas.length > 0) {
-      throw new DomainError(
-        `Una habilidad no puede ser requerida y opcional al mismo tiempo: ${repetidasEntreListas.join(", ")}`,
-      );
-    }
-
+    const codigos = codigosDeHabilidades(
+      codigosHabilidadesRequeridas,
+      codigosHabilidadesOpcionales,
+    );
     validarModoDeAceptacion(modoAceptacion, limiteColaboraciones);
 
-    // Devuelve los DATOS del perfil: quien lo use lo agrega al proyecto con
-    // proyecto.agregarPerfil(), que crea el subdocumento. Las habilidades del
-    // catalogo se guardan como copia {codigo, titulo} (lo resuelve el schema).
     return {
+      titulo,
       descripcion,
       compromiso: this.construirCompromiso(compromiso),
       modalidadColaboracion: this.resolverModalidadColaboracion(modalidadColaboracion),
-      habilidadesRequeridas: await this.habilidadService.resolverPorCodigos(requeridas),
-      habilidadesOpcionales:
-        opcionales.length > 0
-          ? await this.habilidadService.resolverPorCodigos(opcionales)
-          : [],
+      ...(await this.construirHabilidades(codigos)),
       busquedaAbierta,
       fechaCierreBusqueda,
       limiteColaboraciones,
       modoAceptacion,
     };
   }
+
+  async construirHabilidades({ requeridas, opcionales }, perfil) {
+    const [habilidadesRequeridas, habilidadesOpcionales] = await Promise.all([
+      this.resolverGrupoDeHabilidades(requeridas, perfil?.habilidadesRequeridas),
+      this.resolverGrupoDeHabilidades(opcionales, perfil?.habilidadesOpcionales),
+    ]);
+    return { habilidadesRequeridas, habilidadesOpcionales };
+  }
+
+  async resolverGrupoDeHabilidades(codigos, existentes = []) {
+    const porCodigo = new Map(
+      existentes.map((habilidad) => [habilidad.codigo, habilidad]),
+    );
+    const nuevas = codigos.filter((codigo) => !porCodigo.has(codigo));
+    if (nuevas.length > 0) {
+      for (const habilidad of await this.habilidadService.resolverPorCodigos(nuevas)) {
+        porCodigo.set(habilidad.codigo, habilidad);
+      }
+    }
+    return codigos.map((codigo) => porCodigo.get(codigo));
+  }
+}
+
+function codigosDeHabilidades(codigosRequeridos, codigosOpcionales) {
+  if (!Array.isArray(codigosRequeridos) || codigosRequeridos.length === 0) {
+    throw new DomainError("El perfil debe tener al menos una habilidad requerida");
+  }
+  if (!Array.isArray(codigosOpcionales)) {
+    throw new DomainError("Las habilidades opcionales deben ser una lista");
+  }
+
+  const requeridas = [...new Set(codigosRequeridos)];
+  const opcionales = [...new Set(codigosOpcionales)];
+  const requeridasSet = new Set(requeridas);
+  const repetidas = opcionales.filter((codigo) => requeridasSet.has(codigo));
+  if (repetidas.length > 0) {
+    throw new DomainError(
+      `Una habilidad no puede ser requerida y opcional al mismo tiempo: ${repetidas.join(", ")}`,
+    );
+  }
+  return { requeridas, opcionales };
 }

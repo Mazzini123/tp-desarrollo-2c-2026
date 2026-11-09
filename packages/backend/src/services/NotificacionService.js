@@ -40,7 +40,9 @@ export class NotificacionService {
   // allSettled y no all: si falla el SMS igual tiene que salir el email, y un
   // proveedor caido no puede hacer fallar la operacion que genero el aviso.
   async replicar(colaborador, notificacion) {
-    const medios = colaborador.mediosDeContacto.filter((medio) => this.canales[medio.tipo]);
+    const medios = colaborador.mediosDeContacto.filter(
+      (medio) => this.canales[medio.tipo],
+    );
 
     const resultados = await Promise.allSettled(
       medios.map((medio) =>
@@ -54,26 +56,37 @@ export class NotificacionService {
 
     return resultados.map((resultado, i) => {
       if (resultado.status === "rejected") {
-        console.error(`No se pudo replicar por ${medios[i].tipo}:`, resultado.reason?.message);
+        console.error(
+          `No se pudo replicar por ${medios[i].tipo}:`,
+          resultado.reason?.message,
+        );
       }
       return { canal: medios[i].tipo, exito: resultado.status === "fulfilled" };
     });
   }
 
-  async listar(colaboradorId, { numeroPagina = 1, limitePorPagina = 10 } = {}) {
+  async listar(colaboradorId, { numeroPagina = 1, limitePorPagina = 10, leida } = {}) {
     if (!(await this.colaboradorRepository.buscarPorId(colaboradorId))) {
       throw new NotFoundError(`No existe un colaborador con id "${colaboradorId}"`);
     }
 
-    return armarPaginado(
+    const pagina = armarPaginado(
       await this.notificacionRepository.listarPorDestinatarioPaginado(
         colaboradorId,
         numeroPagina,
         limitePorPagina,
+        { leida },
       ),
       numeroPagina,
       limitePorPagina,
     );
+    const noLeidas = await this.notificacionRepository.contarNoLeidas(colaboradorId);
+
+    return { ...pagina, noLeidas };
+  }
+
+  async yaInvitada(colaboradorId, perfilId) {
+    return this.notificacionRepository.existeInvitacion(colaboradorId, perfilId);
   }
 
   async marcarComoLeida(colaboradorId, notificacionId) {
@@ -82,7 +95,9 @@ export class NotificacionService {
     // Una notificacion ajena responde igual que una inexistente: no se confirma
     // que exista algo que no es tuyo.
     if (!notificacion || !notificacion.esPara(colaboradorId)) {
-      throw new NotFoundError(`No existe la notificacion "${notificacionId}" para ese colaborador`);
+      throw new NotFoundError(
+        `No existe la notificacion "${notificacionId}" para ese colaborador`,
+      );
     }
 
     notificacion.marcarComoLeida();

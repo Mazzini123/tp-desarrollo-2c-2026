@@ -48,6 +48,15 @@ export class Proyecto {
     return this.colaboraciones.some((c) => c.esDe(colaborador));
   }
 
+  yaSePostuloAlPerfil(colaborador, perfil) {
+    return this.colaboraciones.some(
+      (c) =>
+        c.esDe(colaborador) &&
+        !c.estaRetirada() &&
+        String(c.perfil) === String(perfil.id),
+    );
+  }
+
   agregarColaboracion(datos) {
     const colaboracion = this.colaboraciones.create(datos);
     this.colaboraciones.push(colaboracion);
@@ -85,6 +94,8 @@ export class Proyecto {
   }
 
   puedeVerContactoDe(colaborador) {
-    return this.colaboraciones.some((c) => c.esDe(colaborador) && c.estaAceptada());
+    return this.colaboraciones.some(
+      (c) => c.esDe(colaborador) && c.estaAceptada() && c.esPublica,
+    );
   }
 }

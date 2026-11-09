@@ -11,6 +11,10 @@ export class InMemoryColectivoRepository extends InMemoryRepository {
     return null;
   }
 
+  buscarPorCuenta(cuentaId) {
+    return this.listar().find((c) => c.cuentaId === cuentaId) ?? null;
+  }
+
   registrarVisualizacion(proyectoId) {
     const resultado = this.buscarProyecto(proyectoId);
     if (resultado) {
@@ -82,9 +86,9 @@ export class InMemoryColectivoRepository extends InMemoryRepository {
     return { items: todos.slice(inicio, inicio + limitePorPagina), total: todos.length };
   }
 
-  listarProyectosPaginado(numeroPagina, limitePorPagina, { etiqueta } = {}) {
-    const todos = this.listarProyectos().filter(
-      (p) => !etiqueta || p.etiquetas.includes(etiqueta),
+  listarProyectosPaginado(numeroPagina, limitePorPagina, filtros = {}) {
+    const todos = this.listar().flatMap((colectivo) =>
+      colectivo.proyectos.filter((p) => cumpleFiltros(colectivo, p, filtros)),
     );
     const inicio = (numeroPagina - 1) * limitePorPagina;
 
@@ -93,4 +97,20 @@ export class InMemoryColectivoRepository extends InMemoryRepository {
       total: todos.length,
     };
   }
+}
+
+function cumpleFiltros(
+  colectivo,
+  proyecto,
+  { etiqueta, estado, habilidad, tipoColectivo, ubicacion, modalidad },
+) {
+  const codigos = (perfil) => [...perfil.codigosRequeridos(), ...perfil.codigosOpcionales()];
+  return (
+    (!etiqueta || proyecto.etiquetas.includes(etiqueta)) &&
+    (!estado || proyecto.estado === estado) &&
+    (!tipoColectivo || colectivo.tipoColectivo === tipoColectivo) &&
+    (!ubicacion || colectivo.ubicacion?.nombre === ubicacion) &&
+    (!modalidad || proyecto.perfiles.some((p) => p.modalidadColaboracion === modalidad)) &&
+    (!habilidad || proyecto.perfiles.some((p) => codigos(p).includes(habilidad)))
+  );
 }

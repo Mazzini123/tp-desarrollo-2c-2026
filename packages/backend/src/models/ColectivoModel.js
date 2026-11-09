@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import mongoose from "mongoose";
 import { Colectivo } from "../domain/Colectivo.js";
 import { Proyecto } from "../domain/Proyecto.js";
@@ -43,6 +44,7 @@ const valoracionSchema = new mongoose.Schema(
 );
 
 const perfilSchema = new mongoose.Schema({
+  titulo: { type: String, default: null },
   descripcion: { type: String, required: true },
   compromiso: { type: compromisoSchema, required: true },
   modalidadColaboracion: { type: String, required: true },
@@ -58,6 +60,30 @@ const perfilSchema = new mongoose.Schema({
   },
 });
 perfilSchema.loadClass(Perfil);
+perfilSchema.virtual("versionEdicion").get(function () {
+  return createHash("sha256")
+    .update(
+      JSON.stringify([
+        this.id,
+        this.titulo,
+        this.descripcion,
+        this.compromiso?.cantidadHoras,
+        this.compromiso?.periodo,
+        this.modalidadColaboracion,
+        this.busquedaAbierta,
+        this.fechaCierreBusqueda,
+        this.limiteColaboraciones,
+        this.modoAceptacion,
+        this.codigosRequeridos(),
+        this.codigosOpcionales(),
+      ]),
+    )
+    .digest("hex");
+});
+perfilSchema.virtual("estadoBusqueda").get(function () {
+  const proyecto = this.parent?.();
+  return proyecto ? this.estadoDeBusqueda(proyecto) : null;
+});
 aplicarFormatoJSON(perfilSchema);
 
 const colaboracionSchema = new mongoose.Schema({
@@ -127,6 +153,10 @@ const proyectoSchema = new mongoose.Schema({
   fechaCierre: { type: Date, default: null },
   // Requerimiento adicional 17: cuantas veces se consulto el proyecto.
   visualizaciones: { type: Number, default: 0 },
+  idempotenciaPublicacion: {
+    clave: String,
+    huella: String,
+  },
 });
 proyectoSchema.loadClass(Proyecto);
 proyectoSchema.pre("validate", function () {
@@ -137,10 +167,21 @@ proyectoSchema.pre("validate", function () {
     this.urlRepositorio = ultimo.urlRepositorio ?? null;
   }
 });
-aplicarFormatoJSON(proyectoSchema);
+proyectoSchema.virtual("colectivo").get(function () {
+  const colectivo = this.parent?.();
+  return colectivo?.nombre === undefined
+    ? undefined
+    : {
+        id: colectivo.id,
+        nombre: colectivo.nombre,
+        ubicacion: colectivo.ubicacion ?? null,
+      };
+});
+aplicarFormatoJSON(proyectoSchema, { ocultar: ["idempotenciaPublicacion"] });
 
 const colectivoSchema = new mongoose.Schema(
   {
+    cuentaId: { type: String, default: null },
     nombre: { type: String, required: true },
     descripcion: { type: String, required: true },
     tipoColectivo: { type: String, required: true },
@@ -158,7 +199,18 @@ const colectivoSchema = new mongoose.Schema(
   },
 );
 colectivoSchema.loadClass(Colectivo);
-aplicarFormatoJSON(colectivoSchema, { ocultar: ["createdAt", "updatedAt"] });
+aplicarFormatoJSON(colectivoSchema, {
+  ocultar: ["createdAt", "updatedAt", "mediosDeContacto", "cuentaId"],
+  transformar(_colectivo, salida) {
+    for (const proyecto of salida.proyectos ?? []) {
+      delete proyecto.colectivo;
+    }
+  },
+});
+colectivoSchema.index(
+  { cuentaId: 1 },
+  { unique: true, partialFilterExpression: { cuentaId: { $type: "string" } } },
+);
 colectivoSchema.index({ "proyectos._id": 1 });
 colectivoSchema.index({ etiquetas: 1 });
 colectivoSchema.index({ "proyectos.etiquetas": 1 });

@@ -15,15 +15,19 @@ import { cargarHabilidadesIniciales } from "../../src/seed/habilidadesSeed.js";
  * que el schema de Zod rechace lo que tiene que rechazar y que la respuesta
  * JSON no muestre lo que no debe.
  */
-export async function armarApp({ limites } = {}) {
+export async function armarApp({ limites, verificadorDeToken = null } = {}) {
   const canales = crearCanalesEnMemoria();
-  const { controllers, services } = componerApp({
+  const { controllers, services, autorizacion } = componerApp({
     repositorios: crearRepositoriosEnMemoria(),
     canales,
+    verificadorDeToken,
   });
   await cargarHabilidadesIniciales(services.habilidadService);
   // Limites altos por defecto: un test no tiene que chocar contra el rate
   // limit salvo que lo este probando.
-  const app = crearApp(controllers, { limites: limites ?? { general: 10000, busquedas: 10000 } });
+  const app = crearApp(controllers, {
+    limites: limites ?? { general: 10000, busquedas: 10000 },
+    autorizacion,
+  });
   return { api: request(app), services, canales };
 }

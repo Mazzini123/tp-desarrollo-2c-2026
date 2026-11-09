@@ -35,6 +35,11 @@ export function manejadorErrores(err, _req, res, _next) {
     return;
   }
 
+  if (err?.code === 11000) {
+    res.status(409).json({ message: "Ya existe un recurso con esos datos" });
+    return;
+  }
+
   console.error(err);
   res.status(500).json({ message: "Error interno del servidor" });
 }

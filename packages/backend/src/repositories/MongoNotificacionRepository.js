@@ -10,8 +10,30 @@ export class MongoNotificacionRepository {
     return esIdValido(id) ? NotificacionModel.findById(id) : null;
   }
 
-  async listarPorDestinatarioPaginado(destinatarioId, numeroPagina, limitePorPagina) {
-    const filtro = { destinatarioId };
+  async existeInvitacion(destinatarioId, perfilId) {
+    return Boolean(
+      await NotificacionModel.exists({
+        destinatarioId,
+        tipo: "INVITACION",
+        "referencias.perfilId": String(perfilId),
+      }),
+    );
+  }
+
+  async contarNoLeidas(destinatarioId) {
+    return NotificacionModel.countDocuments({ destinatarioId, esLeida: { $ne: true } });
+  }
+
+  async listarPorDestinatarioPaginado(
+    destinatarioId,
+    numeroPagina,
+    limitePorPagina,
+    { leida } = {},
+  ) {
+    const filtro = {
+      destinatarioId,
+      ...(leida === undefined ? {} : { esLeida: leida ? true : { $ne: true } }),
+    };
     const salto = (numeroPagina - 1) * limitePorPagina;
 
     const [items, total] = await Promise.all([

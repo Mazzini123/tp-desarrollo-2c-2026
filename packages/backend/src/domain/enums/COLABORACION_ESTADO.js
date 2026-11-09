@@ -6,6 +6,7 @@ export const COLABORACION_ESTADO = Object.freeze({
   RECHAZADA: "RECHAZADA",
   FINALIZADA: "FINALIZADA",
   DESVINCULADA: "DESVINCULADA",
+  RETIRADA: "RETIRADA",
 });
 
 export const esColaboracionEstadoValido = (valor) =>

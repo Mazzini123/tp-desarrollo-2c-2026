@@ -1,3 +1,5 @@
+import { ESTADO_BUSQUEDA } from "./enums/ESTADO_BUSQUEDA.js";
+
 export class Perfil {
   tieneHabilidad(lista, habilidad) {
     return lista.some((item) => item.equals(habilidad));
@@ -60,6 +62,18 @@ export class Perfil {
 
   limiteAlcanzado(cantidadAceptadas) {
     return this.tieneLimite() && cantidadAceptadas >= this.limiteColaboraciones;
+  }
+
+  estadoDeBusqueda(proyecto, ahora = new Date()) {
+    if (!proyecto.estaAbierto()) {
+      return ESTADO_BUSQUEDA.CERRADA;
+    }
+    if (this.limiteAlcanzado(proyecto.cantidadAceptadas(this))) {
+      return ESTADO_BUSQUEDA.LIMITE_ALCANZADO;
+    }
+    return this.aceptaPostulaciones(ahora)
+      ? ESTADO_BUSQUEDA.ABIERTA
+      : ESTADO_BUSQUEDA.CERRADA;
   }
 
   aceptaPostulaciones(ahora = new Date()) {

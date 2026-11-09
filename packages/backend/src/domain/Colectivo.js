@@ -5,6 +5,7 @@ export class Colectivo {
 
   darDeBaja(fecha) {
     this.fechaBaja = fecha;
+    this.cuentaId = null;
     this.mediosDeContacto = [];
     this.redesSociales = [];
   }

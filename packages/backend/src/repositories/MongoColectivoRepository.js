@@ -103,6 +103,10 @@ export class MongoColectivoRepository {
       : null;
   }
 
+  async buscarPorCuenta(cuentaId) {
+    return ColectivoModel.findOne({ cuentaId });
+  }
+
   async registrarVisualizacion(proyectoId) {
     if (!esIdValido(proyectoId)) {
       return;
@@ -172,15 +176,14 @@ export class MongoColectivoRepository {
     };
   }
 
-  async listarProyectosPaginado(numeroPagina, limitePorPagina, { etiqueta } = {}) {
+  async listarProyectosPaginado(numeroPagina, limitePorPagina, filtros = {}) {
     const salto = (numeroPagina - 1) * limitePorPagina;
-    const filtroPorEtiqueta = etiqueta
-      ? [{ $match: { "proyectos.etiquetas": etiqueta } }]
-      : [];
+    const condiciones = condicionesDeProyectos(filtros);
+    const filtroDeProyectos = condiciones.length ? [{ $match: { $and: condiciones } }] : [];
     const [resultado] = await ColectivoModel.aggregate([
       { $sort: ORDEN },
       { $unwind: "$proyectos" },
-      ...filtroPorEtiqueta,
+      ...filtroDeProyectos,
       {
         $facet: {
           items: [{ $skip: salto }, { $limit: limitePorPagina }],
@@ -196,9 +199,27 @@ export class MongoColectivoRepository {
   }
 }
 
+function condicionesDeProyectos({ etiqueta, estado, habilidad, tipoColectivo, ubicacion, modalidad }) {
+  const condiciones = [];
+  if (etiqueta) condiciones.push({ "proyectos.etiquetas": etiqueta });
+  if (estado) condiciones.push({ "proyectos.estado": estado });
+  if (tipoColectivo) condiciones.push({ tipoColectivo });
+  if (ubicacion) condiciones.push({ "ubicacion.nombre": ubicacion });
+  if (modalidad) condiciones.push({ "proyectos.perfiles.modalidadColaboracion": modalidad });
+  if (habilidad) {
+    condiciones.push({
+      $or: [
+        { "proyectos.perfiles.habilidadesRequeridas.codigo": habilidad },
+        { "proyectos.perfiles.habilidadesOpcionales.codigo": habilidad },
+      ],
+    });
+  }
+  return condiciones;
+}
+
 export async function proyectosDesdeAgregacion(filas) {
   const colectivos = filas.map((fila) =>
-    ColectivoModel.hydrate({ _id: fila._id, proyectos: [fila.proyectos] }),
+    ColectivoModel.hydrate({ ...fila, proyectos: [fila.proyectos] }),
   );
   await ColectivoModel.populate(colectivos, COLABORADORES);
   return colectivos.map((colectivo) => colectivo.proyectos[0]);

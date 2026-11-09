@@ -1,6 +1,14 @@
+import { jest } from "@jest/globals";
 import mongoose from "mongoose";
+import request from "supertest";
+import { crearApp } from "../../src/app.js";
 import { MongoColectivoRepository } from "../../src/repositories/MongoColectivoRepository.js";
-import { crearProyectoDePrueba } from "../fixtures.js";
+import {
+  CODIGOS,
+  crearColectivoDePrueba,
+  crearProyectoDePrueba,
+  datosDePerfil,
+} from "../fixtures.js";
 import { armarServicesConMongo, usarBaseDeTest } from "./baseDeTest.js";
 
 /**
@@ -52,4 +60,69 @@ test("guardar dos veces seguidas el mismo documento funciona", async () => {
 
   const enLaBase = await repositorio.buscarPorId(colectivo.id);
   expect(enLaBase.buscarProyecto(proyecto.id).titulo).toBe("Segundo cambio");
+});
+
+function coordinarDosGuardados(repositorio) {
+  const guardar = repositorio.guardar.bind(repositorio);
+  let guardados = 0;
+  let liberar;
+  const ambosLlegaron = new Promise((resolve) => {
+    liberar = resolve;
+  });
+  return jest.spyOn(repositorio, "guardar").mockImplementation(async (documento) => {
+    guardados += 1;
+    if (guardados === 2) liberar();
+    await ambosLlegaron;
+    return guardar(documento);
+  });
+}
+
+test("dos POST simultaneos con la misma clave guardan un proyecto y avisan una sola vez", async () => {
+  const colectivo = await crearColectivoDePrueba(s.colectivoService);
+  const api = request(
+    crearApp(s.controllers, { limites: { general: 10000, busquedas: 10000 } }),
+  );
+  const avisar = jest
+    .spyOn(s.avisoAutomaticoService, "avisarPorProyectoNuevo")
+    .mockResolvedValue(undefined);
+  const guardar = coordinarDosGuardados(s.proyectoService.colectivoRepository);
+  const publicar = () =>
+    api
+      .post(`/colectivos/${colectivo.id}/proyectos`)
+      .set("Idempotency-Key", "534f50df-fb88-4d48-8a55-274a469228f8")
+      .send({ titulo: "Sitio", descripcion: "d", perfiles: [datosDePerfil()] })
+      .expect(201);
+
+  const [primero, segundo] = await Promise.all([publicar(), publicar()]);
+  expect(primero.body.id).toBe(segundo.body.id);
+  expect(guardar).toHaveBeenCalledTimes(2);
+  expect(await s.proyectoService.listarPorColectivo(colectivo.id)).toHaveLength(1);
+  expect(avisar).toHaveBeenCalledTimes(1);
+});
+
+test("dos PUT simultáneos con la misma versión solo aplican la edición ganadora", async () => {
+  const { proyecto } = await crearProyectoDePrueba(s);
+  const perfil = proyecto.perfiles[0];
+  const api = request(
+    crearApp(s.controllers, { limites: { general: 10000, busquedas: 10000 } }),
+  );
+  const guardar = coordinarDosGuardados(s.perfilService.colectivoRepository);
+  const editar = (descripcion, requerida, opcional) =>
+    api.put(`/proyectos/${proyecto.id}/perfiles/${perfil.id}`).send({
+      descripcion,
+      versionEdicion: perfil.versionEdicion,
+      codigosHabilidadesRequeridas: [requerida],
+      codigosHabilidadesOpcionales: [opcional],
+    });
+
+  const resultados = await Promise.all([
+    editar("Desarrollo", CODIGOS.react, CODIGOS.node),
+    editar("Pruebas", CODIGOS.cypress, CODIGOS.react),
+  ]);
+  expect(resultados.map(({ status }) => status).sort()).toEqual([200, 409]);
+  expect(guardar).toHaveBeenCalledTimes(2);
+  const ganadora = resultados.find(({ status }) => status === 200).body;
+  const actual = await s.perfilService.buscarPorId(proyecto.id, perfil.id);
+  expect(actual.toJSON()).toMatchObject(ganadora);
+  expect(actual.versionEdicion).not.toBe(perfil.versionEdicion);
 });

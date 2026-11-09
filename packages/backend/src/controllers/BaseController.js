@@ -3,7 +3,11 @@ export class BaseController {
     return { numeroPagina: page, limitePorPagina: limit };
   }
 
-  responderPaginado(res, { items, numeroPagina, limitePorPagina, totalPaginas, total }) {
+  responderPaginado(
+    res,
+    { items, numeroPagina, limitePorPagina, totalPaginas, total },
+    metaExtra = {},
+  ) {
     res.status(200).json({
       data: items,
       meta: {
@@ -11,6 +15,7 @@ export class BaseController {
         per_page: limitePorPagina,
         total,
         total_pages: totalPaginas,
+        ...metaExtra,
       },
     });
   }

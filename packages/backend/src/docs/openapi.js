@@ -24,6 +24,10 @@ const META_PAGINACION = {
     per_page: { type: "integer", example: 10 },
     total: { type: "integer", example: 12 },
     total_pages: { type: "integer", example: 2 },
+    unread: {
+      type: "integer",
+      description: "Solo en la bandeja de mensajes: total de no leidas.",
+    },
   },
 };
 
@@ -69,15 +73,50 @@ const paramEtiqueta = {
   schema: { type: "string" },
 };
 
+const paramsFiltroDeProyectos = [
+  paramEtiqueta,
+  {
+    name: "estado",
+    in: "query",
+    description: "ABIERTO o FINALIZADO. Sin el parametro se devuelven todos.",
+    schema: { type: "string", enum: ["ABIERTO", "FINALIZADO"] },
+  },
+  {
+    name: "habilidad",
+    in: "query",
+    description: "Codigo de una habilidad requerida u opcional de algun perfil.",
+    schema: { type: "string" },
+  },
+  {
+    name: "tipoColectivo",
+    in: "query",
+    description: "Tipo del colectivo que publica.",
+    schema: { type: "string", enum: ["FUNDACION", "ASOCIACION_BARRIAL", "ONG", "ASAMBLEA"] },
+  },
+  {
+    name: "ubicacion",
+    in: "query",
+    description:
+      "Nombre exacto de la ubicacion del colectivo (una provincia del catalogo o una localidad).",
+    schema: { type: "string" },
+  },
+  {
+    name: "modalidad",
+    in: "query",
+    description: "Modalidad de colaboracion de algun perfil del proyecto.",
+    schema: {
+      type: "string",
+      enum: [
+        "GRATUITA",
+        "OFRECE_INCENTIVO_ECONOMICO",
+        "EXISTE_POSIBILIDAD_DE_CONTRATACION",
+      ],
+    },
+  },
+];
+
 const paramColaboracionId = {
   name: "colaboracionId",
-  in: "path",
-  required: true,
-  schema: OBJECT_ID,
-};
-
-const paramColaboradorId = {
-  name: "colaboradorId",
   in: "path",
   required: true,
   schema: OBJECT_ID,
@@ -181,6 +220,7 @@ function body(nombreSchema) {
 
 export const openapi = {
   openapi: "3.0.3",
+  security: [{}, { bearerAuth: [] }],
   info: {
     title: "Codigo a Voluntad",
     version: "2.0.0",
@@ -196,6 +236,14 @@ export const openapi = {
       "**Cambio respecto de la primera entrega.** Las respuestas ya no traen el campo",
       "`status`, y `PATCH /proyectos/{id}` fue reemplazado por",
       "`POST /proyectos/{id}/finalizacion`.",
+      "",
+      "**Autenticacion.** Con `LOGTO_ENDPOINT` y `LOGTO_API_RESOURCE` configurados, las",
+      "escrituras piden `Authorization: Bearer <access token de Logto>` y la API valida el",
+      "JWT (emisor, audiencia y firma). Las lecturas publicas siguen abiertas. Las altas de",
+      "colectivo y de persona asocian el perfil a la cuenta (409 si ya tiene uno), y cada",
+      "operacion se limita a quien corresponde: 401 sin sesion valida, 403 si la cuenta no",
+      "es la duena del recurso. Sin esas variables la API corre sin autenticacion (solo",
+      "desarrollo y tests).",
       "",
       "**Persistencia.** MongoDB. Colectivo es el agregado raiz: sus proyectos, perfiles y",
       "colaboraciones van embebidos en el mismo documento; los colaboradores se referencian",
@@ -296,7 +344,7 @@ export const openapi = {
           "opcional pero condicionada: si `tipoUbicacion` es PROVINCIA, `nombre` tiene que " +
           "ser una de las 23 provincias argentinas; si es LOCALIDAD, `nombre` es obligatorio. " +
           "Opcionales: `redesSociales` (req. 27, solo URLs http/https), `etiquetas` (req. 34, " +
-          "se normalizan) y `mediosDeContacto` (publicos, a diferencia de los de las personas).",
+          "se normalizan) y `mediosDeContacto` (privados, se omiten de la respuesta).",
         requestBody: body("CrearColectivo"),
         responses: {
           ...recurso("Colectivo", 201, "Colectivo creado."),
@@ -323,8 +371,9 @@ export const openapi = {
         summary: "Actualizar colectivo",
         description:
           "Todos los campos son opcionales. `tipoColectivo` no se puede cambiar despues del " +
-          "alta. Las listas (`redesSociales`, `etiquetas`, `mediosDeContacto`) se reemplazan " +
-          "completas. Un colectivo dado de baja no se puede modificar (409).",
+          "alta. Las listas (`redesSociales`, `etiquetas`) se reemplazan completas. " +
+          "La edicion de medios de contacto esta suspendida. Un colectivo dado de baja " +
+          "no se puede modificar (409).",
         requestBody: body("ActualizarColectivo"),
         responses: {
           ...recurso("Colectivo"),
@@ -346,10 +395,19 @@ export const openapi = {
           "su limite de colaboraciones y su modo de aceptacion (ver CrearPerfil). " +
           "`fechaCierre` (req. 10) tiene que ser futura. Al crearlo, " +
           "se avisa a las personas compatibles (req. 9). Un colectivo dado de baja no puede " +
-          "publicar proyectos (409).",
+          "publicar proyectos (409). Repetir la clave con el mismo cuerpo devuelve el proyecto " +
+          "existente sin volver a enviar avisos. Con otros datos responde 409.",
+        parameters: [
+          {
+            name: "Idempotency-Key",
+            in: "header",
+            description: "UUID opcional. Reutilizarlo al reintentar la misma publicacion.",
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
         requestBody: body("CrearProyecto"),
         responses: {
-          ...recurso("Proyecto", 201, "Proyecto creado."),
+          ...recurso("Proyecto", 201, "Proyecto creado o recuperado por su clave."),
           400: errores[400],
           404: errores[404],
           409: errores[409],
@@ -430,7 +488,8 @@ export const openapi = {
         summary: "Panel de estadisticas del colectivo",
         description:
           "Req. adicional 17: proyectos, colaboraciones por estado, visualizaciones, avance " +
-          "promedio (porcentaje de concrecion) y logros, en total y por proyecto.",
+          "promedio (porcentaje de concrecion) y logros, en total y por proyecto. " +
+          "Solo la consulta el colectivo dueño (401 sin sesion, 403 si es otro).",
         responses: {
           ...recurso("EstadisticasColectivo"),
           404: errores[404],
@@ -454,8 +513,10 @@ export const openapi = {
       get: {
         tags: ["Proyectos"],
         summary: "Listar proyectos",
-        description: "Todos los proyectos de todos los colectivos.",
-        parameters: [...paramsPaginacion, paramEtiqueta],
+        description:
+          "Todos los proyectos de todos los colectivos, en orden de alta del colectivo. " +
+          "Los filtros se combinan con AND.",
+        parameters: [...paramsPaginacion, ...paramsFiltroDeProyectos],
         responses: listado("Proyecto"),
       },
     },
@@ -465,7 +526,9 @@ export const openapi = {
       get: {
         tags: ["Proyectos"],
         summary: "Obtener proyecto",
-        description: "Cada consulta suma una visualizacion (req. adicional 17).",
+        description:
+          "Cada consulta suma una visualizacion (req. adicional 17), tambien las del propio " +
+          "colectivo: el back todavia no sabe quien consulta.",
         responses: { ...recurso("Proyecto"), 404: errores[404] },
       },
       put: {
@@ -480,6 +543,140 @@ export const openapi = {
           400: errores[400],
           404: errores[404],
           409: errores[409],
+        },
+      },
+    },
+
+    "/auth/me": {
+      get: {
+        tags: ["Cuenta"],
+        summary: "Cuenta de la persona con sesion",
+        description:
+          "Requiere `Authorization: Bearer <access token de Logto>`. Devuelve el `sub` del " +
+          "token como `id`, el rol (`COLECTIVO`, `COLABORADORA` o `null` si todavia no tiene " +
+          "perfil) y el id del perfil. 401 con un token inexistente, invalido o vencido, o con " +
+          "la autenticacion desactivada.",
+        responses: {
+          200: {
+            description: "Cuenta.",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string", description: "`sub` del token." },
+                    rol: { type: "string", enum: ["COLECTIVO", "COLABORADORA"], nullable: true },
+                    perfilId: { ...OBJECT_ID, nullable: true },
+                  },
+                },
+              },
+            },
+          },
+          401: { description: "Sin sesion o sesion invalida." },
+        },
+      },
+    },
+
+    "/proyectos/{id}/colaboradores/{colaboradorId}/contacto": {
+      get: {
+        tags: ["Postulaciones"],
+        summary: "Medios de contacto de una persona aceptada",
+        description:
+          "Solo con la autenticacion activa y solo para el colectivo dueño del proyecto. 403 si " +
+          "la persona no tiene una colaboracion aceptada y publica en el proyecto (una " +
+          "postulacion anonima nunca revela su contacto). Sin autenticacion la ruta no existe (404).",
+        parameters: [
+          paramId,
+          { name: "colaboradorId", in: "path", required: true, schema: OBJECT_ID },
+        ],
+        responses: {
+          200: {
+            description: "Medios de contacto.",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/MedioDeContacto" },
+                },
+              },
+            },
+          },
+          401: { description: "Sin sesion." },
+          403: { description: "No es el dueño o no hay colaboracion aceptada y publica." },
+          404: errores[404],
+        },
+      },
+    },
+
+    "/colectivos/{id}/medios-de-contacto": {
+      parameters: [paramId],
+      get: {
+        tags: ["Colectivos"],
+        summary: "Leer los medios de contacto del colectivo",
+        description: "Solo con la autenticacion activa y solo el propio colectivo (403 si no).",
+        responses: {
+          200: {
+            description: "Medios de contacto.",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/MedioDeContacto" },
+                },
+              },
+            },
+          },
+          401: { description: "Sin sesion." },
+          403: { description: "No es el propio colectivo." },
+        },
+      },
+      post: {
+        tags: ["Colectivos"],
+        summary: "Agregar un medio de contacto al colectivo",
+        description: "Solo con la autenticacion activa. 409 si ya lo tiene.",
+        requestBody: body("MedioDeContacto"),
+        responses: {
+          201: { description: "Medio agregado." },
+          401: { description: "Sin sesion." },
+          403: { description: "No es el propio colectivo." },
+          409: errores[409],
+        },
+      },
+    },
+
+    "/colectivos/{id}/medios-de-contacto/{tipo}/{valor}": {
+      delete: {
+        tags: ["Colectivos"],
+        summary: "Quitar un medio de contacto del colectivo",
+        description: "Solo con la autenticacion activa y solo el propio colectivo.",
+        parameters: [
+          paramId,
+          { name: "tipo", in: "path", required: true, schema: { type: "string" } },
+          { name: "valor", in: "path", required: true, schema: { type: "string" } },
+        ],
+        responses: {
+          204: { description: "Medio quitado." },
+          401: { description: "Sin sesion." },
+          403: { description: "No es el propio colectivo." },
+          404: errores[404],
+        },
+      },
+    },
+
+    "/catalogos/provincias": {
+      get: {
+        tags: ["Colectivos"],
+        summary: "Provincias validas para una ubicacion",
+        description:
+          "Las 23 provincias, tal como se guardan (sin tildes). Al cargar una ubicacion " +
+          "se aceptan tambien con tildes o en minusculas y se guardan con el nombre del catalogo.",
+        responses: {
+          200: {
+            description: "Lista de nombres.",
+            content: {
+              "application/json": { schema: { type: "array", items: { type: "string" } } },
+            },
+          },
         },
       },
     },
@@ -520,7 +717,9 @@ export const openapi = {
         summary: "Actualizar un perfil",
         description:
           "Actualizacion parcial: se manda solo lo que cambia, pero al menos un campo (400 si " +
-          "viene vacio). Las habilidades se cambian con sus propias rutas. Cambiar " +
+          "viene vacio). Para reemplazar habilidades, enviar ambos grupos de codigos y la " +
+          "`versionEdicion` del perfil leído. Los grupos y los otros campos se guardan juntos. " +
+          "Una version desactualizada responde 409. Cambiar " +
           "`modoAceptacion` o `limiteColaboraciones` resuelve las postulaciones pendientes del " +
           "perfil con las reglas nuevas; el limite no puede quedar por debajo de las ya " +
           "aceptadas (400). Si el proyecto esta finalizado, 409.",
@@ -744,39 +943,6 @@ export const openapi = {
       },
     },
 
-    "/proyectos/{id}/colaboradores/{colaboradorId}/contacto": {
-      parameters: [paramId, paramColaboradorId],
-      get: {
-        tags: ["Postulaciones"],
-        summary: "Datos de contacto de una persona colaboradora",
-        description:
-          "Solo si la persona tiene una colaboracion ACEPTADA en el proyecto: recien ahi sus " +
-          "datos quedan a disposicion del colectivo. Si la postulacion esta pendiente, fue " +
-          "rechazada, se desvinculo o nunca se postulo, responde 403.",
-        responses: {
-          200: {
-            description: "Medios de contacto de la persona.",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "array",
-                  items: { $ref: "#/components/schemas/MedioDeContacto" },
-                },
-              },
-            },
-          },
-          403: {
-            description:
-              "No hay una colaboracion aceptada con esta persona en el proyecto.",
-            content: {
-              "application/json": { schema: { $ref: "#/components/schemas/Problema" } },
-            },
-          },
-          404: errores[404],
-        },
-      },
-    },
-
     "/proyectos/{id}/colaboraciones": {
       parameters: [paramId],
       post: {
@@ -845,6 +1011,22 @@ export const openapi = {
         description: "Solo una PENDIENTE, de un proyecto abierto (409 si no).",
         responses: {
           ...recurso("Colaboracion", 200, "Postulacion rechazada."),
+          404: errores[404],
+          409: errores[409],
+        },
+      },
+    },
+
+    "/proyectos/{id}/colaboraciones/{colaboracionId}/retiro": {
+      parameters: [paramId, paramColaboracionId],
+      post: {
+        tags: ["Postulaciones"],
+        summary: "Retirar una postulacion pendiente",
+        description:
+          "La persona deshace una postulacion hecha por error. Solo una PENDIENTE " +
+          "(409 si no): queda RETIRADA y puede volver a postularse al mismo perfil (a diferencia de rechazo, finalizacion o desvinculacion, que lo impiden).",
+        responses: {
+          ...recurso("Colaboracion", 200, "Postulacion retirada."),
           404: errores[404],
           409: errores[409],
         },
@@ -1070,8 +1252,8 @@ export const openapi = {
         tags: ["Colaboradores"],
         summary: "Listar colaboraciones del colaborador",
         description:
-          "Cada item trae el `proyectoId` ademas de la colaboracion, porque la colaboracion " +
-          "vive dentro del proyecto y por si sola no dice a cual pertenece.",
+          "Cada item trae el `proyectoId`, un resumen del proyecto y del perfil, y la " +
+          "colaboracion, porque esta vive dentro del proyecto y por si sola no dice a cual pertenece.",
         responses: {
           200: {
             description:
@@ -1084,6 +1266,23 @@ export const openapi = {
                     type: "object",
                     properties: {
                       proyectoId: OBJECT_ID,
+                      proyecto: {
+                        type: "object",
+                        properties: {
+                          id: OBJECT_ID,
+                          titulo: { type: "string" },
+                          estado: { type: "string", enum: ["ABIERTO", "FINALIZADO"] },
+                        },
+                      },
+                      perfil: {
+                        type: "object",
+                        nullable: true,
+                        properties: {
+                          id: OBJECT_ID,
+                          titulo: { type: "string", nullable: true },
+                          descripcion: { type: "string" },
+                        },
+                      },
                       colaboracion: { $ref: "#/components/schemas/Colaboracion" },
                     },
                   },
@@ -1116,6 +1315,26 @@ export const openapi = {
 
     "/colaboradores/{id}/medios-de-contacto": {
       parameters: [paramId],
+      get: {
+        tags: ["Colaboradores"],
+        summary: "Leer los propios medios de contacto",
+        description: "Solo con la autenticacion activa y solo la propia persona (403 si no).",
+        responses: {
+          200: {
+            description: "Medios de contacto.",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/MedioDeContacto" },
+                },
+              },
+            },
+          },
+          401: { description: "Sin sesion." },
+          403: { description: "No es la propia persona." },
+        },
+      },
       post: {
         tags: ["Colaboradores"],
         summary: "Registrar un medio de contacto",
@@ -1179,8 +1398,19 @@ export const openapi = {
       get: {
         tags: ["Notificaciones"],
         summary: "Bandeja de mensajes de la persona",
-        description: "De la mas nueva a la mas vieja.",
-        parameters: paramsPaginacion,
+        description:
+          "De la mas nueva a la mas vieja. `meta.unread` trae el total de no leidas de la " +
+          "persona, sin importar el filtro. Las notificaciones son solo de personas " +
+          "colaboradoras: los colectivos no tienen bandeja.",
+        parameters: [
+          ...paramsPaginacion,
+          {
+            name: "leida",
+            in: "query",
+            description: "`true` solo leidas, `false` solo no leidas. Sin el parametro, todas.",
+            schema: { type: "boolean" },
+          },
+        ],
         responses: { ...listado("Notificacion"), 404: errores[404] },
       },
     },
@@ -1229,6 +1459,9 @@ export const openapi = {
   },
 
   components: {
+    securitySchemes: {
+      bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
+    },
     schemas: {
       Problema: PROBLEMA,
       MetaPaginacion: META_PAGINACION,
@@ -1326,10 +1559,6 @@ export const openapi = {
             items: { $ref: "#/components/schemas/RedSocial" },
           },
           etiquetas: { type: "array", items: { type: "string" }, example: ["ambiente"] },
-          mediosDeContacto: {
-            type: "array",
-            items: { $ref: "#/components/schemas/MedioDeContacto" },
-          },
           fechaAlta: { type: "string", format: "date-time" },
           fechaBaja: {
             type: "string",
@@ -1344,6 +1573,19 @@ export const openapi = {
         type: "object",
         properties: {
           id: OBJECT_ID,
+          versionEdicion: { type: "string", pattern: "^[a-f0-9]{64}$" },
+          titulo: {
+            type: "string",
+            nullable: true,
+            description: "Titulo corto del perfil (hasta 80 caracteres). null en perfiles viejos.",
+          },
+          estadoBusqueda: {
+            type: "string",
+            enum: ["ABIERTA", "LIMITE_ALCANZADO", "CERRADA"],
+            description:
+              "Calculado por el back: CERRADA si el proyecto esta finalizado o la busqueda " +
+              "esta cerrada o vencida; LIMITE_ALCANZADO si las aceptadas llegaron al limite.",
+          },
           descripcion: { type: "string" },
           compromiso: { $ref: "#/components/schemas/Compromiso" },
           modalidadColaboracion: {
@@ -1383,6 +1625,19 @@ export const openapi = {
           titulo: { type: "string" },
           descripcion: { type: "string", description: "Admite Markdown (req. 38)." },
           estado: { type: "string", enum: ["ABIERTO", "FINALIZADO"] },
+          colectivo: {
+            type: "object",
+            description:
+              "Colectivo que publica el proyecto. Se informa en el detalle y en los listados " +
+              "de proyectos; no dentro de las respuestas de colectivos.",
+            properties: {
+              id: OBJECT_ID,
+              nombre: { type: "string" },
+              ubicacion: {
+                oneOf: [{ $ref: "#/components/schemas/Ubicacion" }, { type: "null" }],
+              },
+            },
+          },
           perfiles: { type: "array", items: { $ref: "#/components/schemas/Perfil" } },
           colaboraciones: {
             type: "array",
@@ -1400,14 +1655,20 @@ export const openapi = {
             type: "string",
             format: "date-time",
             nullable: true,
-            description: "Al llegar esta fecha se cierra solo (req. 10).",
+            description:
+              "Al llegar esta fecha se cierra solo (req. 10). Una fecha sin hora (`2026-12-01`) " +
+              "se toma como el fin de ese dia en Argentina (23:59:59 -03:00); \"hoy\" cuenta como futura.",
           },
-          visualizaciones: { type: "integer" },
+          visualizaciones: {
+            type: "integer",
+            description: "Cantidad de GET /proyectos/{id}, incluidos los del colectivo dueño.",
+          },
         },
       },
 
       Logro: {
         type: "object",
+        description: "Titulo de hasta 100 caracteres, unico por proyecto sin distinguir mayusculas.",
         properties: {
           id: OBJECT_ID,
           titulo: { type: "string" },
@@ -1418,6 +1679,9 @@ export const openapi = {
 
       Avance: {
         type: "object",
+        description:
+          "El porcentaje es decimal y tiene que superar al del proyecto (400 si no). Los avances " +
+          "no se editan ni se eliminan.",
         properties: {
           id: OBJECT_ID,
           porcentajeConcrecion: { type: "number", minimum: 0, maximum: 100 },
@@ -1472,6 +1736,7 @@ export const openapi = {
             allOf: [{ $ref: "#/components/schemas/Colaborador" }],
             description: "null si la contribucion es anonima.",
           },
+          perfil: { ...OBJECT_ID, description: "Id del perfil al que se postulo." },
           esPublica: { type: "boolean" },
           fecha: {
             type: "string",
@@ -1480,7 +1745,7 @@ export const openapi = {
           },
           estado: {
             type: "string",
-            enum: ["PENDIENTE", "ACEPTADA", "RECHAZADA", "FINALIZADA"],
+            enum: ["PENDIENTE", "ACEPTADA", "RECHAZADA", "FINALIZADA", "DESVINCULADA", "RETIRADA"],
           },
           fechaResolucion: { type: "string", format: "date-time", nullable: true },
           fechaFin: { type: "string", format: "date-time", nullable: true },
@@ -1508,6 +1773,7 @@ export const openapi = {
               "POSTULACION_ACEPTADA",
               "POSTULACION_RECHAZADA",
               "COLABORACION_FINALIZADA",
+              "DESVINCULACION",
             ],
           },
           asunto: { type: "string" },
@@ -1534,6 +1800,9 @@ export const openapi = {
 
       ColaboradoraPotencial: {
         type: "object",
+        description:
+          "Cumple todas las habilidades requeridas del perfil y no tiene ninguna postulacion " +
+          "en el proyecto. El orden es por cantidad de opcionales, de mayor a menor.",
         properties: {
           colaborador: { $ref: "#/components/schemas/Colaborador" },
           habilidadesOpcionalesQueTiene: {
@@ -1736,10 +2005,6 @@ export const openapi = {
             items: { $ref: "#/components/schemas/RedSocial" },
           },
           etiquetas: { type: "array", items: { type: "string" } },
-          mediosDeContacto: {
-            type: "array",
-            items: { $ref: "#/components/schemas/MedioDeContacto" },
-          },
         },
       },
 
@@ -1748,6 +2013,7 @@ export const openapi = {
         required: ["descripcion", "codigosHabilidadesRequeridas", "compromiso"],
         additionalProperties: false,
         properties: {
+          titulo: { type: "string", minLength: 1, maxLength: 80 },
           descripcion: { type: "string", minLength: 1 },
           codigosHabilidadesRequeridas: {
             type: "array",
@@ -1790,7 +2056,11 @@ export const openapi = {
         additionalProperties: false,
         minProperties: 1,
         properties: {
+          titulo: { type: "string", minLength: 1, maxLength: 80 },
           descripcion: { type: "string", minLength: 1 },
+          versionEdicion: { type: "string", pattern: "^[a-f0-9]{64}$" },
+          codigosHabilidadesRequeridas: { type: "array", minItems: 1, items: { type: "string" } },
+          codigosHabilidadesOpcionales: { type: "array", items: { type: "string" } },
           compromiso: { $ref: "#/components/schemas/Compromiso" },
           modalidadColaboracion: {
             type: "string",
@@ -1973,6 +2243,9 @@ export const openapi = {
 
       Invitacion: {
         type: "object",
+        description:
+          "Errores: 400 si el mensaje supera 500 caracteres; 409 si la persona ya fue invitada " +
+          "a ese perfil, ya se postulo o no acepta mensajeria interna.",
         required: ["colaboradorId"],
         additionalProperties: false,
         properties: {

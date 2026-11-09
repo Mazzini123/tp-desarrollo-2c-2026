@@ -9,7 +9,8 @@ export class ColaboradorController extends BaseController {
   }
 
   crear = async (req, res) => {
-    res.status(201).json(await this.colaboradorService.crear(req.body));
+    const cuentaId = req.identidad?.sub ?? null;
+    res.status(201).json(await this.colaboradorService.crear({ ...req.body, cuentaId }));
   };
 
   listar = async (req, res) => {
@@ -59,6 +60,10 @@ export class ColaboradorController extends BaseController {
     res.status(200).json(colaborador);
   };
 
+  mediosDeContacto = async (req, res) => {
+    res.status(200).json(await this.colaboradorService.mediosDeContacto(req.params.id));
+  };
+
   agregarMedioDeContacto = async (req, res) => {
     res
       .status(201)
@@ -85,8 +90,12 @@ export class ColaboradorController extends BaseController {
   };
 
   listarColaboraciones = async (req, res) => {
-    res
-      .status(200)
-      .json(await this.colaboracionService.listarPorColaborador(req.params.id));
+    const esLaDuena =
+      req.cuenta?.rol === "COLABORADORA" && req.cuenta.perfilId === req.params.id;
+    res.status(200).json(
+      await this.colaboracionService.listarPorColaborador(req.params.id, {
+        incluirAnonimas: esLaDuena,
+      }),
+    );
   };
 }

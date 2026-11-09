@@ -26,6 +26,18 @@ export const PROVINCIAS = Object.freeze([
   "Tucuman",
 ]);
 
+const sinAcentos = (texto) =>
+  String(texto ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+
+export function buscarProvincia(nombre) {
+  const buscada = sinAcentos(nombre);
+  return PROVINCIAS.find((provincia) => sinAcentos(provincia) === buscada) ?? null;
+}
+
 export class Ubicacion {
   esDeAlcanceNacional() {
     return this.tipoUbicacion === TIPO_UBICACION.ARGENTINA;

@@ -12,6 +12,9 @@ import { InMemoryColaboradorRepository } from "./repositories/InMemoryColaborado
 import { MongoEstadisticaRepository } from "./repositories/MongoEstadisticaRepository.js";
 import { InMemoryEstadisticaRepository } from "./repositories/InMemoryEstadisticaRepository.js";
 
+import { CuentaService } from "./services/CuentaService.js";
+import { CuentaController } from "./controllers/CuentaController.js";
+import { crearAutorizacion } from "./middlewares/autorizacion.js";
 import { CanalEmail } from "./canales/CanalEmail.js";
 import { CanalWhatsApp } from "./canales/CanalWhatsApp.js";
 import { CanalSimulado } from "./canales/CanalSimulado.js";
@@ -98,6 +101,7 @@ export function crearCanalesEnMemoria() {
 export function componerApp({
   repositorios = crearRepositoriosMongo(),
   canales = crearCanales(),
+  verificadorDeToken = null,
 } = {}) {
   const {
     habilidadRepository,
@@ -171,7 +175,16 @@ export function componerApp({
 
   const avanceService = new AvanceService({ colectivoRepository });
 
+  const cuentaService = new CuentaService({ colectivoRepository, colaboradorRepository });
+
+  const autorizacion = crearAutorizacion({
+    verificador: verificadorDeToken,
+    cuentaService,
+    proyectoService,
+  });
+
   const controllers = {
+    cuenta: new CuentaController(),
     colectivo: new ColectivoController({
       colectivoService,
       proyectoService,
@@ -204,5 +217,5 @@ export function componerApp({
     avanceService,
   };
 
-  return { controllers, services };
+  return { controllers, services, autorizacion };
 }

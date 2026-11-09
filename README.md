@@ -201,6 +201,9 @@ y terminan las colaboraciones en curso.
 |---|---|---|
 | `MONGO_URI` | sí | Conexión a MongoDB |
 | `SERVER_PORT` | no (8000) | Puerto de la API |
+| `LOGTO_ENDPOINT` | para autenticar | Endpoint del tenant de Logto. La API valida los JWT (emisor `<endpoint>/oidc`, JWKS del tenant) |
+| `LOGTO_API_RESOURCE` | para autenticar | Identificador del API resource de Logto: es la audiencia que tiene que traer el token. Es el mismo valor que `VITE_LOGTO_API_RESOURCE` en el front |
+| `AUTH_DESACTIVADA` | no | Con `NODE_ENV=production` y sin Logto, `true` permite arrancar sin autenticación (no recomendado) |
 | `SMTP_URL` | no | Servidor SMTP para mandar las notificaciones por email. Sin esto se simulan (quedan en el log) |
 | `SMTP_REMITENTE` | no | El "De:" de esos emails |
 | `LIMITE_SOLICITUDES_GENERAL` | no (300) | Solicitudes por IP cada 15 minutos |
@@ -249,6 +252,29 @@ El resultado de la operación lo dice el código HTTP, no un campo del body.
 > `status`, y `PATCH /proyectos/:id` fue reemplazado por
 > `POST /proyectos/:id/finalizacion`. Cualquier cliente que leyera
 > `respuesta.data` para un recurso individual tiene que ajustarse.
+
+## Autenticación con Logto
+
+La API valida el access token (JWT) que emite [Logto](https://logto.io) y toma su `sub` como identidad de la cuenta. El front hace el ingreso y le manda `Authorization: Bearer <token>`.
+
+**Configuración en Logto**
+
+1. Crear una aplicación **Single page app** para el front. Redirect URI: `<origen del front>/auth/callback` (por ejemplo `http://localhost:5173/auth/callback`). Post sign-out redirect URI: `<origen del front>/`. Hay que registrar un par por cada origen real (el puerto forma parte del origen).
+2. Crear un **API resource** y copiar su identificador (por ejemplo `https://api.codigo-a-voluntad`). Ese valor va **igual** en `LOGTO_API_RESOURCE` del back y en `VITE_LOGTO_API_RESOURCE` del front: es la audiencia del token.
+3. En el back, `LOGTO_ENDPOINT` es el endpoint del tenant (`https://<tenant>.logto.app`). El emisor se arma como `<endpoint>/oidc` y las claves salen de `<endpoint>/oidc/jwks`.
+
+**Cómo se comporta**
+
+- Con las dos variables, las escrituras exigen sesión (401 sin token válido, 403 si la cuenta no corresponde). Las lecturas públicas siguen abiertas. Sin las variables corre sin autenticación; con `NODE_ENV=production` no arranca sin ellas.
+- `GET /auth/me` devuelve `{ id, rol, perfilId }`. `rol` y `perfilId` son `null` mientras la cuenta no creó un perfil.
+- Cada cuenta tiene un solo perfil: `POST /colectivos` y `POST /colaboradores` asocian el perfil al `sub` y responden 409 si ya hay uno.
+- **Baja de un colectivo:** el colectivo y su historia quedan visibles, pero la cuenta se desvincula. `GET /auth/me` pasa a devolver `rol: null` y la persona puede crear un perfil nuevo. La cuenta en Logto no se borra (la API no usa la Management API de Logto).
+
+**Prueba de punta a punta con un tenant real**
+
+1. Iniciar el back con las dos variables y el front con `VITE_LOGTO_ENDPOINT`, `VITE_LOGTO_APP_ID` y `VITE_LOGTO_API_RESOURCE`.
+2. Con un token real: `curl -H "Authorization: Bearer <token>" http://localhost:8000/auth/me` (200 con `rol: null` en una cuenta nueva; 401 sin token o con uno vencido).
+3. Recorrer en el front: registro, alta del perfil, recarga de la página, cierre de sesión y vencimiento del token (esperar a que expire o acortar su vida en Logto).
 
 ## Puesta en marcha
 

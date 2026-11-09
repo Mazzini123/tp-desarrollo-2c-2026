@@ -3,6 +3,7 @@ import { ConflictError } from "../errors/ConflictError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
 import { ForbiddenError } from "../errors/ForbiddenError.js";
 import { AUTOR_VALORACION } from "../domain/enums/AUTOR_VALORACION.js";
+import { ROL_CUENTA } from "../domain/enums/ROL_CUENTA.js";
 import { TIPO_NOTIFICACION } from "../domain/enums/TIPO_NOTIFICACION.js";
 import { aplicarModoDeAceptacion, notificarResoluciones } from "./reglasDePostulacion.js";
 
@@ -54,8 +55,8 @@ export class ColaboracionService {
       );
     }
 
-    if (this.yaEstaAnotado(colaborador, proyecto)) {
-      throw new ConflictError("El colaborador ya está anotado en este proyecto");
+    if (proyecto.yaSePostuloAlPerfil(colaborador, perfil)) {
+      throw new ConflictError("El colaborador ya está anotado en este perfil");
     }
 
     const colaboracion = proyecto.agregarColaboracion({
@@ -74,10 +75,6 @@ export class ColaboracionService {
     });
 
     return colaboracion;
-  }
-
-  yaEstaAnotado(colaborador, proyecto) {
-    return proyecto.yaColaboraron(colaborador);
   }
 
   async buscarColaboracion(proyectoId, colaboracionId) {
@@ -165,7 +162,7 @@ export class ColaboracionService {
     return colaboracion;
   }
 
-  async desvincular(proyectoId, colaboracionId, ahora = new Date()) {
+  async desvincular(proyectoId, colaboracionId, ahora = new Date(), { cuenta = null } = {}) {
     const { colectivo, colaboracion } = await this.buscarColaboracion(
       proyectoId,
       colaboracionId,
@@ -179,7 +176,27 @@ export class ColaboracionService {
 
     colaboracion.desvincular(ahora);
     await this.colectivoRepository.guardar(colectivo);
-    await this.notificarDesvinculacion(proyectoId, colaboracion);
+    if (cuenta?.rol !== ROL_CUENTA.COLABORADORA) {
+      await this.notificarDesvinculacion(proyectoId, colaboracion);
+    }
+
+    return colaboracion;
+  }
+
+  async retirar(proyectoId, colaboracionId, ahora = new Date()) {
+    const { colectivo, colaboracion } = await this.buscarColaboracion(
+      proyectoId,
+      colaboracionId,
+    );
+
+    if (!colaboracion.estaPendiente()) {
+      throw new ConflictError(
+        `Solo se puede retirar una postulacion pendiente (esta esta ${colaboracion.estado})`,
+      );
+    }
+
+    colaboracion.retirar(ahora);
+    await this.colectivoRepository.guardar(colectivo);
 
     return colaboracion;
   }
@@ -301,7 +318,7 @@ export class ColaboracionService {
     return (await this.proyectoService.buscarPorId(proyectoId)).colaboraciones;
   }
 
-  async listarPorColaborador(colaboradorId) {
+  async listarPorColaborador(colaboradorId, { incluirAnonimas = false } = {}) {
     const colaborador = await this.colaboradorService.buscarPorId(colaboradorId);
     const colectivos =
       await this.colectivoRepository.buscarColectivosDeColaborador(colaboradorId);
@@ -309,10 +326,25 @@ export class ColaboracionService {
 
     return proyectos.flatMap((proyecto) =>
       proyecto.colaboraciones
-        .filter((c) => c.esDe(colaborador) && c.esPublica)
-        .map((c) => ({ proyectoId: proyecto.id, colaboracion: c })),
+        .filter((c) => c.esDe(colaborador) && (incluirAnonimas || c.esPublica))
+        .map((c) => ({
+          proyectoId: proyecto.id,
+          proyecto: {
+            id: proyecto.id,
+            titulo: proyecto.titulo,
+            estado: proyecto.estado,
+          },
+          perfil: resumirPerfil(proyecto.buscarPerfil(c.perfil)),
+          colaboracion: c,
+        })),
     );
   }
+}
+
+function resumirPerfil(perfil) {
+  return perfil
+    ? { id: perfil.id, titulo: perfil.titulo ?? null, descripcion: perfil.descripcion }
+    : null;
 }
 
 function resumirValoraciones(valoraciones) {

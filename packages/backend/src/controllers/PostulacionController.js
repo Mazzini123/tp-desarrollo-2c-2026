@@ -30,7 +30,17 @@ export class PostulacionController extends BaseController {
         await this.colaboracionService.desvincular(
           req.params.id,
           req.params.colaboracionId,
+          new Date(),
+          { cuenta: req.cuenta },
         ),
+      );
+  };
+
+  retirar = async (req, res) => {
+    res
+      .status(200)
+      .json(
+        await this.colaboracionService.retirar(req.params.id, req.params.colaboracionId),
       );
   };
 

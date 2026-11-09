@@ -53,7 +53,7 @@ export class LogroService {
 
     validarTituloLogroParaProyecto(tituloLogro, proyecto, logroId = null) {
         if (proyecto.logros.some(
-            l => l.titulo === tituloLogro && l.id !== logroId
+            l => l.titulo.toLowerCase() === tituloLogro.toLowerCase() && l.id !== logroId
         )) {
             throw new ConflictError(
                 `El proyecto con id "${proyecto.id}" ya contiene un logro con mismo titulo`

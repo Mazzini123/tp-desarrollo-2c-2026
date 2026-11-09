@@ -16,7 +16,10 @@ export const RUTAS_DE_BUSQUEDA = [
   "/colectivos/:id/estadisticas",
 ];
 
-export function crearApp(controllers, { limites = limitesDesdeEntorno() } = {}) {
+export function crearApp(
+  controllers,
+  { limites = limitesDesdeEntorno(), autorizacion } = {},
+) {
   const app = express();
   const limitadores = crearLimitadores(limites);
 
@@ -30,7 +33,7 @@ export function crearApp(controllers, { limites = limitesDesdeEntorno() } = {}) 
   app.use("/docs", swaggerUi.serve, swaggerUi.setup(openapi));
   app.get("/openapi.json", (_req, res) => res.json(openapi));
 
-  app.use(crearRouter(controllers));
+  app.use(crearRouter(controllers, autorizacion));
 
   app.use(noEncontrado);
   app.use(manejadorErrores);

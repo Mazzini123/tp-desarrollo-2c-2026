@@ -14,6 +14,7 @@ export class ColaboradorService {
   }
 
   async crear({
+    cuentaId = null,
     nombreFantasia,
     nombre,
     apellido,
@@ -28,6 +29,7 @@ export class ColaboradorService {
     this.validarIdentificacion({ nombreFantasia, nombre, apellido, cuentaGit });
 
     const colaborador = new ColaboradorModel({
+      cuentaId,
       nombreFantasia,
       nombre,
       apellido,
@@ -67,6 +69,11 @@ export class ColaboradorService {
       numeroPagina,
       limitePorPagina,
     );
+  }
+
+  async mediosDeContacto(id) {
+    const colaborador = await this.buscarPorId(id);
+    return colaborador.mediosDeContacto.map(({ tipo, valor }) => ({ tipo, valor }));
   }
 
   async buscarPorId(id) {

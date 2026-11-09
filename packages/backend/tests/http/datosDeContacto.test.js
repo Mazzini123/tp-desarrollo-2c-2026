@@ -33,42 +33,16 @@ describe("HTTP · datos de contacto", () => {
     colaboradorId = ada.body.id;
   });
 
-  const contacto = (id = colaboradorId) =>
-    api.get(`/proyectos/${proyectoId}/colaboradores/${id}/contacto`);
-
-  test("sin postularse no se ven los datos", async () => {
-    await contacto().expect(403);
-  });
-
-  test("con la postulacion pendiente no se ven, y al aceptarla si", async () => {
+  test("la ruta de contacto esta suspendida incluso con una colaboracion aceptada", async () => {
     const postulacion = await api
       .post(`/proyectos/${proyectoId}/colaboraciones`)
       .send({ colaboradorId, perfilId })
       .expect(201);
-
-    await contacto().expect(403);
 
     await api
       .post(`/proyectos/${proyectoId}/colaboraciones/${postulacion.body.id}/aceptacion`)
       .expect(200);
 
-    const respuesta = await contacto().expect(200);
-    expect(respuesta.body).toEqual([{ tipo: "EMAIL", valor: "ada@mail.com" }]);
-  });
-
-  test("con la postulacion rechazada no se ven", async () => {
-    const postulacion = await api
-      .post(`/proyectos/${proyectoId}/colaboraciones`)
-      .send({ colaboradorId, perfilId })
-      .expect(201);
-    await api
-      .post(`/proyectos/${proyectoId}/colaboraciones/${postulacion.body.id}/rechazo`)
-      .expect(200);
-
-    await contacto().expect(403);
-  });
-
-  test("una persona que no existe da 404", async () => {
-    await contacto("64b000000000000000000000").expect(404);
+    await api.get(`/proyectos/${proyectoId}/colaboradores/${colaboradorId}/contacto`).expect(404);
   });
 });

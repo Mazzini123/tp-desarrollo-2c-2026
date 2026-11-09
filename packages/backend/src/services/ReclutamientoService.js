@@ -74,6 +74,10 @@ export class ReclutamientoService {
       throw new ConflictError("La persona ya se postulo a este proyecto");
     }
 
+    if (await this.notificacionService.yaInvitada(colaborador.id, perfil.id)) {
+      throw new ConflictError("La persona ya fue invitada a este perfil");
+    }
+
     if (!colaborador.recibeMensajeriaInterna) {
       throw new ConflictError(
         "La persona no acepta ser contactada por mensajeria interna",

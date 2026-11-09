@@ -4,6 +4,10 @@ export class InMemoryColaboradorRepository extends InMemoryRepository {
     return this.listar().filter((colaborador) => tieneTodas(colaborador, codigos));
   }
 
+  buscarPorCuenta(cuentaId) {
+    return this.listar().find((c) => c.cuentaId === cuentaId) ?? null;
+  }
+
   buscarPotenciales(
     { requeridas, opcionales = [], excluirIds = [] },
     numeroPagina,

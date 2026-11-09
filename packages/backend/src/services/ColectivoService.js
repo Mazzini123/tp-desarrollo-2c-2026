@@ -1,5 +1,5 @@
 import { ColectivoModel } from "../models/ColectivoModel.js";
-import { PROVINCIAS, nombreDeUbicacion } from "../domain/Ubicacion.js";
+import { buscarProvincia, nombreDeUbicacion } from "../domain/Ubicacion.js";
 import { DomainError } from "../errors/DomainError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
 import { esTipoColectivoValido } from "../domain/enums/TIPO_COLECTIVO.js";
@@ -20,6 +20,7 @@ export class ColectivoService {
   }
 
   async crear({
+    cuentaId = null,
     nombre,
     descripcion,
     tipoColectivo,
@@ -33,6 +34,7 @@ export class ColectivoService {
     this.validarTipoColectivo(tipoColectivo);
 
     const colectivo = new ColectivoModel({
+      cuentaId,
       nombre,
       descripcion,
       tipoColectivo,
@@ -59,6 +61,38 @@ export class ColectivoService {
       throw new NotFoundError(`No existe un colectivo con id "${id}"`);
     }
     return colectivo;
+  }
+
+  async mediosDeContacto(id) {
+    const colectivo = await this.buscarPorId(id);
+    return colectivo.mediosDeContacto.map(({ tipo, valor }) => ({ tipo, valor }));
+  }
+
+  async agregarMedioDeContacto(id, medio) {
+    const colectivo = await this.buscarPorId(id);
+    const [nuevo] = this.construirMediosDeContacto([medio]);
+
+    if (colectivo.mediosDeContacto.some((existente) => mismoMedioDeContacto(existente, nuevo))) {
+      throw new ConflictError("El colectivo ya tiene registrado ese medio de contacto");
+    }
+
+    colectivo.mediosDeContacto.push(nuevo);
+    await this.colectivoRepository.guardar(colectivo);
+    return nuevo;
+  }
+
+  async quitarMedioDeContacto(id, medio) {
+    const colectivo = await this.buscarPorId(id);
+    const restantes = colectivo.mediosDeContacto.filter(
+      (existente) => !mismoMedioDeContacto(existente, medio),
+    );
+
+    if (restantes.length === colectivo.mediosDeContacto.length) {
+      throw new NotFoundError("El colectivo no tiene registrado ese medio de contacto");
+    }
+
+    colectivo.mediosDeContacto = restantes;
+    await this.colectivoRepository.guardar(colectivo);
   }
 
   async actualizar(id, { nombre, descripcion, ubicacion, redesSociales, etiquetas, mediosDeContacto }) {
@@ -200,7 +234,9 @@ export class ColectivoService {
     if (!esTipoUbicacionValido(tipoUbicacion)) {
       throw new DomainError(`Tipo de ubicación inválido: ${tipoUbicacion}`);
     }
-    if (tipoUbicacion === TIPO_UBICACION.PROVINCIA && !PROVINCIAS.includes(nombre)) {
+    const provincia =
+      tipoUbicacion === TIPO_UBICACION.PROVINCIA ? buscarProvincia(nombre) : null;
+    if (tipoUbicacion === TIPO_UBICACION.PROVINCIA && !provincia) {
       throw new DomainError(
         `Para PROVINCIA, nombre debe ser una de las 23 provincias argentinas. Recibido: ${nombre}`,
       );
@@ -209,7 +245,7 @@ export class ColectivoService {
       throw new DomainError("Para LOCALIDAD, nombre es obligatorio");
     }
 
-    return { tipoUbicacion, nombre: nombreDeUbicacion(tipoUbicacion, nombre) };
+    return { tipoUbicacion, nombre: nombreDeUbicacion(tipoUbicacion, provincia ?? nombre) };
   }
 
   validarNombre(nombre) {

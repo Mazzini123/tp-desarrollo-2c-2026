@@ -8,10 +8,12 @@ export class NotificacionController extends BaseController {
 
   listar = async (req, res) => {
     const paginacion = this.aPaginacionDeDominio(req.paginacion);
-    this.responderPaginado(
-      res,
-      await this.notificacionService.listar(req.params.id, paginacion),
-    );
+    const { leida } = req.paginacion;
+    const { noLeidas, ...pagina } = await this.notificacionService.listar(req.params.id, {
+      ...paginacion,
+      leida,
+    });
+    this.responderPaginado(res, pagina, { unread: noLeidas });
   };
 
   marcarComoLeida = async (req, res) => {

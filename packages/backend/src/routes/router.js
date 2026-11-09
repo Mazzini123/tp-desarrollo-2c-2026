@@ -5,15 +5,21 @@ import { crearProyectosRouter } from "./proyectosRouter.js";
 import { crearHabilidadesRouter } from "./habilidadesRouter.js";
 import { crearColaboradoresRouter } from "./colaboradoresRouter.js";
 import { crearEstadisticasRouter } from "./estadisticasRouter.js";
+import { crearCatalogosRouter } from "./catalogosRouter.js";
+import { crearCuentaRouter } from "./cuentaRouter.js";
+import { autorizacionDesactivada } from "../middlewares/autorizacion.js";
 
-export function crearRouter(controllers) {
+export function crearRouter(controllers, autorizacion = autorizacionDesactivada()) {
   const router = Router();
+
+  router.use(autorizacion.identificar);
 
   router.use("/health", crearHealthRouter());
   router.use(
     "/colectivos",
-    crearColectivosRouter(controllers.colectivo, controllers.estadistica),
+    crearColectivosRouter(controllers.colectivo, controllers.estadistica, autorizacion),
   );
+  router.use("/catalogos", crearCatalogosRouter());
   router.use("/estadisticas", crearEstadisticasRouter(controllers.estadistica));
   router.use(
     "/proyectos",
@@ -23,7 +29,8 @@ export function crearRouter(controllers) {
       controllers.reclutamiento,
       controllers.postulacion,
       controllers.logro,
-      controllers.avance
+      controllers.avance,
+      autorizacion,
     ),
   );
   router.use("/habilidades", crearHabilidadesRouter(controllers.habilidad));
@@ -33,8 +40,10 @@ export function crearRouter(controllers) {
       controllers.colaborador,
       controllers.notificacion,
       controllers.reclutamiento,
+      autorizacion,
     ),
   );
+  router.use("/auth", crearCuentaRouter(controllers.cuenta, autorizacion));
 
   return router;
 }
