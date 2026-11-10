@@ -1,7 +1,7 @@
-import { SolicitudIngresoModel } from "../models/SolicitudIngresoModel.js";
-import { ESTADO_SOLICITUD } from "../domain/enums/ESTADO_SOLICITUD.js";
-import { esIdValido } from "./objectIds.js";
-import { errorDeDuplicado, esDuplicado } from "./duplicados.js";
+import { SolicitudIngresoModel } from "./SolicitudIngresoModel.js";
+import { ESTADO_SOLICITUD } from "../application/ESTADO_SOLICITUD.js";
+import { esIdValido } from "../../repositories/objectIds.js";
+import { errorDeDuplicado, esDuplicado } from "../../repositories/duplicados.js";
 
 export class MongoSolicitudIngresoRepository {
   async crear(datos) {

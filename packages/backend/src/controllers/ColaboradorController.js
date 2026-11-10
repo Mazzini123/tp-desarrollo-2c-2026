@@ -1,5 +1,5 @@
 import { BaseController } from "./BaseController.js";
-import { colaboradorDelContexto } from "../domain/contexto.js";
+import { colaboradorDelContexto } from "../security/http/contexto.js";
 
 export class ColaboradorController extends BaseController {
   constructor({ colaboradorService, colaboracionService, modalidadService }) {
@@ -20,17 +20,6 @@ export class ColaboradorController extends BaseController {
     res
       .status(200)
       .json(await this.modalidadService.darDeBajaPerfilColaborador(req.params.id));
-  };
-
-  reactivar = async (req, res) => {
-    res
-      .status(200)
-      .json(
-        await this.modalidadService.reactivarPerfilColaborador(
-          req.usuario,
-          req.params.id,
-        ),
-      );
   };
 
   listar = async (req, res) => {

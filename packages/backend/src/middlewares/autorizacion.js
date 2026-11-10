@@ -1,15 +1,23 @@
 import { AUTOR_VALORACION } from "../domain/enums/AUTOR_VALORACION.js";
 import { UnauthorizedError } from "../errors/UnauthorizedError.js";
+import { ConflictError } from "../errors/ConflictError.js";
+import { CODIGO_ERROR } from "../errors/CODIGO_ERROR.js";
 import { ForbiddenError } from "../errors/ForbiddenError.js";
-import { crearAutenticacion } from "./autenticacion.js";
-import { crearIdentificacion } from "./identificacion.js";
-import { crearAutorizacionContextual } from "./autorizarEnContexto.js";
-import { colaboradorDelContexto, colectivoDelContexto } from "../domain/contexto.js";
+import {
+  crearAutenticacion,
+  exigirAutenticacion,
+} from "../security/http/autenticacion.js";
+import { crearIdentificacion } from "../security/http/identificacion.js";
+import { crearAutorizacionContextual } from "../security/http/autorizarEnContexto.js";
+import {
+  colaboradorDelContexto,
+  colectivoDelContexto,
+} from "../security/http/contexto.js";
 
 const pasar = (_req, _res, next) => next();
 
 function exigirSesion(req) {
-  if (!req.identidad) {
+  if (!req.usuario) {
     throw new UnauthorizedError();
   }
 }
@@ -28,12 +36,12 @@ export function autorizacionDesactivada() {
     autenticar: (req, _res, next) => {
       req.autenticacion = null;
       req.usuario = null;
-      req.identidad = null;
       req.contexto = null;
       next();
     },
-    exigirAutenticacion: pasar,
+    exigirAutenticacion,
     usuario: () => pasar,
+    nombre: pasar,
     permiso: () => pasar,
     opcional: pasar,
     colaboradoraDe: () => pasar,
@@ -58,10 +66,7 @@ export function crearAutorizacion({
     return autorizacionDesactivada();
   }
 
-  const identificacion = crearIdentificacion({
-    registroService,
-    compat: compatContextoImplicito,
-  });
+  const identificacion = crearIdentificacion({ registroService });
   const contextual = crearAutorizacionContextual({
     contextoService,
     catalogoDeRoles,
@@ -102,14 +107,20 @@ export function crearAutorizacion({
 
     autenticar: crearAutenticacion(autenticador),
 
-    exigirAutenticacion: (req, _res, next) => {
-      if (!req.autenticacion) throw identificacion.noAutenticado();
-      next();
-    },
+    exigirAutenticacion,
 
-    usuario: (opciones) => identificacion.exigida(opciones),
+    usuario: () => identificacion.exigida,
 
-    permiso: (codigo = null) => [identificacion.exigida(), contextual.exigida(codigo)],
+    nombre: guarda((req) => {
+      if (!req.usuario.nombre) {
+        throw new ConflictError(
+          "Antes de continuar, contanos tu nombre",
+          CODIGO_ERROR.NOMBRE_REQUERIDO,
+        );
+      }
+    }),
+
+    permiso: (codigo = null) => [identificacion.exigida, contextual.exigida(codigo)],
 
     opcional: [identificacion.opcional, contextual.opcional],
 

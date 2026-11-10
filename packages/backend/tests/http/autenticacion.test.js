@@ -18,22 +18,34 @@ async function armar() {
     verificadorDeToken: verificadorDePrueba,
     compatContextoImplicito: true,
   });
-  const crearColectivo = async (cuenta) =>
-    (
+  const registrar = (cuenta) =>
+    api
+      .post("/auth/registro")
+      .set(como(cuenta))
+      .expect((res) => {
+        expect([200, 201]).toContain(res.status);
+      });
+  const crearColectivo = async (cuenta) => {
+    await registrar(cuenta);
+    await api.put("/auth/usuario").set(como(cuenta)).send({ nombre: cuenta }).expect(200);
+    return (
       await api
         .post("/colectivos")
         .set(como(cuenta))
         .send({ nombre: `Colectivo ${cuenta}`, descripcion: "d", tipoColectivo: "ONG" })
         .expect(201)
     ).body;
-  const crearPersona = async (cuenta, extra = {}) =>
-    (
+  };
+  const crearPersona = async (cuenta, extra = {}) => {
+    await registrar(cuenta);
+    return (
       await api
         .post("/colaboradores")
         .set(como(cuenta))
         .send({ cuentaGit: cuenta, codigosHabilidades: [CODIGOS.node], ...extra })
         .expect(201)
     ).body;
+  };
   const crearProyecto = async (cuenta, colectivoId) =>
     (
       await api
@@ -46,16 +58,18 @@ async function armar() {
         })
         .expect(201)
     ).body;
-  return { api, crearColectivo, crearPersona, crearProyecto };
+  return { api, registrar, crearColectivo, crearPersona, crearProyecto };
 }
 
 describe("HTTP · sesion y cuenta", () => {
   test("GET /auth/me pide una sesion valida y informa el rol y el perfil", async () => {
-    const { api, crearPersona } = await armar();
+    const { api, registrar, crearPersona } = await armar();
 
     await api.get("/auth/me").expect(401);
     await api.get("/auth/me").set("Authorization", "Bearer basura").expect(401);
 
+    await api.get("/auth/me").set(como("ana")).expect(403);
+    await registrar("ana");
     const sinPerfil = await api.get("/auth/me").set(como("ana")).expect(200);
     expect(sinPerfil.body).toMatchObject({ id: "cuenta-ana", rol: null, perfilId: null });
 
@@ -296,7 +310,8 @@ describe("HTTP · postulaciones, bandeja y contacto", () => {
   });
 
   test("buscar y invitar candidatas es del dueño y no expone contactos", async () => {
-    const { api, ada, proyecto } = await conPostulacion();
+    const { api, ada, proyecto, registrar } = await conPostulacion();
+    await registrar("linus");
     const nuevo = await api
       .post("/colaboradores")
       .set(como("linus"))

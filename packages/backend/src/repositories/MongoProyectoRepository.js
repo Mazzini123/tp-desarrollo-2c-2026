@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { ProyectoModel } from "../models/ProyectoModel.js";
 import { ColaboracionModel } from "../models/ColaboracionModel.js";
+import { transaccionesMongo } from "../config/transacciones.js";
 import { ConcurrenciaError } from "../errors/ConcurrenciaError.js";
 import { PROYECTO_ESTADO } from "../domain/enums/PROYECTO_ESTADO.js";
 import { errorDeDuplicado, esDuplicado } from "./duplicados.js";
@@ -23,20 +24,26 @@ export class MongoProyectoRepository {
   }
 
   async guardar(proyecto) {
-    for (const perfil of proyecto.perfiles) {
-      perfil.cupoCompleto = perfil.limiteAlcanzado(proyecto.cantidadAceptadas(perfil));
-    }
-    if (!proyecto.isNew) proyecto.increment();
-    try {
-      await proyecto.save();
-    } catch (error) {
-      if (error instanceof mongoose.Error.VersionError) throw new ConcurrenciaError();
-      if (esDuplicado(error)) throw errorDeDuplicado("La publicacion ya existe");
-      throw error;
-    }
     const cambiadas = proyecto.colaboraciones.filter((c) => c.isNew || c.isModified());
-    await Promise.all(cambiadas.map((colaboracion) => colaboracion.save()));
-    return proyecto;
+    const guardar = async () => {
+      for (const perfil of proyecto.perfiles) {
+        perfil.cupoCompleto = perfil.limiteAlcanzado(proyecto.cantidadAceptadas(perfil));
+      }
+      if (!proyecto.isNew) proyecto.increment();
+      try {
+        await proyecto.save();
+      } catch (error) {
+        if (error instanceof mongoose.Error.VersionError) throw new ConcurrenciaError();
+        if (esDuplicado(error)) throw errorDeDuplicado("La publicacion ya existe");
+        throw error;
+      }
+      for (const colaboracion of cambiadas) {
+        await colaboracion.save();
+      }
+      return proyecto;
+    };
+
+    return cambiadas.length ? transaccionesMongo.ejecutar(guardar) : guardar();
   }
 
   async buscarPorId(id) {

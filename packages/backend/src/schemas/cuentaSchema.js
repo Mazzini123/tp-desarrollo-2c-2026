@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ESTADO_SOLICITUD } from "../domain/enums/ESTADO_SOLICITUD.js";
+import { ESTADO_SOLICITUD } from "../security/application/ESTADO_SOLICITUD.js";
 import { objectIdSchema } from "./comunesSchema.js";
 
 export const registroSchema = z.preprocess(

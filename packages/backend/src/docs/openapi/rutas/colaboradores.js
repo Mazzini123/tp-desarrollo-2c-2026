@@ -21,26 +21,10 @@ export const rutasColaboradores = {
         "`fechaBaja`), pero su contexto deja de servir para operar y la persona deja de " +
         "aparecer en busquedas, avisos e invitaciones. No cancela nada por su cuenta: con " +
         "postulaciones pendientes o colaboraciones aceptadas responde 409 " +
-        "ACTIVIDAD_EN_CURSO y `detalle` las lista.",
+        "ACTIVIDAD_EN_CURSO y `detalle` las lista. Para volver puede crear un perfil nuevo " +
+        "con la misma cuenta. El perfil anterior queda como historial.",
       responses: {
         200: { description: "Perfil dado de baja." },
-        409: errores[409],
-      },
-    },
-  },
-
-  "/colaboradores/{id}/reactivacion": {
-    parameters: [paramId],
-    post: {
-      tags: ["Colaboradores"],
-      summary: "Reactivar el propio perfil de colaboradora",
-      description:
-        "Sin X-Context-Id (el contexto esta inactivo por la baja). Reactiva el mismo perfil " +
-        "y lo deja como contexto actual. 409 MODALIDAD_INCOMPATIBLE si la cuenta opera " +
-        "como colectivo.",
-      responses: {
-        200: { description: "Perfil activo de nuevo." },
-        404: errores[404],
         409: errores[409],
       },
     },
@@ -57,12 +41,18 @@ export const rutasColaboradores = {
         "payload se descartan en silencio. `mediosDeContacto` se registran pero **nunca " +
         "se muestran** en ninguna respuesta. `recibeMensajeriaInterna` (default true) " +
         "decide si se le pueden mandar notificaciones. Al crearla, se le avisa que " +
-        "proyectos abiertos le sirven (req. 9).",
+        "proyectos abiertos le sirven (req. 9). Con autenticacion activa se requiere un " +
+        "usuario registrado. El contexto nuevo pasa a ser el actual. La cuenta puede tener " +
+        "perfiles anteriores dados de baja, pero recibe 409 si ya tiene uno activo o si " +
+        "opera como colectivo.",
       requestBody: body("CrearColaborador"),
       responses: {
         ...recurso("Colaborador", 201, "Colaborador creado."),
         400: errores[400],
+        401: errores[401],
+        403: errores[403],
         404: errores[404],
+        409: errores[409],
       },
     },
     get: {

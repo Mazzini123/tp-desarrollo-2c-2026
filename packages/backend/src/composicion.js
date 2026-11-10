@@ -9,18 +9,18 @@ import { MongoColaboracionRepository } from "./repositories/MongoColaboracionRep
 import { MongoNotificacionRepository } from "./repositories/MongoNotificacionRepository.js";
 import { MongoEstadisticaRepository } from "./repositories/MongoEstadisticaRepository.js";
 
-import { MongoUsuarioRepository } from "./repositories/MongoUsuarioRepository.js";
-import { MongoIdentidadExternaRepository } from "./repositories/MongoIdentidadExternaRepository.js";
-import { MongoContextoUsuarioRepository } from "./repositories/MongoContextoUsuarioRepository.js";
-import { MongoSolicitudIngresoRepository } from "./repositories/MongoSolicitudIngresoRepository.js";
+import { MongoUsuarioRepository } from "./security/persistencia/MongoUsuarioRepository.js";
+import { MongoIdentidadExternaRepository } from "./security/persistencia/MongoIdentidadExternaRepository.js";
+import { MongoContextoUsuarioRepository } from "./security/persistencia/MongoContextoUsuarioRepository.js";
+import { MongoSolicitudIngresoRepository } from "./security/persistencia/MongoSolicitudIngresoRepository.js";
 import { transaccionesMongo } from "./config/transacciones.js";
 
-import { CatalogoDeRoles } from "./domain/CatalogoDeRoles.js";
-import { RegistroService } from "./services/RegistroService.js";
-import { ContextoService } from "./services/ContextoService.js";
-import { ModalidadService } from "./services/ModalidadService.js";
-import { MembresiaService } from "./services/MembresiaService.js";
-import { LiderazgoService } from "./services/LiderazgoService.js";
+import { CatalogoDeRoles } from "./security/autorizacion/CatalogoDeRoles.js";
+import { RegistroService } from "./security/application/RegistroService.js";
+import { ContextoService } from "./security/application/ContextoService.js";
+import { ModalidadService } from "./application/ModalidadService.js";
+import { MembresiaService } from "./application/MembresiaService.js";
+import { LiderazgoService } from "./security/application/LiderazgoService.js";
 import { CuentaController } from "./controllers/CuentaController.js";
 import { MembresiaController } from "./controllers/MembresiaController.js";
 import { crearAutorizacion } from "./middlewares/autorizacion.js";
@@ -148,12 +148,14 @@ export function componerApp({
   });
 
   const colectivoService = new ColectivoService({
+    transacciones,
     colectivoRepository,
     proyectoRepository,
     notificacionService,
   });
 
   const proyectoService = new ProyectoService({
+    transacciones,
     proyectoRepository,
     colectivoService,
     perfilService,
@@ -170,6 +172,7 @@ export function componerApp({
   });
 
   const colaboracionService = new ColaboracionService({
+    transacciones,
     proyectoRepository,
     colaboracionRepository,
     colectivoService,
@@ -188,11 +191,13 @@ export function componerApp({
   const avanceService = new AvanceService({ proyectoRepository });
 
   const registroService = new RegistroService({
+    transacciones,
     identidadExternaRepository,
     usuarioRepository,
   });
 
   const contextoService = new ContextoService({
+    transacciones,
     contextoUsuarioRepository,
     usuarioRepository,
     colectivoRepository,
@@ -216,12 +221,12 @@ export function componerApp({
     contextoUsuarioRepository,
     solicitudIngresoRepository,
     usuarioRepository,
-    colectivoRepository,
     colectivoService,
   });
 
   const liderazgoService = new LiderazgoService({
     transacciones,
+    contextoService,
     contextoUsuarioRepository,
   });
 

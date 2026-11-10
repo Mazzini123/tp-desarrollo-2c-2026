@@ -13,7 +13,8 @@ export const DESCRIPCION_DE_PERMISOS = {
     "Ver y editar los medios de contacto del colectivo",
   [PERMISO.COLECTIVO_ESTADISTICAS_VER]: "Ver las estadisticas del colectivo",
   [PERMISO.COLECTIVO_ELIMINAR]: "Dar de baja el colectivo",
-  [PERMISO.COLECTIVO_MIEMBROS_VER]: "Ver los miembros del colectivo",
+  [PERMISO.COLECTIVO_MIEMBROS_VER]:
+    "Ver los miembros y las solicitudes de ingreso del colectivo",
   [PERMISO.PROYECTO_CREAR]: "Crear proyectos",
   [PERMISO.PROYECTO_EDITAR]: "Editar proyectos, perfiles, logros y avances",
   [PERMISO.PROYECTO_FINALIZAR]: "Finalizar proyectos",
@@ -29,8 +30,7 @@ export const DESCRIPCION_DE_PERMISOS = {
   [PERMISO.NOTIFICACIONES_VER]: "Leer la bandeja de mensajes",
   [PERMISO.POSTULACION_CREAR]: "Postularse a un perfil",
   [PERMISO.POSTULACION_RETIRAR]: "Retirar una postulacion",
-  [PERMISO.MEMBRESIA_SOLICITUD_RESOLVER]:
-    "Ver, aceptar y rechazar solicitudes de ingreso",
+  [PERMISO.MEMBRESIA_SOLICITUD_RESOLVER]: "Aceptar o rechazar solicitudes de ingreso",
   [PERMISO.MIEMBRO_ELIMINAR]: "Quitar miembros del colectivo",
   [PERMISO.LIDER_ASIGNAR]: "Pasarle el liderazgo a otro miembro",
 };

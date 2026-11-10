@@ -9,7 +9,6 @@ import { aplicarFormatoJSON } from "./formatoJSON.js";
 
 const colectivoSchema = new mongoose.Schema(
   {
-    cuentaId: { type: String, default: null },
     nombre: { type: String, required: true },
     descripcion: { type: String, required: true },
     tipoColectivo: { type: String, required: true },

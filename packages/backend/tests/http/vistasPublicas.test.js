@@ -75,6 +75,9 @@ describe("HTTP · vistas publicas de proyectos y colectivos", () => {
       verificadorDeToken: verificador,
       compatContextoImplicito: true,
     });
+    await api.post("/auth/registro").set(como("ana")).expect(201);
+    await api.put("/auth/usuario").set(como("ana")).send({ nombre: "Ana" }).expect(200);
+    await api.post("/auth/registro").set(como("bea")).expect(201);
 
     const colectivo = (
       await api

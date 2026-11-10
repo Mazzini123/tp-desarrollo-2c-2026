@@ -15,7 +15,7 @@ import { listadoDeProyectosSchema } from "../schemas/comunesSchema.js";
 import { valoracionSchema } from "../schemas/valoracionSchema.js";
 import { crearLogroSchema, actualizarLogroSchema } from "../schemas/logroSchema.js";
 import { crearAvanceSchema } from "../schemas/avanceSchema.js";
-import { PERMISO } from "../domain/enums/PERMISO.js";
+import { PERMISO } from "../security/autorizacion/enums/PERMISO.js";
 
 export function crearProyectosRouter(
   proyectoController,

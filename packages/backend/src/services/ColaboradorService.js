@@ -74,11 +74,6 @@ export class ColaboradorService {
     return this.colaboradorRepository.guardar(colaborador);
   }
 
-  async reactivar(colaborador) {
-    colaborador.fechaBaja = null;
-    return this.colaboradorRepository.guardar(colaborador);
-  }
-
   async listar({ numeroPagina = 1, limitePorPagina = 10 } = {}) {
     return armarPaginado(
       await this.colaboradorRepository.listarPaginado(numeroPagina, limitePorPagina),
@@ -92,8 +87,10 @@ export class ColaboradorService {
     return colaborador.mediosDeContacto.map(({ tipo, valor }) => ({ tipo, valor }));
   }
 
-  async buscarPorId(id) {
-    const colaborador = await this.colaboradorRepository.buscarPorId(id);
+  async buscarPorId(id, { bloquear = false } = {}) {
+    const colaborador = bloquear
+      ? await this.colaboradorRepository.bloquear(id)
+      : await this.colaboradorRepository.buscarPorId(id);
 
     if (!colaborador) {
       throw new NotFoundError(`No existe un colaborador con id "${id}"`);

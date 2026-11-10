@@ -1,11 +1,12 @@
-import { ROL } from "../domain/enums/ROL.js";
-import { ConflictError } from "../errors/ConflictError.js";
-import { NotFoundError } from "../errors/NotFoundError.js";
-import { CODIGO_ERROR } from "../errors/CODIGO_ERROR.js";
-import { mismoId } from "../utils/ids.js";
+import { ROL } from "../autorizacion/enums/ROL.js";
+import { ConflictError } from "../../errors/ConflictError.js";
+import { NotFoundError } from "../../errors/NotFoundError.js";
+import { CODIGO_ERROR } from "../../errors/CODIGO_ERROR.js";
+import { mismoId } from "../../utils/ids.js";
 
 export class LiderazgoService {
-  constructor({ transacciones, contextoUsuarioRepository }) {
+  constructor({ transacciones, contextoUsuarioRepository, contextoService }) {
+    this.contextoService = contextoService;
     this.transacciones = transacciones;
     this.contextoUsuarioRepository = contextoUsuarioRepository;
   }
@@ -21,16 +22,16 @@ export class LiderazgoService {
     if (mismoId(contextoDestinoId, contextoLider._id)) {
       throw this.destinoInvalido();
     }
-    const destino = await this.contextoUsuarioRepository.buscarPorId(contextoDestinoId);
-    if (
-      !destino?.activo ||
-      !mismoId(destino.colectivoId, colectivoId) ||
-      destino.rol !== ROL.MIEMBRO
-    ) {
-      throw this.destinoInvalido();
-    }
+    return this.transacciones.ejecutar(async () => {
+      const destino = await this.contextoUsuarioRepository.buscarPorId(contextoDestinoId);
+      if (
+        !destino?.activo ||
+        !mismoId(destino.colectivoId, colectivoId) ||
+        destino.rol !== ROL.MIEMBRO
+      ) {
+        throw this.destinoInvalido();
+      }
 
-    await this.transacciones.ejecutar(async () => {
       const degradado = await this.contextoUsuarioRepository.cambiarRolSi(
         contextoLider._id,
         { colectivoId, rol: ROL.LIDER },
@@ -42,14 +43,17 @@ export class LiderazgoService {
           CODIGO_ERROR.YA_NO_ES_LIDER,
         );
       }
+      await this.contextoService.bloquearActual(contextoLider);
       const ascendido = await this.contextoUsuarioRepository.cambiarRolSi(
         destino._id,
         { colectivoId, rol: ROL.MIEMBRO },
         ROL.LIDER,
       );
       if (!ascendido) throw this.destinoInvalido();
+      return {
+        liderAnterior: String(contextoLider._id),
+        liderNuevo: String(destino._id),
+      };
     });
-
-    return { liderAnterior: String(contextoLider._id), liderNuevo: String(destino._id) };
   }
 }

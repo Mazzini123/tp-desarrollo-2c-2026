@@ -2,6 +2,7 @@ import request from "supertest";
 import { componerApp, crearCanalesEnMemoria } from "../../src/composicion.js";
 import { vaciarBase } from "../soporte/base.js";
 import { crearApp } from "../../src/app.js";
+import { asegurarValidadores } from "../../src/security/persistencia/validadoresDeColecciones.js";
 import { cargarHabilidadesIniciales } from "../../src/seed/habilidadesSeed.js";
 
 // Los tests viejos traen un verificador { verificar(token) -> { sub } }: se
@@ -31,6 +32,7 @@ export async function armarApp({
   compatContextoImplicito = false,
 } = {}) {
   await vaciarBase();
+  await asegurarValidadores();
   const canales = crearCanalesEnMemoria();
   const { controllers, services, autorizacion } = componerApp({
     canales,

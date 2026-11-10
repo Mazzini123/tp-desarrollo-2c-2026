@@ -10,12 +10,14 @@ export const rutasCuenta = {
       description:
         "Solo pide un access token valido y no lleva body. Crea el usuario interno y su " +
         "identidad externa (proveedor + sub) si no existen. Idempotente: llamarlo de " +
-        "nuevo, o varias veces a la vez, no duplica nada. No crea contextos ni roles. " +
-        "Despues, el front le pide el nombre a la persona y lo manda a PUT /auth/usuario.",
+        "nuevo, o varias veces a la vez, no duplica nada. Se llama al iniciar la sesion " +
+        "antes de consultar GET /auth/me. No requiere ni crea un contexto. " +
+        "El nombre se completa mediante PUT /auth/usuario.",
       responses: {
         201: { description: "Usuario creado. `{ usuarioId, creado: true }`" },
         200: { description: "Ya estaba registrado. `{ usuarioId, creado: false }`" },
         401: { description: "Sin token o token invalido." },
+        503: { description: "El proveedor de claves no esta disponible." },
       },
     },
   },
@@ -25,9 +27,10 @@ export const rutasCuenta = {
       tags: ["Cuenta"],
       summary: "Cuenta, contexto actual y contextos disponibles",
       description:
-        "`id`, `rol` y `perfilId` se conservan por compatibilidad y salen del contexto " +
-        "actual. `contextos` lista solo los validos (activos y, si son de un colectivo, " +
-        "con el colectivo sin baja); cada uno trae sus `permisos`. 403 " +
+        "Consulta de solo lectura para un usuario registrado. Funciona sin contexto actual. " +
+        "`id` conserva el sub por compatibilidad. El identificador interno es `usuario.id`. " +
+        "`rol` y `perfilId` corresponden al contexto actual. `contextos` lista los contextos " +
+        "activos cuya entidad asociada sigue activa. Cada contexto trae sus `permisos`. 403 " +
         "USUARIO_NO_REGISTRADO si falta `POST /auth/registro`.",
       responses: {
         200: {

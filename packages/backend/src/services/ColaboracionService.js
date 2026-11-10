@@ -24,7 +24,9 @@ export class ColaboracionService {
     proyectoService,
     colaboradorService,
     notificacionService,
+    transacciones,
   }) {
+    this.transacciones = transacciones;
     this.proyectoRepository = proyectoRepository;
     this.colaboracionRepository = colaboracionRepository;
     this.colectivoService = colectivoService;
@@ -37,56 +39,63 @@ export class ColaboracionService {
     { proyectoId, perfilId, colaboradorId, esPublica = true },
     ahora = new Date(),
   ) {
-    const proyecto = await this.proyectoService.buscarPorId(proyectoId);
-    const colaborador = await this.colaboradorService.buscarPorId(colaboradorId);
-    this.colaboradorService.exigirActiva(colaborador);
+    const resultado = await this.transacciones.ejecutar(async () => {
+      const colaborador = await this.colaboradorService.buscarPorId(colaboradorId, {
+        bloquear: true,
+      });
+      this.colaboradorService.exigirActiva(colaborador);
+      const proyecto = await this.proyectoService.buscarPorId(proyectoId);
 
-    if (cierreVencido(proyecto, ahora)) {
-      await this.proyectoService.cerrar(proyecto, ahora);
-    }
+      if (cierreVencido(proyecto, ahora)) {
+        await this.proyectoService.cerrar(proyecto, ahora, { propagarError: true });
+        return null;
+      }
+      if (!proyecto.estaAbierto()) {
+        throw new ConflictError(
+          "No se puede anotar a un proyecto que ya está finalizado",
+        );
+      }
 
-    if (!proyecto.estaAbierto()) {
+      const perfil = proyecto.buscarPerfil(perfilId);
+      if (!perfil) {
+        throw new NotFoundError(
+          `No existe el perfil "${perfilId}" en el proyecto "${proyectoId}"`,
+        );
+      }
+      if (!perfilAceptaPostulaciones(perfil, ahora)) {
+        throw new ConflictError("La búsqueda de este perfil está cerrada");
+      }
+      if (!cumpleHabilidadesRequeridas(perfil, colaborador)) {
+        throw new DomainError(
+          "El colaborador debe cumplir todas las habilidades requeridas del perfil",
+        );
+      }
+      if (yaSePostuloAlPerfil(proyecto, colaborador, perfil)) {
+        throw new ConflictError("El colaborador ya está anotado en este perfil");
+      }
+
+      const colaboracion = proyecto.agregarColaboracion(
+        this.proyectoRepository.nuevaColaboracion(proyecto, {
+          colaborador,
+          perfil: perfil.id,
+          esPublica,
+          fecha: ahora,
+        }),
+      );
+      const cambios = aplicarModoDeAceptacion(proyecto, perfil, ahora);
+      await this.proyectoRepository.guardar(proyecto);
+      return { proyecto, colaboracion, cambios };
+    });
+
+    if (!resultado) {
       throw new ConflictError("No se puede anotar a un proyecto que ya está finalizado");
     }
 
-    const perfil = proyecto.buscarPerfil(perfilId);
-    if (!perfil) {
-      throw new NotFoundError(
-        `No existe el perfil "${perfilId}" en el proyecto "${proyectoId}"`,
-      );
-    }
-
-    if (!perfilAceptaPostulaciones(perfil, ahora)) {
-      throw new ConflictError("La búsqueda de este perfil está cerrada");
-    }
-
-    if (!cumpleHabilidadesRequeridas(perfil, colaborador)) {
-      throw new DomainError(
-        "El colaborador debe cumplir todas las habilidades requeridas del perfil",
-      );
-    }
-
-    if (yaSePostuloAlPerfil(proyecto, colaborador, perfil)) {
-      throw new ConflictError("El colaborador ya está anotado en este perfil");
-    }
-
-    const colaboracion = proyecto.agregarColaboracion(
-      this.proyectoRepository.nuevaColaboracion(proyecto, {
-        colaborador,
-        perfil: perfil.id,
-        esPublica,
-        fecha: ahora,
-      }),
-    );
-
-    const cambios = aplicarModoDeAceptacion(proyecto, perfil, ahora);
-    await this.proyectoRepository.guardar(proyecto);
-
+    const { proyecto, colaboracion, cambios } = resultado;
     await notificarResoluciones(this.notificacionService, proyecto, {
       aceptadas: cambios.aceptadas.filter((c) => c !== colaboracion),
       rechazadas: cambios.rechazadas.filter((c) => c !== colaboracion),
     });
-
     return colaboracion;
   }
 

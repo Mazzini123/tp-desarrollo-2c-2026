@@ -1,10 +1,8 @@
-import { TIPO_CONTEXTO } from "../domain/enums/TIPO_CONTEXTO.js";
-import { ROL } from "../domain/enums/ROL.js";
+import { TIPO_CONTEXTO } from "../security/autorizacion/enums/TIPO_CONTEXTO.js";
+import { ROL } from "../security/autorizacion/enums/ROL.js";
 import { COLABORACION_ESTADO } from "../domain/enums/COLABORACION_ESTADO.js";
 import { ConflictError } from "../errors/ConflictError.js";
-import { NotFoundError } from "../errors/NotFoundError.js";
 import { CODIGO_ERROR } from "../errors/CODIGO_ERROR.js";
-import { mismoId } from "../utils/ids.js";
 
 const EN_CURSO = [COLABORACION_ESTADO.PENDIENTE, COLABORACION_ESTADO.ACEPTADA];
 
@@ -46,20 +44,14 @@ export class ModalidadService {
     const colaborador = await this.transacciones.ejecutar(async () => {
       await this.usuarioRepository.bloquear(usuario._id);
       await this.contextoService.exigirSinModalidad(usuario._id, TIPO_CONTEXTO.COLECTIVO);
-      const existente = await this.contextoUsuarioRepository.buscarColaboradorDeUsuario(
+      const tienePerfilActivo = await this.contextoUsuarioRepository.existeActivoDeTipo(
         usuario._id,
+        TIPO_CONTEXTO.COLABORADOR,
       );
-      if (existente?.activo) {
+      if (tienePerfilActivo) {
         throw new ConflictError(
-          "La cuenta ya tiene un perfil de colaboradora",
+          "La cuenta ya tiene un perfil de colaboradora activo",
           CODIGO_ERROR.PERFIL_COLABORADOR_EXISTENTE,
-        );
-      }
-      if (existente) {
-        throw new ConflictError(
-          "Tu perfil de colaboradora esta dado de baja: podes reactivarlo",
-          CODIGO_ERROR.PERFIL_COLABORADOR_DADO_DE_BAJA,
-          { colaboradorId: String(existente.colaboradorId) },
         );
       }
 
@@ -79,30 +71,32 @@ export class ModalidadService {
   }
 
   async darDeBajaPerfilColaborador(colaboradorId, ahora = new Date()) {
-    const colaborador = await this.colaboradorService.buscarPorId(colaboradorId);
-    this.colaboradorService.exigirActiva(colaborador);
-
-    const enCurso = (
-      await this.colaboracionService.listarPorColaborador(colaboradorId, {
-        incluirAnonimas: true,
-      })
-    )
-      .filter(({ colaboracion }) => EN_CURSO.includes(colaboracion.estado))
-      .map(({ proyecto, colaboracion }) => ({
-        proyectoId: proyecto.id,
-        proyecto: proyecto.titulo,
-        colaboracionId: colaboracion.id,
-        estado: colaboracion.estado,
-      }));
-    if (enCurso.length > 0) {
-      throw new ConflictError(
-        motivoDeActividad(enCurso),
-        CODIGO_ERROR.ACTIVIDAD_EN_CURSO,
-        enCurso,
-      );
-    }
-
     return this.transacciones.ejecutar(async () => {
+      const colaborador = await this.colaboradorService.buscarPorId(colaboradorId, {
+        bloquear: true,
+      });
+      this.colaboradorService.exigirActiva(colaborador);
+
+      const enCurso = (
+        await this.colaboracionService.listarPorColaborador(colaboradorId, {
+          incluirAnonimas: true,
+        })
+      )
+        .filter(({ colaboracion }) => EN_CURSO.includes(colaboracion.estado))
+        .map(({ proyecto, colaboracion }) => ({
+          proyectoId: proyecto.id,
+          proyecto: proyecto.titulo,
+          colaboracionId: colaboracion.id,
+          estado: colaboracion.estado,
+        }));
+      if (enCurso.length > 0) {
+        throw new ConflictError(
+          motivoDeActividad(enCurso),
+          CODIGO_ERROR.ACTIVIDAD_EN_CURSO,
+          enCurso,
+        );
+      }
+
       const dadoDeBaja = await this.colaboradorService.darDeBaja(colaborador, ahora);
       const contexto = await this.contextoUsuarioRepository.buscarDeColaborador(
         colaborador._id,
@@ -115,28 +109,6 @@ export class ModalidadService {
         );
       }
       return dadoDeBaja;
-    });
-  }
-
-  async reactivarPerfilColaborador(usuario, colaboradorId) {
-    const contexto = await this.contextoUsuarioRepository.buscarColaboradorDeUsuario(
-      usuario._id,
-    );
-    if (!contexto || !mismoId(contexto.colaboradorId, colaboradorId)) {
-      throw new NotFoundError("No tenes un perfil de colaboradora con ese id");
-    }
-    if (contexto.activo) {
-      throw new ConflictError("El perfil de colaboradora ya esta activo");
-    }
-    const colaborador = await this.colaboradorService.buscarPorId(String(colaboradorId));
-
-    return this.transacciones.ejecutar(async () => {
-      await this.usuarioRepository.bloquear(usuario._id);
-      await this.contextoService.exigirSinModalidad(usuario._id, TIPO_CONTEXTO.COLECTIVO);
-      const reactivado = await this.colaboradorService.reactivar(colaborador);
-      await this.contextoUsuarioRepository.reactivar(contexto._id);
-      await this.usuarioRepository.fijarContextoActual(usuario._id, contexto._id);
-      return reactivado;
     });
   }
 

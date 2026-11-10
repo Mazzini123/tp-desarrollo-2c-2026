@@ -16,6 +16,10 @@ async function escenario() {
     verificadorDeToken: verificadorDePrueba,
     compatContextoImplicito: true,
   });
+  for (const cuenta of ["duenio", "ajeno", "ada"]) {
+    await api.post("/auth/registro").set(como(cuenta)).expect(201);
+    await api.put("/auth/usuario").set(como(cuenta)).send({ nombre: cuenta }).expect(200);
+  }
   const colectivo = (
     await api
       .post("/colectivos")

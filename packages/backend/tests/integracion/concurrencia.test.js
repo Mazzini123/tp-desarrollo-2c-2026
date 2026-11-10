@@ -86,7 +86,7 @@ test("dos aceptaciones simultaneas no superan el limite del perfil", async () =>
   };
   const a = await postular("ada");
   const b = await postular("bea");
-  coordinarDosGuardados(s.proyectoService.proyectoRepository);
+  coordinarDosLlamadas(s.proyectoService.proyectoRepository, "guardar");
 
   const resultados = await Promise.allSettled([
     s.colaboracionService.aceptar(proyecto.id, a.id),
@@ -118,7 +118,7 @@ test("postularse a un proyecto no choca con editar otro del mismo colectivo", as
     cuentaGit: "ada",
     codigosHabilidades: [CODIGOS.node],
   });
-  coordinarDosGuardados(s.proyectoService.proyectoRepository);
+  coordinarDosLlamadas(s.proyectoService.proyectoRepository, "guardar");
 
   await Promise.all([
     s.colaboracionService.registrar({
@@ -132,18 +132,18 @@ test("postularse a un proyecto no choca con editar otro del mismo colectivo", as
   expect((await s.proyectoService.buscarPorId(otro.id)).titulo).toBe("Otro, editado");
 });
 
-function coordinarDosGuardados(repositorio) {
-  const guardar = repositorio.guardar.bind(repositorio);
-  let guardados = 0;
+function coordinarDosLlamadas(objeto, metodo) {
+  const llamar = objeto[metodo].bind(objeto);
+  let llamadas = 0;
   let liberar;
   const ambosLlegaron = new Promise((resolve) => {
     liberar = resolve;
   });
-  return jest.spyOn(repositorio, "guardar").mockImplementation(async (documento) => {
-    guardados += 1;
-    if (guardados === 2) liberar();
+  return jest.spyOn(objeto, metodo).mockImplementation(async (...args) => {
+    llamadas += 1;
+    if (llamadas === 2) liberar();
     await ambosLlegaron;
-    return guardar(documento);
+    return llamar(...args);
   });
 }
 
@@ -155,7 +155,8 @@ test("dos POST simultaneos con la misma clave guardan un proyecto y avisan una s
   const avisar = jest
     .spyOn(s.avisoAutomaticoService, "avisarPorProyectoNuevo")
     .mockResolvedValue(undefined);
-  const guardar = coordinarDosGuardados(s.proyectoService.proyectoRepository);
+  coordinarDosLlamadas(s.colectivoService, "buscarPorId");
+  const guardar = jest.spyOn(s.proyectoService.proyectoRepository, "guardar");
   const publicar = () =>
     api
       .post(`/colectivos/${colectivo.id}/proyectos`)
@@ -165,7 +166,7 @@ test("dos POST simultaneos con la misma clave guardan un proyecto y avisan una s
 
   const [primero, segundo] = await Promise.all([publicar(), publicar()]);
   expect(primero.body.id).toBe(segundo.body.id);
-  expect(guardar).toHaveBeenCalledTimes(2);
+  expect(guardar).toHaveBeenCalledTimes(1);
   expect(await s.proyectoService.listarPorColectivo(colectivo.id)).toHaveLength(1);
   expect(avisar).toHaveBeenCalledTimes(1);
 });
@@ -176,7 +177,7 @@ test("dos PUT simultáneos con la misma versión solo aplican la edición ganado
   const api = request(
     crearApp(s.controllers, { limites: { general: 10000, busquedas: 10000 } }),
   );
-  const guardar = coordinarDosGuardados(s.perfilService.proyectoRepository);
+  const guardar = coordinarDosLlamadas(s.perfilService.proyectoRepository, "guardar");
   const editar = (descripcion, requerida, opcional) =>
     api.put(`/proyectos/${proyecto.id}/perfiles/${perfil.id}`).send({
       descripcion,

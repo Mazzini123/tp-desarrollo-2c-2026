@@ -261,10 +261,14 @@ export class PerfilService {
   }
 
   async construirHabilidades({ requeridas, opcionales }, perfil) {
-    const [habilidadesRequeridas, habilidadesOpcionales] = await Promise.all([
-      this.resolverGrupoDeHabilidades(requeridas, perfil?.habilidadesRequeridas),
-      this.resolverGrupoDeHabilidades(opcionales, perfil?.habilidadesOpcionales),
-    ]);
+    const habilidadesRequeridas = await this.resolverGrupoDeHabilidades(
+      requeridas,
+      perfil?.habilidadesRequeridas,
+    );
+    const habilidadesOpcionales = await this.resolverGrupoDeHabilidades(
+      opcionales,
+      perfil?.habilidadesOpcionales,
+    );
     return { habilidadesRequeridas, habilidadesOpcionales };
   }
 

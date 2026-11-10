@@ -103,6 +103,7 @@ export async function notificarResoluciones(
   notificacionService,
   proyecto,
   { aceptadas = [], rechazadas = [], finalizadas = [] },
+  { propagarError = false } = {},
 ) {
   const titulo = `"${proyecto.titulo}"`;
   const avisos = [
@@ -132,6 +133,7 @@ export async function notificarResoluciones(
         referencias: { proyectoId: proyecto.id, colaboracionId: colaboracion.id },
       });
     } catch (error) {
+      if (propagarError) throw error;
       console.error(
         "No se pudo notificar la resolucion de una postulacion:",
         error.message,

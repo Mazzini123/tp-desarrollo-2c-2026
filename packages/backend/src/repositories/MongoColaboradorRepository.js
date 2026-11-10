@@ -10,6 +10,16 @@ export class MongoColaboradorRepository {
     return colaborador.save();
   }
 
+  async bloquear(id) {
+    return esIdValido(id)
+      ? ColaboradorModel.findByIdAndUpdate(
+          id,
+          { $inc: { __v: 1 } },
+          { returnDocument: "after" },
+        )
+      : null;
+  }
+
   async buscarPorId(id) {
     return esIdValido(id) ? ColaboradorModel.findById(id) : null;
   }

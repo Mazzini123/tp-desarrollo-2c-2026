@@ -32,10 +32,12 @@ El backend sigue una arquitectura de capas:
 
 | Capa | Responsabilidad |
 |---|---|
-| `src/domain` | Las entidades, con un dominio anémico: solo datos y operaciones estructurales (agregar/quitar, buscar por id, predicados y cambios de estado, conteos). También el catálogo de roles y permisos y los enums |
+| `src/domain` | Las entidades, con un dominio anémico: solo datos y operaciones estructurales (agregar/quitar, buscar por id, predicados y cambios de estado, conteos). Incluye los enums propios del negocio |
 | `src/services` | Casos de uso y **toda la lógica de negocio**, incluidas las reglas puras de `reglasDePostulacion.js` y `reglasDeBusqueda.js`. En `soporte/`, helpers compartidos entre services |
-| `src/repositories` | Acceso a datos: MongoDB en la app, en memoria para los tests |
-| `src/models` | Schemas de Mongoose: cómo se **guarda** cada documento, + `loadClass` de su clase de dominio, y los validadores de colección de MongoDB |
+| `src/repositories` | Repositorios de negocio en MongoDB |
+| `src/models` | Esquemas de los documentos de negocio y `loadClass` de las clases de dominio |
+| `src/security` | Proveedores, identidad interna, contextos, roles, permisos, middlewares M1–M3 y su persistencia |
+| `src/application` | Orquestación de las altas, bajas y membresías entre seguridad y negocio |
 | `src/controllers` | Traducción HTTP ↔ servicios |
 | `src/routes` | Definición de endpoints y middlewares por ruta |
 | `src/middlewares` | Validación, sanitización, límite de solicitudes, 404 y manejo de errores |
@@ -58,11 +60,9 @@ La regla es que las dependencias apuntan siempre hacia adentro: los controllers
 conocen a los services, los services a los modelos y a los repositories, y el
 dominio no conoce a nadie.
 
-Desde las correcciones de la segunda entrega, el modelo de Mongoose **es** la
-entidad de dominio (`loadClass`, ver Persistencia): los services crean entidades
-con el modelo (`new ColectivoModel(...)`) y los repositories solo consultan y
-guardan. Un documento de Mongoose se puede crear sin conexión a la base, por eso
-los tests con repositorios en memoria siguen sin necesitar Mongo.
+Mongoose agrega los métodos de las entidades de dominio a los documentos mediante
+`loadClass`. Los services usan los repositorios para crear, consultar y guardar
+entidades. Las pruebas de persistencia y HTTP usan un MongoDB real con replica set.
 
 Ningún controller ni service importa del contenedor: las dependencias entran
 únicamente por constructor y se arman en `composicion.js`.
@@ -77,7 +77,7 @@ clase de `src/domain` con `schema.loadClass(Clase)`:
 
 ```
 src/domain/Proyecto.js        →  operaciones estructurales sobre sus datos
-src/models/ColectivoModel.js  →  cómo se GUARDA (campos, defaults, índices)
+src/models/ProyectoModel.js   →  cómo se GUARDA (campos, defaults, índices)
                                  + proyectoSchema.loadClass(Proyecto)
 ```
 
@@ -227,7 +227,7 @@ y terminan las colaboraciones en curso.
 | `LOGTO_API_RESOURCE` | para autenticar | Identificador del API resource de Logto: es la audiencia que tiene que traer el token. Es el mismo valor que `VITE_LOGTO_API_RESOURCE` en el front |
 | `LOGTO_ALGORITMOS` | no (`ES384`) | Algoritmos de firma aceptados, separados por coma. Los que publica `<endpoint>/oidc/jwks` |
 | `AUTH_PROVEEDORES` | no | JSON con varios proveedores (reemplaza a las `LOGTO_*`). Ver `.env.example` |
-| `AUTH_DESACTIVADA` | no | Sin Logto la API no arranca; `true` permite correrla sin autenticación (solo desarrollo, nunca en producción) |
+| `AUTH_DESACTIVADA` | no (`false`) | Permite iniciar sin proveedor únicamente con `NODE_ENV=development` o `NODE_ENV=test`. Con `NODE_ENV=production`, `true` impide el arranque |
 | `COMPAT_CONTEXTO_IMPLICITO` | no | Transitorio. `true` acepta pedidos sin `X-Context-Id` si el usuario tiene un único contexto válido y es el actual. Apagar cuando el front mande el encabezado |
 | `CORS_ORIGENES` | no | Orígenes del front, separados por coma. Sin esto se acepta cualquiera |
 | `SMTP_URL` | no | Servidor SMTP para mandar las notificaciones por email. Sin esto se simulan (quedan en el log) |
@@ -282,7 +282,7 @@ El resultado de la operación lo dice el código HTTP, no un campo del body.
 
 ## Autenticación con Logto
 
-La API valida el access token (JWT) que emite [Logto](https://logto.io) y toma su `sub` como identidad de la cuenta. El front hace el ingreso y le manda `Authorization: Bearer <token>`.
+Logto registra, autentica y emite el access token. Al iniciar o restaurar la sesión, el frontend obtiene un token para el API resource y llama a `POST /auth/registro` con `Authorization: Bearer <token>`. La API vincula `proveedor` y `sub` con un usuario propio. Con el registro confirmado, el frontend consulta `GET /auth/me`, que es de solo lectura. Si falta el nombre, lo completa con `PUT /auth/usuario`. Luego puede crear o seleccionar un contexto y enviar `X-Context-Id` en las operaciones contextuales.
 
 **Configuración en Logto**
 
@@ -290,44 +290,53 @@ La API valida el access token (JWT) que emite [Logto](https://logto.io) y toma s
 2. Crear un **API resource** y copiar su identificador (por ejemplo `https://api.codigo-a-voluntad`). Ese valor va **igual** en `LOGTO_API_RESOURCE` del back y en `VITE_LOGTO_API_RESOURCE` del front: es la audiencia del token.
 3. En el back, `LOGTO_ENDPOINT` es el endpoint del tenant (`https://<tenant>.logto.app`). El emisor se arma como `<endpoint>/oidc` y las claves salen de `<endpoint>/oidc/jwks`.
 
-**Usuarios, identidades y contextos**
+**Identidad, contexto y permisos**
 
-Logto solo autentica. Usuarios, roles, permisos y contextos son del backend:
+- Cada `Usuario` tiene un ObjectId interno, `fechaAlta`, `nombre` inicialmente nulo y `contextoActualId`. `IdentidadExterna` vincula el usuario con el par único `proveedor` y `sub`. Dos proveedores pueden emitir el mismo `sub` sin compartir cuenta. Si una nueva cuenta de Logto tiene otro `sub`, su primer `POST /auth/registro` crea un usuario interno distinto. El correo y el nombre que el proveedor incluya en sus claims se mantienen fuera del registro interno.
+- `Usuario.nombre` se completa o cambia mediante `PUT /auth/usuario`. La API lo pide al crear un colectivo o enviar una solicitud de ingreso, y lo usa al listar miembros y solicitudes del colectivo. El perfil público de colaboradora mantiene su identificación propia.
+- Un contexto activo `COLABORADOR` representa el único perfil activo de la persona. Un contexto activo `COLECTIVO` representa su membresía en ese colectivo como `MIEMBRO` o `LIDER`. El usuario puede tener varios colectivos o ninguno. Las dos modalidades activas son excluyentes.
+- El seed toma los códigos y la matriz de `src/security/autorizacion/rolesYPermisos.js` y actualiza los catálogos por código. La API carga los roles sembrados al arrancar. Un cambio en código surte efecto al reiniciar la aplicación. Los proveedores configurados se siembran por código y conservan su indicador `activo` en MongoDB. Los miembros y el líder operan sobre proyectos y colaboraciones y consultan solicitudes y estadísticas. Solo el líder puede editar el colectivo y sus contactos, darlo de baja, aceptar o rechazar ingresos, quitar miembros y transferir el liderazgo. El listado de miembros está disponible para `MIEMBRO` y `LIDER` del colectivo seleccionado en su contexto actual. [Auditoría de autenticación y contextos](packages/backend/AUDITORIA-AUTH-CONTEXTOS.md)
 
-- **Usuario** interno con exactamente una **identidad externa** (`proveedor` + `sub`, única). La misma persona con otro proveedor es otro usuario; no se fusionan.
-- **Contexto**: con qué opera el usuario. `COLABORADOR` (su perfil de colaboradora, como máximo uno) o `COLECTIVO` (uno por cada colectivo al que pertenece, con rol `MIEMBRO` o `LIDER`). Las dos modalidades no se mezclan: se puede pasar de una a la otra cuando ya no quedan contextos válidos de la anterior.
-- **Nombre**: es un dato de la aplicación (`Usuario.nombre`), no del proveedor. Después del registro el front se lo pide a la persona (`nombrePendiente` en `GET /auth/me`). Hace falta antes de crear un colectivo o pedir el ingreso a uno, y es el que se muestra en miembros y solicitudes. El colectivo tiene su propio nombre (el de la organización) y la colaboradora conserva su identificación pública (nombre de fantasía, o nombre y apellido, o cuenta de Git), que es una regla del enunciado y una decisión de privacidad de ella.
-- **Bajas**: la de colaboradora es lógica y se rechaza (409 `ACTIVIDAD_EN_CURSO`, con el detalle) mientras tenga postulaciones pendientes o colaboraciones aceptadas; para volver, se reactiva el mismo perfil. La de colectivo la hace el líder: además de lo de siempre, cancela las solicitudes pendientes y desactiva las membresías. Un líder no abandona: primero pasa el liderazgo o, si es el único miembro, da de baja el colectivo.
-- **Roles y permisos** (`src/domain/rolesYPermisos.js`): catálogos del sistema, sembrados al arrancar. `LIDER` tiene todo lo de `MIEMBRO` más editar el colectivo y sus contactos, darlo de baja, resolver solicitudes de ingreso, quitar miembros y pasar el liderazgo. Un colectivo tiene exactamente un líder.
+**Flujo HTTP**
 
-**Cada pedido protegido** pasa por tres middlewares y después por el guard del recurso:
+1. M1 (`src/security/http/autenticacion.js`) valida el Bearer. El registro de proveedores usa el emisor leído inicialmente para elegir adaptador. OIDC/JWT verifica firma con JWKS, algoritmo permitido, emisor, audiencia de la API, `sub`, `exp`, `iat`, `nbf` si está presente y los claims adicionales configurados. Un encabezado mal formado devuelve 401 `TOKEN_INVALIDO`. Si falla la disponibilidad de JWKS, devuelve 503 `PROVEEDOR_NO_DISPONIBLE`.
+2. M2 (`identificacion.js`) recupera la identidad externa y su usuario. Si falta el registro en una ruta de usuario, devuelve 403 `USUARIO_NO_REGISTRADO`. `POST /auth/registro` requiere solo M1 y crea ambos documentos en una transacción. Las rutas de cuenta, alta de modalidad y solicitud propia usan M2 y pueden operar sin contexto.
+3. M3 (`autorizarEnContexto.js`) protege las operaciones que se ejecutan en nombre de una colaboradora o colectivo. Valida que `X-Context-Id` sea del usuario, coincida con su contexto actual, esté activo, tenga una entidad asociada activa y posea el permiso de la ruta. Los guards de recurso verifican que el ID de negocio corresponda al contexto. Según el caso, la API responde `CONTEXTO_REQUERIDO` (400), `CONTEXTO_INVALIDO` (403), `CONTEXTO_NO_ACTUAL` (409), `CONTEXTO_INACTIVO` (403) o `PERMISO_INSUFICIENTE` (403).
 
-1. `autenticacion.js`: valida el access token (firma, `iss`, `aud`, `exp`, `nbf`, algoritmo) con el adaptador del proveedor que corresponde a su `iss`. 401 `TOKEN_INVALIDO`; 503 `PROVEEDOR_NO_DISPONIBLE` si el JWKS no responde.
-2. `identificacion.js`: busca al usuario interno. 403 `USUARIO_NO_REGISTRADO` si falta `POST /auth/registro`.
-3. `autorizarEnContexto.js`: lee `X-Context-Id`, que tiene que existir, ser del usuario, ser su contexto actual y estar activo, y comprueba que el rol tenga el permiso que declara la ruta. 400 `CONTEXTO_REQUERIDO`, 403 `CONTEXTO_INVALIDO`, 409 `CONTEXTO_NO_ACTUAL`, 403 `CONTEXTO_INACTIVO`, 403 `PERMISO_INSUFICIENTE`.
+`Usuario.contextoActualId` es global. Elegir otro contexto afecta las demás ventanas y dispositivos. Un cliente con un contexto anterior puede actualizar su vista con `GET /auth/me`. El logout intenta limpiarlo con `DELETE /auth/contexto-actual`. Si la API está indisponible, la limpieza queda sin confirmar.
 
-El contexto actual es uno por usuario: cambiarlo en una ventana hace que las otras reciban 409 `CONTEXTO_NO_ACTUAL` hasta recargar `GET /auth/me`.
+La compatibilidad transitoria `COMPAT_CONTEXTO_IMPLICITO=true` acepta la ausencia del header solo cuando hay exactamente un contexto válido y coincide con el persistido. La respuesta indica `Deprecation: true`. La opción está desactivada por defecto y se limita a la resolución del contexto.
 
 | Endpoint | Para qué |
 |---|---|
-| `POST /auth/registro` | Alta idempotente del usuario del token (sin body) |
+| `POST /auth/registro` | Alta o recuperación idempotente del usuario del token. Se llama antes de consultar la cuenta |
 | `PUT /auth/usuario` | Completar o cambiar el nombre (dato propio de la app) |
-| `GET /auth/me` | Cuenta, contexto actual y contextos con sus permisos (conserva `id`, `rol`, `perfilId`) |
+| `GET /auth/me` | Consulta de solo lectura del usuario, nombre, contexto actual y contextos con sus permisos. Conserva el `id` legado del token y `rol` y `perfilId` del contexto actual. El ID interno está en `usuario.id` |
 | `PUT` / `DELETE /auth/contexto-actual` | Elegir el contexto / dejarlo en `null` al cerrar sesión |
 | `POST /colectivos/:id/solicitudes-ingreso` y `.../cancelacion` | Pedir el ingreso / cancelarlo |
-| `GET`, `.../aceptacion`, `.../rechazo` en `/colectivos/:id/solicitudes-ingreso` | Bandeja del líder |
+| `GET /colectivos/:id/solicitudes-ingreso` | Bandeja consultable por miembros y líder |
+| `POST .../aceptacion`, `POST .../rechazo` | Resolución de solicitudes por el líder |
 | `GET /colectivos/:id/miembros`, `DELETE /colectivos/:id/miembros/:contextoId` | Miembros / quitar uno |
 | `POST /colectivos/:id/abandono`, `POST /colectivos/:id/lider` | Irse / pasar el liderazgo |
-| `POST /colaboradores/:id/baja`, `POST /colaboradores/:id/reactivacion` | Baja lógica del perfil de colaboradora / volver a activarlo |
+| `POST /colectivos/:id/baja` | Baja lógica del colectivo del contexto actual del líder. Disponible con autenticación activa |
+| `POST /colaboradores/:id/baja` | Baja lógica del perfil de colaboradora |
 
-Un proveedor nuevo que emita JWT con JWKS (Auth0, Keycloak, otro tenant) se agrega solo con `AUTH_PROVEEDORES`. Uno con otro mecanismo necesita un adaptador nuevo en `src/auth/RegistroDeProveedores.js`; los middlewares no cambian.
+**Proveedores y arranque**
 
-**Migración de las cuentas existentes.** Al arrancar, la migración `001-cuentas-a-contextos` (una sola vez, anotada en la colección `migraciones`) convierte cada `cuentaId` en usuario + identidad + contexto (`LIDER` del colectivo, o `COLABORADOR`), deja ese contexto como actual y elimina el índice único de `colectivos.cuentaId`. El informe queda en el log y en la colección.
+`AUTH_PROVEEDORES` acepta un arreglo JSON de proveedores con `codigo`, `mecanismo`, `issuers`, `audiencia`, `jwksUri` y `algoritmos`. Para `OIDC_JWT` se pueden configurar `tipo` del encabezado JWT, `claimsObligatorios`, `toleranciaReloj` y `cooldownJwksMs`. La audiencia se configura con el identificador de la API. Los emisores y JWKS usan HTTPS en producción. Códigos o emisores repetidos, algoritmos fuera de la lista asimétrica y una lista sin proveedores habilitados impiden el arranque con autenticación. Un proveedor compatible con OIDC/JWT se configura sin modificar el negocio. Un protocolo distinto requiere un adaptador y su mecanismo de selección en `src/security/auth`.
+
+Al arrancar, la API comprueba que MongoDB soporte transacciones, instala o actualiza el validador de contextos, asegura los índices declarados mediante `createIndexes()` y siembra los catálogos de seguridad y habilidades. Un error de persistencia en esas operaciones detiene el inicio. La cuenta de MongoDB necesita permisos para crear índices y colecciones y ejecutar `collMod` en la colección de contextos existente. El arranque ejecuta las migraciones 002 de proyectos y colaboraciones, 003 de envíos y 004 de unicidad del perfil activo. En bases que ya tienen el índice anterior, la 004 instala el índice nuevo antes de retirar el anterior y conserva los documentos.
+
+El validador exige ambos campos de asociación en un contexto. Según el tipo, uno es ObjectId y el otro es explícitamente nulo. Los índices únicos cubren la identidad externa, el perfil activo por usuario, la membresía por usuario y colectivo, el líder activo y la solicitud pendiente. Las referencias entre documentos y la exclusividad de modalidades se coordinan en transacciones. Las altas y la aceptación comparten una escritura de control sobre el usuario. La publicación y las solicitudes de ingreso comparten una escritura de control sobre el colectivo con su baja. Una escritura de control sobre el perfil coordina la baja de colaboradora con nuevas postulaciones.
+
+Las operaciones reservadas al líder confirman el contexto actual dentro de su transacción. El cambio de contexto, el logout y la escritura privilegiada se ordenan mediante el documento del usuario. La baja de colectivo confirma en conjunto colectivo, cierre de proyectos y colaboraciones, solicitudes pendientes, membresías, contextos actuales y notificaciones encoladas. El job de envíos despacha después del commit. La baja de colaboradora es definitiva para ese perfil y conserva su historial. Se rechaza con `ACTIVIDAD_EN_CURSO` mientras haya postulaciones pendientes o colaboraciones aceptadas. Para volver, la misma cuenta usa `POST /colaboradores`. La API crea un perfil y un contexto distintos y selecciona ese contexto. Los perfiles y contextos anteriores conservan sus IDs y su historial.
+
+El replica set de un solo nodo de Docker habilita transacciones en desarrollo y en el despliegue actual. Un solo nodo tiene un único punto de falla.
 
 **Prueba de punta a punta con un tenant real**
 
 1. Iniciar el back con las dos variables y el front con `VITE_LOGTO_ENDPOINT`, `VITE_LOGTO_APP_ID` y `VITE_LOGTO_API_RESOURCE`.
-2. Con un token real: `curl -H "Authorization: Bearer <token>" http://localhost:8000/auth/me` (200 con `rol: null` en una cuenta nueva; 401 sin token o con uno vencido).
+2. Enviar el access token a `POST /auth/registro` y luego a `GET /auth/me`. Una cuenta recién registrada recibe 200 con `usuario.nombre: null` y `contextoActual: null`. Un token ausente o vencido recibe 401.
 3. Recorrer en el front: registro, alta del perfil, recarga de la página, cierre de sesión y vencimiento del token (esperar a que expire o acortar su vida en Logto).
 
 ## Puesta en marcha

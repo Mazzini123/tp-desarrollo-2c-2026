@@ -1,5 +1,5 @@
 import { BaseController } from "./BaseController.js";
-import { colaboradorDelContexto } from "../domain/contexto.js";
+import { colaboradorDelContexto } from "../security/http/contexto.js";
 
 // Acciones sobre una colaboracion ya creada (una postulacion).
 export class PostulacionController extends BaseController {

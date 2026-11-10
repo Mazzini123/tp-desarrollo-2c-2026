@@ -15,11 +15,7 @@ export function crearCuentaRouter(cuentaController, autorizacion) {
     validarBody(registroSchema),
     cuentaController.registrar,
   );
-  router.get(
-    "/me",
-    autorizacion.usuario({ registrarSiFalta: true }),
-    cuentaController.yo,
-  );
+  router.get("/me", autorizacion.usuario(), cuentaController.yo);
 
   if (autorizacion.activa) {
     router.put(

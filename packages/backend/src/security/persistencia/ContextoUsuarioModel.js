@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
-import { TIPO_CONTEXTO } from "../domain/enums/TIPO_CONTEXTO.js";
-import { ROL } from "../domain/enums/ROL.js";
-import { aplicarFormatoJSON } from "./formatoJSON.js";
+import { TIPO_CONTEXTO } from "../autorizacion/enums/TIPO_CONTEXTO.js";
+import { ROL } from "../autorizacion/enums/ROL.js";
+import { aplicarFormatoJSON } from "../../models/formatoJSON.js";
 
 const ObjectId = mongoose.Schema.Types.ObjectId;
 
@@ -61,8 +61,12 @@ contextoUsuarioSchema.index(
   { unique: true, partialFilterExpression: { tipo: TIPO_CONTEXTO.COLECTIVO } },
 );
 contextoUsuarioSchema.index(
-  { usuarioId: 1, tipo: 1 },
-  { unique: true, partialFilterExpression: { tipo: TIPO_CONTEXTO.COLABORADOR } },
+  { usuarioId: 1 },
+  {
+    name: "colaborador_activo_por_usuario",
+    unique: true,
+    partialFilterExpression: { tipo: TIPO_CONTEXTO.COLABORADOR, activo: true },
+  },
 );
 contextoUsuarioSchema.index(
   { colaboradorId: 1 },
@@ -83,10 +87,13 @@ export const ContextoUsuarioModel = mongoose.model(
 export const VALIDADOR_DE_CONTEXTOS = {
   $jsonSchema: {
     bsonType: "object",
-    required: ["usuarioId", "tipo", "rol", "activo"],
+    required: ["usuarioId", "tipo", "rol", "activo", "colaboradorId", "colectivoId"],
+    properties: {
+      usuarioId: { bsonType: "objectId" },
+      activo: { bsonType: "bool" },
+    },
     oneOf: [
       {
-        required: ["colaboradorId"],
         properties: {
           tipo: { enum: [TIPO_CONTEXTO.COLABORADOR] },
           rol: { enum: ROLES_POR_TIPO[TIPO_CONTEXTO.COLABORADOR] },
@@ -95,7 +102,6 @@ export const VALIDADOR_DE_CONTEXTOS = {
         },
       },
       {
-        required: ["colectivoId"],
         properties: {
           tipo: { enum: [TIPO_CONTEXTO.COLECTIVO] },
           rol: { enum: ROLES_POR_TIPO[TIPO_CONTEXTO.COLECTIVO] },

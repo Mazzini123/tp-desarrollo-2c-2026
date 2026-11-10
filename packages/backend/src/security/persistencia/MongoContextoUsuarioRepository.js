@@ -1,7 +1,7 @@
-import { ContextoUsuarioModel } from "../models/ContextoUsuarioModel.js";
-import { TIPO_CONTEXTO } from "../domain/enums/TIPO_CONTEXTO.js";
-import { ROL } from "../domain/enums/ROL.js";
-import { esIdValido } from "./objectIds.js";
+import { ContextoUsuarioModel } from "./ContextoUsuarioModel.js";
+import { TIPO_CONTEXTO } from "../autorizacion/enums/TIPO_CONTEXTO.js";
+import { ROL } from "../autorizacion/enums/ROL.js";
+import { esIdValido } from "../../repositories/objectIds.js";
 
 export class MongoContextoUsuarioRepository {
   async crear(datos) {
@@ -14,6 +14,10 @@ export class MongoContextoUsuarioRepository {
 
   async listarDeUsuario(usuarioId) {
     return ContextoUsuarioModel.find({ usuarioId }).sort({ fechaAlta: 1, _id: 1 });
+  }
+
+  async existeActivoDeTipo(usuarioId, tipo) {
+    return Boolean(await ContextoUsuarioModel.exists({ usuarioId, tipo, activo: true }));
   }
 
   async listarActivosDeColectivo(colectivoId) {
@@ -31,10 +35,6 @@ export class MongoContextoUsuarioRepository {
     });
   }
 
-  async buscarColaboradorDeUsuario(usuarioId) {
-    return ContextoUsuarioModel.findOne({ usuarioId, tipo: TIPO_CONTEXTO.COLABORADOR });
-  }
-
   async buscarDeColaborador(colaboradorId) {
     return ContextoUsuarioModel.findOne({
       colaboradorId,
@@ -42,11 +42,12 @@ export class MongoContextoUsuarioRepository {
     });
   }
 
-  async reactivar(contextoId) {
-    await ContextoUsuarioModel.updateOne(
-      { _id: contextoId },
-      { $set: { activo: true, fechaBaja: null } },
+  async bloquearSi(contextoId, condicion) {
+    const { matchedCount } = await ContextoUsuarioModel.updateOne(
+      { _id: contextoId, activo: true, ...condicion },
+      { $inc: { __v: 1 } },
     );
+    return matchedCount === 1;
   }
 
   async desactivarActivosDeColectivo(colectivoId, fecha = new Date()) {
@@ -64,7 +65,7 @@ export class MongoContextoUsuarioRepository {
 
   async habilitarMembresia(usuarioId, colectivoId) {
     return ContextoUsuarioModel.findOneAndUpdate(
-      { usuarioId, colectivoId, tipo: TIPO_CONTEXTO.COLECTIVO },
+      { usuarioId, colectivoId, tipo: TIPO_CONTEXTO.COLECTIVO, activo: false },
       {
         $set: { rol: ROL.MIEMBRO, activo: true, fechaBaja: null },
         $setOnInsert: { colaboradorId: null, fechaAlta: new Date() },

@@ -13,7 +13,6 @@ export class CuentaController extends BaseController {
   }
 
   registrar = async (req, res) => {
-    if (!req.autenticacion) throw sinAutenticacion();
     const { usuario, creado } = await this.registroService.registrar(req.autenticacion);
     res.status(creado ? 201 : 200).json({ usuarioId: usuario.id, creado });
   };
@@ -22,7 +21,7 @@ export class CuentaController extends BaseController {
     if (!req.usuario) throw sinAutenticacion();
     res
       .status(200)
-      .json(await this.contextoService.cuentaDe(req.usuario, req.identidad.sub));
+      .json(await this.contextoService.cuentaDe(req.usuario, req.autenticacion.sub));
   };
 
   cambiarNombre = async (req, res) => {

@@ -2,16 +2,16 @@ import "dotenv/config";
 import { componerApp } from "./src/composicion.js";
 import { crearApp } from "./src/app.js";
 import { cargarHabilidadesIniciales } from "./src/seed/habilidadesSeed.js";
-import { asegurarCatalogos } from "./src/seed/catalogosSeed.js";
-import { conectarBaseDeDatos } from "./src/config/db.js";
-import { asegurarValidadores } from "./src/models/validadoresDeColecciones.js";
+import { asegurarCatalogos } from "./src/security/catalogosSeed.js";
+import { asegurarIndices, conectarBaseDeDatos } from "./src/config/db.js";
+import { asegurarValidadores } from "./src/security/persistencia/validadoresDeColecciones.js";
 import { ejecutarMigraciones } from "./src/migraciones/ejecutarMigraciones.js";
-import { MongoCatalogoRepository } from "./src/repositories/MongoCatalogoRepository.js";
-import { CatalogoDeRoles } from "./src/domain/CatalogoDeRoles.js";
+import { MongoCatalogoRepository } from "./src/security/persistencia/MongoCatalogoRepository.js";
+import { CatalogoDeRoles } from "./src/security/autorizacion/CatalogoDeRoles.js";
 import {
   crearAutenticador,
   proveedoresDesdeEntorno,
-} from "./src/auth/configuracionAuth.js";
+} from "./src/security/auth/configuracionAuth.js";
 import { iniciarCierreAutomatico } from "./src/jobs/cierreAutomatico.js";
 import { iniciarEnviosPendientes } from "./src/jobs/enviosPendientes.js";
 
@@ -21,12 +21,13 @@ const host = "0.0.0.0";
 const proveedores = proveedoresDesdeEntorno();
 
 await conectarBaseDeDatos();
+await asegurarValidadores();
+await asegurarIndices();
 
 const { roles, proveedoresActivos } = await asegurarCatalogos(
   new MongoCatalogoRepository(),
   proveedores,
 );
-await asegurarValidadores();
 await ejecutarMigraciones();
 
 const autenticador = crearAutenticador(proveedores, proveedoresActivos);

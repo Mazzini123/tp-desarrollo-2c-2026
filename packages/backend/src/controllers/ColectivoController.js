@@ -1,5 +1,5 @@
 import { BaseController } from "./BaseController.js";
-import { colectivoDelContexto } from "../domain/contexto.js";
+import { colectivoDelContexto } from "../security/http/contexto.js";
 import {
   colectivoPublico,
   paginaPublica,
@@ -67,7 +67,9 @@ export class ColectivoController extends BaseController {
   };
 
   darDeBaja = async (req, res) => {
-    const colectivo = await this.membresiaService.darDeBajaColectivo(req.params.id);
+    const colectivo = await this.membresiaService.darDeBajaColectivo(req.params.id, {
+      contexto: req.contexto,
+    });
     res.status(200).json(await this.colectivoService.conProyectos(colectivo));
   };
 

@@ -8,7 +8,19 @@ export async function conectarBaseDeDatos() {
     throw new Error("Falta la variable de entorno MONGO_URI");
   }
 
-  await mongoose.connect(uri);
+  await mongoose.connect(uri, { autoCreate: false, autoIndex: false });
+  const topologia = await mongoose.connection.db.command({ hello: 1 });
+  if (!topologia.setName && topologia.msg !== "isdbgrid") {
+    throw new Error(
+      "La API requiere MongoDB con soporte de transacciones (replica set o mongos)",
+    );
+  }
 
   console.log(`Conectado a MongoDB (base: ${mongoose.connection.name})`);
+}
+
+export async function asegurarIndices() {
+  for (const modelo of Object.values(mongoose.models)) {
+    await modelo.createIndexes();
+  }
 }

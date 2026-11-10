@@ -8,7 +8,6 @@ import {
 import { aplicarFormatoJSON } from "./formatoJSON.js";
 
 const colaboradorSchema = new mongoose.Schema({
-  cuentaId: { type: String, default: null },
   nombreFantasia: { type: String, default: null },
   nombre: { type: String, default: null },
   apellido: { type: String, default: null },
@@ -37,10 +36,6 @@ aplicarFormatoJSON(colaboradorSchema, {
     "fechaBaja",
   ],
 });
-colaboradorSchema.index(
-  { cuentaId: 1 },
-  { unique: true, partialFilterExpression: { cuentaId: { $type: "string" } } },
-);
 colaboradorSchema.index({ "habilidades.codigo": 1 });
 
 export const ColaboradorModel = mongoose.model("Colaborador", colaboradorSchema);

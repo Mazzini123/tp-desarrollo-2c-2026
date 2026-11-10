@@ -22,6 +22,16 @@ export class MongoColectivoRepository {
     }
   }
 
+  async bloquear(id) {
+    return esIdValido(id)
+      ? ColectivoModel.findByIdAndUpdate(
+          id,
+          { $inc: { __v: 1 } },
+          { returnDocument: "after", timestamps: false },
+        )
+      : null;
+  }
+
   async buscarPorId(id) {
     return esIdValido(id) ? ColectivoModel.findById(id) : null;
   }

@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { aplicarFormatoJSON } from "./formatoJSON.js";
+import { aplicarFormatoJSON } from "../../models/formatoJSON.js";
 
 const identidadExternaSchema = new mongoose.Schema(
   {

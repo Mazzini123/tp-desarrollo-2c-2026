@@ -22,11 +22,15 @@ export const rutasColectivos = {
         "opcional pero condicionada: si `tipoUbicacion` es PROVINCIA, `nombre` tiene que " +
         "ser una de las 23 provincias argentinas; si es LOCALIDAD, `nombre` es obligatorio. " +
         "Opcionales: `redesSociales` (req. 27, solo URLs http/https), `etiquetas` (req. 34, " +
-        "se normalizan) y `mediosDeContacto` (privados, se omiten de la respuesta).",
+        "se normalizan) y `mediosDeContacto`. Con autenticacion activa se requiere un " +
+        "usuario registrado con nombre propio. Se crea su contexto LIDER y se selecciona.",
       requestBody: body("CrearColectivo"),
       responses: {
         ...recurso("Colectivo", 201, "Colectivo creado."),
         400: errores[400],
+        401: errores[401],
+        403: errores[403],
+        409: errores[409],
       },
     },
     get: {
@@ -121,9 +125,13 @@ export const rutasColectivos = {
         "Req. adicional 23. Sin body. Borra sus datos de contacto (medios y redes) y cierra " +
         "sus proyectos abiertos con las mismas consecuencias que un cierre manual. La " +
         "historia se conserva: el colectivo se sigue pudiendo consultar, con `fechaBaja`. " +
-        "Darlo de baja dos veces responde 409.",
+        "Requiere el contexto actual del lider de ese colectivo. En modo sin autenticacion " +
+        "la ruta no se registra. Darlo de baja dos veces responde 409.",
       responses: {
         ...recurso("Colectivo", 200, "Colectivo dado de baja."),
+        400: errores[400],
+        401: errores[401],
+        403: errores[403],
         404: errores[404],
         409: errores[409],
       },
@@ -148,7 +156,7 @@ export const rutasColectivos = {
     },
     get: {
       tags: ["Membresias"],
-      summary: "Solicitudes del colectivo (lider)",
+      summary: "Consultar solicitudes del colectivo (miembro o lider)",
       parameters: [
         {
           name: "estado",
@@ -215,9 +223,14 @@ export const rutasColectivos = {
     parameters: [paramId],
     get: {
       tags: ["Membresias"],
-      summary: "Miembros del colectivo",
+      summary: "Consultar miembros del colectivo",
+      description: "Disponible para MIEMBRO y LIDER del colectivo del contexto actual.",
       responses: {
         200: { description: "`[{ contextoId, usuarioId, nombre, rol, fechaAlta }]`" },
+        400: errores[400],
+        401: errores[401],
+        403: errores[403],
+        409: errores[409],
       },
     },
   },
@@ -230,7 +243,8 @@ export const rutasColectivos = {
     delete: {
       tags: ["Membresias"],
       summary: "Quitar a un miembro (lider)",
-      description: "No se puede quitar al lider ni a uno mismo (para eso, abandono).",
+      description:
+        "Para quitar al lider, primero debe transferir el liderazgo a otro miembro.",
       responses: {
         204: { description: "Quitado." },
         404: errores[404],

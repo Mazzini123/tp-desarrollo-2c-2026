@@ -1,5 +1,6 @@
 import { decodeJwt } from "jose";
-import { ValidadorOidcJwt, tokenInvalido } from "./ValidadorOidcJwt.js";
+import { ValidadorOidcJwt } from "./ValidadorOidcJwt.js";
+import { tokenInvalido } from "./erroresDeAutenticacion.js";
 
 export const MECANISMOS = Object.freeze({
   OIDC_JWT: (configuracion) => new ValidadorOidcJwt(configuracion),
@@ -18,7 +19,7 @@ export class RegistroDeProveedores {
     this.porIssuer = new Map();
     for (const configuracion of configuraciones) {
       const crear = mecanismos[configuracion.mecanismo];
-      if (!crear) {
+      if (!Object.hasOwn(mecanismos, configuracion.mecanismo)) {
         throw new Error(
           `El proveedor "${configuracion.codigo}" usa un mecanismo no soportado: ${configuracion.mecanismo}`,
         );

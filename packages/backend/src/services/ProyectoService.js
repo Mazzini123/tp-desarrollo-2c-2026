@@ -14,7 +14,9 @@ export class ProyectoService {
     perfilService,
     notificacionService,
     avisoAutomaticoService,
+    transacciones,
   }) {
+    this.transacciones = transacciones;
     this.proyectoRepository = proyectoRepository;
     this.colectivoService = colectivoService;
     this.perfilService = perfilService;
@@ -41,40 +43,52 @@ export class ProyectoService {
         .digest("hex"),
     };
 
-    const colectivo = await this.colectivoService.buscarPorId(colectivoId);
-    const existente = await this.buscarPublicacion(colectivo, publicacion);
-    if (existente) return existente;
+    const resolverPublicacion = () =>
+      this.transacciones.ejecutar(async () => {
+        // La baja usa el mismo documento antes de buscar sus proyectos abiertos.
+        const colectivo = await this.colectivoService.buscarPorId(colectivoId, {
+          bloquear: true,
+        });
+        const existente = await this.buscarPublicacion(colectivo._id, publicacion);
+        if (existente) return { proyecto: existente, creado: false };
 
-    this.validarFechaCierre(fechaCierre, ahora);
-    if (colectivo.estaDadoDeBaja()) {
-      throw new ConflictError("Un colectivo dado de baja no puede publicar proyectos");
-    }
+        this.validarFechaCierre(fechaCierre, ahora);
+        if (colectivo.estaDadoDeBaja()) {
+          throw new ConflictError(
+            "Un colectivo dado de baja no puede publicar proyectos",
+          );
+        }
 
-    const perfilesConstruidos = await Promise.all(
-      perfiles.map((datos) => this.perfilService.construirPerfil(datos)),
-    );
+        const proyecto = this.proyectoRepository.nuevo({
+          colectivoId: colectivo._id,
+          datosDelColectivo: datosDelColectivo(colectivo),
+          titulo,
+          descripcion,
+          fechaCierre,
+          fechaCreacion: ahora,
+          etiquetas: normalizarEtiquetas(etiquetas),
+          idempotenciaPublicacion: publicacion,
+        });
 
-    const proyecto = this.proyectoRepository.nuevo({
-      colectivoId: colectivo._id,
-      datosDelColectivo: datosDelColectivo(colectivo),
-      titulo,
-      descripcion,
-      fechaCierre,
-      fechaCreacion: ahora,
-      etiquetas: normalizarEtiquetas(etiquetas),
-      idempotenciaPublicacion: publicacion,
-    });
+        for (const datos of perfiles) {
+          proyecto.agregarPerfil(await this.perfilService.construirPerfil(datos));
+        }
+        await this.proyectoRepository.guardar(proyecto);
+        return { proyecto, creado: true };
+      });
 
-    perfilesConstruidos.forEach((perfil) => proyecto.agregarPerfil(perfil));
+    let resultado;
     try {
-      await this.proyectoRepository.guardar(proyecto);
+      resultado = await resolverPublicacion();
     } catch (error) {
       if (publicacion && error instanceof DuplicadoError) {
-        const ganador = await this.buscarPublicacion(colectivo, publicacion);
+        const ganador = await this.buscarPublicacion(colectivoId, publicacion);
         if (ganador) return ganador;
       }
       throw error;
     }
+    const { proyecto, creado } = resultado;
+    if (!creado) return proyecto;
 
     try {
       await this.avisoAutomaticoService.avisarPorProyectoNuevo(proyecto);
@@ -164,10 +178,15 @@ export class ProyectoService {
     return proyecto;
   }
 
-  async cerrar(proyecto, ahora) {
+  async cerrar(proyecto, ahora, opcionesDeNotificacion) {
     const cambios = cerrarProyecto(proyecto, ahora);
     await this.proyectoRepository.guardar(proyecto);
-    await notificarResoluciones(this.notificacionService, proyecto, cambios);
+    await notificarResoluciones(
+      this.notificacionService,
+      proyecto,
+      cambios,
+      opcionesDeNotificacion,
+    );
   }
 
   async cerrarVencidos(ahora = new Date()) {
@@ -189,10 +208,10 @@ export class ProyectoService {
     return cerrados;
   }
 
-  async buscarPublicacion(colectivo, publicacion) {
+  async buscarPublicacion(colectivoId, publicacion) {
     if (!publicacion) return null;
     const proyecto = await this.proyectoRepository.buscarPorClaveDePublicacion(
-      colectivo._id,
+      colectivoId,
       publicacion.clave,
     );
     if (proyecto && proyecto.idempotenciaPublicacion.huella !== publicacion.huella) {

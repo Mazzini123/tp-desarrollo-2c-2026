@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
-import { ESTADO_SOLICITUD } from "../domain/enums/ESTADO_SOLICITUD.js";
-import { aplicarFormatoJSON } from "./formatoJSON.js";
+import { ESTADO_SOLICITUD } from "../application/ESTADO_SOLICITUD.js";
+import { aplicarFormatoJSON } from "../../models/formatoJSON.js";
 
 const ObjectId = mongoose.Schema.Types.ObjectId;
 

@@ -14,7 +14,7 @@ import {
   medioDeContactoEnRutaSchema,
   medioDeContactoSchema,
 } from "../schemas/medioDeContactoSchema.js";
-import { PERMISO } from "../domain/enums/PERMISO.js";
+import { PERMISO } from "../security/autorizacion/enums/PERMISO.js";
 
 export function crearColaboradoresRouter(
   colaboradorController,
@@ -29,7 +29,7 @@ export function crearColaboradoresRouter(
   router.post(
     "/",
     validarBody(crearColaboradorSchema),
-    autorizacion.usuario({ registrarSiFalta: true }),
+    autorizacion.usuario(),
     colaboradorController.crear,
   );
   router.get("/", validarQuery(paginacionSchema), colaboradorController.listar);
@@ -47,13 +47,6 @@ export function crearColaboradoresRouter(
     colaboradoraDe(),
     colaboradorController.darDeBaja,
   );
-  if (autorizacion.activa) {
-    router.post(
-      "/:id/reactivacion",
-      autorizacion.usuario(),
-      colaboradorController.reactivar,
-    );
-  }
 
   router.post(
     "/:id/pronombres",

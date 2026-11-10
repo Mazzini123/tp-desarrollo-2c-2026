@@ -1,4 +1,4 @@
-import { TIPO_CONTEXTO } from "./enums/TIPO_CONTEXTO.js";
+import { TIPO_CONTEXTO } from "../autorizacion/enums/TIPO_CONTEXTO.js";
 
 export function colectivoDelContexto(contexto) {
   return contexto?.tipo === TIPO_CONTEXTO.COLECTIVO ? String(contexto.colectivoId) : null;

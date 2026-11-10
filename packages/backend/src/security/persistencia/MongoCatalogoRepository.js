@@ -3,7 +3,7 @@ import {
   ProveedorAutentificadorModel,
   RolModel,
   TipoContextoModel,
-} from "../models/catalogos.js";
+} from "./catalogos.js";
 
 function upsertPorCodigo(modelo, items, { soloAlCrear = null } = {}) {
   if (items.length === 0) return Promise.resolve();

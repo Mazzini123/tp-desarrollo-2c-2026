@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
-import { UsuarioModel } from "../models/UsuarioModel.js";
-import { esIdValido } from "./objectIds.js";
+import { UsuarioModel } from "./UsuarioModel.js";
+import { NotFoundError } from "../../errors/NotFoundError.js";
+import { esIdValido } from "../../repositories/objectIds.js";
 
 export class MongoUsuarioRepository {
   nuevoId() {
@@ -57,9 +58,16 @@ export class MongoUsuarioRepository {
   }
 
   async bloquear(usuarioId) {
-    await UsuarioModel.updateOne(
-      { _id: usuarioId },
-      { $set: { contextosActualizadosEn: new Date() } },
+    if (!(await this.bloquearSi(usuarioId))) {
+      throw new NotFoundError("No existe el usuario");
+    }
+  }
+
+  async bloquearSi(usuarioId, condiciones = {}) {
+    const { matchedCount } = await UsuarioModel.updateOne(
+      { _id: usuarioId, ...condiciones },
+      { $inc: { versionContextos: 1 } },
     );
+    return matchedCount === 1;
   }
 }

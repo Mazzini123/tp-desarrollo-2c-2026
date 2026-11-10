@@ -16,6 +16,12 @@ test("al darse de baja, la cuenta queda sin contexto valido y puede pasar a cola
     verificadorDeToken: verificadorDePrueba,
     compatContextoImplicito: true,
   });
+  await api.post("/auth/registro").set(como("fundacion")).expect(201);
+  await api
+    .put("/auth/usuario")
+    .set(como("fundacion"))
+    .send({ nombre: "Fundacion" })
+    .expect(200);
   const colectivo = await api
     .post("/colectivos")
     .set(como("fundacion"))

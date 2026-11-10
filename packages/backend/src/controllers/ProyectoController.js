@@ -1,5 +1,5 @@
 import { BaseController } from "./BaseController.js";
-import { colectivoDelContexto } from "../domain/contexto.js";
+import { colectivoDelContexto } from "../security/http/contexto.js";
 import { paginaPublica, proyectoPublico } from "../dto/vistasPublicas.js";
 
 export class ProyectoController extends BaseController {

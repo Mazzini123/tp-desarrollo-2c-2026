@@ -1,9 +1,9 @@
-import { PERMISO } from "../domain/enums/PERMISO.js";
+import { PERMISO } from "./autorizacion/enums/PERMISO.js";
 import {
   DESCRIPCION_DE_PERMISOS,
   ROLES,
   TIPOS_DE_CONTEXTO,
-} from "../domain/rolesYPermisos.js";
+} from "./autorizacion/rolesYPermisos.js";
 
 export async function asegurarCatalogos(catalogoRepository, proveedores = []) {
   await catalogoRepository.asegurarPermisos(

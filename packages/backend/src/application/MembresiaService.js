@@ -1,6 +1,6 @@
-import { TIPO_CONTEXTO } from "../domain/enums/TIPO_CONTEXTO.js";
-import { ROL } from "../domain/enums/ROL.js";
-import { ESTADO_SOLICITUD } from "../domain/enums/ESTADO_SOLICITUD.js";
+import { TIPO_CONTEXTO } from "../security/autorizacion/enums/TIPO_CONTEXTO.js";
+import { ROL } from "../security/autorizacion/enums/ROL.js";
+import { ESTADO_SOLICITUD } from "../security/application/ESTADO_SOLICITUD.js";
 import { ConflictError } from "../errors/ConflictError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
 import { CODIGO_ERROR } from "../errors/CODIGO_ERROR.js";
@@ -14,7 +14,6 @@ export class MembresiaService {
     contextoUsuarioRepository,
     solicitudIngresoRepository,
     usuarioRepository,
-    colectivoRepository,
     colectivoService,
   }) {
     this.transacciones = transacciones;
@@ -23,21 +22,18 @@ export class MembresiaService {
     this.contextoUsuarioRepository = contextoUsuarioRepository;
     this.solicitudIngresoRepository = solicitudIngresoRepository;
     this.usuarioRepository = usuarioRepository;
-    this.colectivoRepository = colectivoRepository;
   }
 
-  async colectivoActivo(colectivoId) {
-    const colectivo = await this.colectivoRepository.buscarResumen(String(colectivoId));
-    if (!colectivo) {
-      throw new NotFoundError(`No existe un colectivo con id "${colectivoId}"`);
-    }
-    if (colectivo.fechaBaja) {
+  async bloquearColectivoActivo(colectivoId) {
+    const colectivo = await this.colectivoService.buscarPorId(colectivoId, {
+      bloquear: true,
+    });
+    if (colectivo.estaDadoDeBaja()) {
       throw new ConflictError(
         "El colectivo esta dado de baja",
         CODIGO_ERROR.COLECTIVO_DADO_DE_BAJA,
       );
     }
-    return colectivo;
   }
 
   async esMiembro(usuarioId, colectivoId) {
@@ -62,9 +58,8 @@ export class MembresiaService {
   }
 
   async solicitarIngreso(usuario, colectivoId) {
-    await this.colectivoActivo(colectivoId);
-
     return this.transacciones.ejecutar(async () => {
+      await this.bloquearColectivoActivo(colectivoId);
       await this.usuarioRepository.bloquear(usuario._id);
       await this.contextoService.exigirSinModalidad(
         usuario._id,
@@ -141,15 +136,22 @@ export class MembresiaService {
   }
 
   async aceptar(contextoLider, colectivoId, solicitudId) {
-    const solicitud = await this.solicitudDelColectivo(colectivoId, solicitudId);
-    await this.colectivoActivo(colectivoId);
-
     return this.transacciones.ejecutar(async () => {
+      const solicitud = await this.solicitudDelColectivo(colectivoId, solicitudId);
+      if (solicitud.estado !== ESTADO_SOLICITUD.PENDIENTE) throw this.yaResuelta();
+      await this.bloquearColectivoActivo(colectivoId);
+      await this.contextoService.exigirSinCambios(contextoLider, { exigirActual: true });
       await this.usuarioRepository.bloquear(solicitud.usuarioId);
       await this.contextoService.exigirSinModalidad(
         solicitud.usuarioId,
         TIPO_CONTEXTO.COLABORADOR,
       );
+      if (await this.esMiembro(solicitud.usuarioId, colectivoId)) {
+        throw new ConflictError(
+          "Ya sos miembro de este colectivo",
+          CODIGO_ERROR.YA_ES_MIEMBRO,
+        );
+      }
       const aceptada = await this.solicitudIngresoRepository.resolverSiPendiente(
         solicitud._id,
         { estado: ESTADO_SOLICITUD.ACEPTADA, resueltaPor: contextoLider.usuarioId },
@@ -168,16 +170,19 @@ export class MembresiaService {
   }
 
   async rechazar(contextoLider, colectivoId, solicitudId) {
-    const solicitud = await this.solicitudDelColectivo(colectivoId, solicitudId);
-    const rechazada = await this.solicitudIngresoRepository.resolverSiPendiente(
-      solicitud._id,
-      {
-        estado: ESTADO_SOLICITUD.RECHAZADA,
-        resueltaPor: contextoLider.usuarioId,
-      },
-    );
-    if (!rechazada) throw this.yaResuelta();
-    return rechazada;
+    return this.transacciones.ejecutar(async () => {
+      const solicitud = await this.solicitudDelColectivo(colectivoId, solicitudId);
+      await this.contextoService.exigirSinCambios(contextoLider, { exigirActual: true });
+      const rechazada = await this.solicitudIngresoRepository.resolverSiPendiente(
+        solicitud._id,
+        {
+          estado: ESTADO_SOLICITUD.RECHAZADA,
+          resueltaPor: contextoLider.usuarioId,
+        },
+      );
+      if (!rechazada) throw this.yaResuelta();
+      return rechazada;
+    });
   }
 
   async listarMiembros(colectivoId) {
@@ -196,17 +201,19 @@ export class MembresiaService {
   }
 
   async quitarMiembro(contextoLider, colectivoId, contextoId) {
-    const miembro = await this.contextoUsuarioRepository.buscarPorId(contextoId);
-    if (!miembro?.activo || !mismoId(miembro.colectivoId, colectivoId)) {
-      throw new NotFoundError("No es miembro de este colectivo");
-    }
-    if (mismoId(miembro._id, contextoLider._id)) {
-      throw new ConflictError("Para irte del colectivo usa la opcion de abandonarlo");
-    }
-    if (miembro.rol === ROL.LIDER) {
-      throw new ConflictError("No se puede quitar al lider del colectivo");
-    }
-    await this.desactivar(miembro);
+    await this.transacciones.ejecutar(async () => {
+      await this.contextoService.exigirSinCambios(contextoLider, { exigirActual: true });
+      const miembro = await this.contextoUsuarioRepository.buscarPorId(contextoId);
+      if (!miembro?.activo || !mismoId(miembro.colectivoId, colectivoId)) {
+        throw new NotFoundError("No es miembro de este colectivo");
+      }
+      if (miembro.rol === ROL.LIDER) {
+        throw new ConflictError(
+          "Antes de quitar al lider, transferi el liderazgo a otro miembro",
+        );
+      }
+      await this.desactivar(miembro);
+    });
   }
 
   async abandonar(contexto, colectivoId) {
@@ -227,9 +234,11 @@ export class MembresiaService {
     await this.desactivar(contexto);
   }
 
-  async darDeBajaColectivo(colectivoId, ahora = new Date()) {
-    const colectivo = await this.colectivoService.darDeBaja(colectivoId, ahora);
-    await this.transacciones.ejecutar(async () => {
+  async darDeBajaColectivo(colectivoId, { ahora = new Date(), contexto = null } = {}) {
+    return this.transacciones.ejecutar(async () => {
+      if (contexto)
+        await this.contextoService.exigirSinCambios(contexto, { exigirActual: true });
+      const colectivo = await this.colectivoService.darDeBaja(colectivoId, ahora);
       await this.solicitudIngresoRepository.cancelarPendientesDeColectivo(
         colectivo._id,
         ahora,
@@ -240,8 +249,8 @@ export class MembresiaService {
           ahora,
         );
       await this.usuarioRepository.limpiarContextosActuales(desactivados);
+      return colectivo;
     });
-    return colectivo;
   }
 
   async desactivar(contexto) {

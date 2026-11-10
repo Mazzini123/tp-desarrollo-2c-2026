@@ -11,7 +11,13 @@ import { cerrarProyecto, notificarResoluciones } from "./reglasDePostulacion.js"
 import { TIPO_EVENTO_TIMELINE } from "../domain/enums/TIPO_EVENTO_TIMELINE.js";
 
 export class ColectivoService {
-  constructor({ colectivoRepository, proyectoRepository, notificacionService }) {
+  constructor({
+    colectivoRepository,
+    proyectoRepository,
+    notificacionService,
+    transacciones,
+  }) {
+    this.transacciones = transacciones;
     this.colectivoRepository = colectivoRepository;
     this.proyectoRepository = proyectoRepository;
     this.notificacionService = notificacionService;
@@ -47,8 +53,10 @@ export class ColectivoService {
     );
   }
 
-  async buscarPorId(id) {
-    const colectivo = await this.colectivoRepository.buscarPorId(id);
+  async buscarPorId(id, { bloquear = false } = {}) {
+    const colectivo = bloquear
+      ? await this.colectivoRepository.bloquear(id)
+      : await this.colectivoRepository.buscarPorId(id);
     if (!colectivo) {
       throw new NotFoundError(`No existe un colectivo con id "${id}"`);
     }
@@ -133,28 +141,33 @@ export class ColectivoService {
   }
 
   async darDeBaja(id, ahora = new Date()) {
-    const colectivo = await this.buscarPorId(id);
+    return this.transacciones.ejecutar(async () => {
+      const colectivo = await this.buscarPorId(id, { bloquear: true });
 
-    if (colectivo.estaDadoDeBaja()) {
-      throw new ConflictError("El colectivo ya esta dado de baja");
-    }
+      if (colectivo.estaDadoDeBaja()) {
+        throw new ConflictError("El colectivo ya esta dado de baja");
+      }
 
-    colectivo.darDeBaja(ahora);
-    // Al dar de baja se borran los datos de contacto: dejan de ser publicos.
-    colectivo.mediosDeContacto = [];
-    colectivo.redesSociales = [];
-    await this.colectivoRepository.guardar(colectivo);
+      colectivo.darDeBaja(ahora);
+      // Al dar de baja se borran los datos de contacto: dejan de ser publicos.
+      colectivo.mediosDeContacto = [];
+      colectivo.redesSociales = [];
+      await this.colectivoRepository.guardar(colectivo);
 
-    const abiertos = (await this.proyectoRepository.buscarPorColectivo(id)).filter(
-      (proyecto) => proyecto.estaAbierto(),
-    );
-    for (const proyecto of abiertos) {
-      const cambios = cerrarProyecto(proyecto, ahora);
-      await this.proyectoRepository.guardar(proyecto);
-      await notificarResoluciones(this.notificacionService, proyecto, cambios);
-    }
+      const abiertos = (await this.proyectoRepository.buscarPorColectivo(id)).filter(
+        (proyecto) => proyecto.estaAbierto(),
+      );
+      for (const proyecto of abiertos) {
+        const cambios = cerrarProyecto(proyecto, ahora);
+        await this.proyectoRepository.guardar(proyecto);
+        // La notificación se encola en Mongo. El job la ve después del commit.
+        await notificarResoluciones(this.notificacionService, proyecto, cambios, {
+          propagarError: true,
+        });
+      }
 
-    return colectivo;
+      return colectivo;
+    });
   }
 
   async timeline(id) {

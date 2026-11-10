@@ -22,7 +22,7 @@ import {
   listadoDeSolicitudesSchema,
   transferirLiderazgoSchema,
 } from "../schemas/cuentaSchema.js";
-import { PERMISO } from "../domain/enums/PERMISO.js";
+import { PERMISO } from "../security/autorizacion/enums/PERMISO.js";
 
 export function crearColectivosRouter(
   colectivoController,
@@ -36,7 +36,8 @@ export function crearColectivosRouter(
   router.post(
     "/",
     validarBody(crearColectivoSchema),
-    autorizacion.usuario({ registrarSiFalta: true, exigirNombre: true }),
+    autorizacion.usuario(),
+    autorizacion.nombre,
     colectivoController.crear,
   );
   router.get("/", validarQuery(listadoConEtiquetaSchema), colectivoController.listar);
@@ -47,12 +48,6 @@ export function crearColectivosRouter(
     colectivoDe(),
     validarBody(actualizarColectivoSchema),
     colectivoController.actualizar,
-  );
-  router.post(
-    "/:id/baja",
-    permiso(PERMISO.COLECTIVO_ELIMINAR),
-    colectivoDe(),
-    colectivoController.darDeBaja,
   );
 
   router.post(
@@ -78,6 +73,12 @@ export function crearColectivosRouter(
   );
 
   if (autorizacion.activa) {
+    router.post(
+      "/:id/baja",
+      permiso(PERMISO.COLECTIVO_ELIMINAR),
+      colectivoDe(),
+      colectivoController.darDeBaja,
+    );
     router.get(
       "/:id/medios-de-contacto",
       permiso(PERMISO.COLECTIVO_CONTACTO_GESTIONAR),
@@ -101,7 +102,8 @@ export function crearColectivosRouter(
 
     router.post(
       "/:id/solicitudes-ingreso",
-      autorizacion.usuario({ exigirNombre: true }),
+      autorizacion.usuario(),
+      autorizacion.nombre,
       membresiaController.solicitar,
     );
     router.post(
@@ -111,7 +113,7 @@ export function crearColectivosRouter(
     );
     router.get(
       "/:id/solicitudes-ingreso",
-      permiso(PERMISO.MEMBRESIA_SOLICITUD_RESOLVER),
+      permiso(PERMISO.COLECTIVO_MIEMBROS_VER),
       colectivoDe(),
       validarQuery(listadoDeSolicitudesSchema),
       membresiaController.listarSolicitudes,

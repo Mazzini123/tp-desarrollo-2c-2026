@@ -44,7 +44,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "mongosh -u \"$$MONGO_INITDB_ROOT_USERNAME\" -p \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --quiet --eval \"try { quit(rs.status().myState === 1 ? 0 : 1) } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'mongo:27017' }] }); quit(1) }\"",
+          'mongosh -u "$$MONGO_INITDB_ROOT_USERNAME" -p "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --quiet --eval "try { quit(rs.status().myState === 1 ? 0 : 1) } catch (e) { rs.initiate({ _id: ''rs0'', members: [{ _id: 0, host: ''mongo:27017'' }] }); quit(1) }"',
         ]
       interval: 10s
       timeout: 5s
@@ -67,11 +67,13 @@ services:
       # buffers, la pila): con 256 de heap, Node ocupa unos 350-400 MB.
       NODE_OPTIONS: --max-old-space-size=256
       NODE_ENV: production
-      # Autenticacion: obligatoria. Sin estas variables el compose no levanta
-      # y, si llegaran vacias, la API tampoco arranca (fail closed).
-      LOGTO_ENDPOINT: ${LOGTO_ENDPOINT:?Falta LOGTO_ENDPOINT en .env}
-      LOGTO_API_RESOURCE: ${LOGTO_API_RESOURCE:?Falta LOGTO_API_RESOURCE en .env}
+      # La API exige LOGTO_* o AUTH_PROVEEDORES al arrancar.
+      AUTH_PROVEEDORES:
+      AUTH_DESACTIVADA: ${AUTH_DESACTIVADA:-false}
+      LOGTO_ENDPOINT: ${LOGTO_ENDPOINT:-}
+      LOGTO_API_RESOURCE: ${LOGTO_API_RESOURCE:-}
       LOGTO_ALGORITMOS: ${LOGTO_ALGORITMOS:-ES384}
+      COMPAT_CONTEXTO_IMPLICITO: ${COMPAT_CONTEXTO_IMPLICITO:-false}
       # Origen del front (ej. https://codigo-a-voluntad.ejemplo.org). Sin esto
       # la API acepta pedidos desde cualquier origen.
       CORS_ORIGENES: ${CORS_ORIGENES:?Falta CORS_ORIGENES en .env}

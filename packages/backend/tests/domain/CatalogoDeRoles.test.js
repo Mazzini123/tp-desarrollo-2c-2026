@@ -1,7 +1,7 @@
-import { CatalogoDeRoles } from "../../src/domain/CatalogoDeRoles.js";
-import { asegurarCatalogos } from "../../src/seed/catalogosSeed.js";
-import { PERMISO } from "../../src/domain/enums/PERMISO.js";
-import { ROLES } from "../../src/domain/rolesYPermisos.js";
+import { CatalogoDeRoles } from "../../src/security/autorizacion/CatalogoDeRoles.js";
+import { asegurarCatalogos } from "../../src/security/catalogosSeed.js";
+import { PERMISO } from "../../src/security/autorizacion/enums/PERMISO.js";
+import { ROLES } from "../../src/security/autorizacion/rolesYPermisos.js";
 
 function repositorioEnMemoria() {
   const colecciones = {

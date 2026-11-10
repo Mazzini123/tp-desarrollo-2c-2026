@@ -1,12 +1,12 @@
 import mongoose from "mongoose";
-import { migrarCuentasAContextos } from "./001-cuentasAContextos.js";
 import { migrarProyectosYColaboraciones } from "./002-proyectosYColaboracionesAColecciones.js";
 import { migrarEnviosConEstado } from "./003-enviosConEstado.js";
+import { migrarIndiceDeColaboradorActivo } from "./004-indiceDeColaboradorActivo.js";
 
 export const MIGRACIONES = [
-  { id: "001-cuentas-a-contextos", ejecutar: migrarCuentasAContextos },
   { id: "002-proyectos-y-colaboraciones", ejecutar: migrarProyectosYColaboraciones },
   { id: "003-envios-con-estado", ejecutar: migrarEnviosConEstado },
+  { id: "004-indice-colaborador-activo", ejecutar: migrarIndiceDeColaboradorActivo },
 ];
 
 export async function ejecutarMigraciones(migraciones = MIGRACIONES) {

@@ -1,8 +1,8 @@
-import { ForbiddenError } from "../errors/ForbiddenError.js";
-import { AppError } from "../errors/AppError.js";
-import { CODIGO_ERROR } from "../errors/CODIGO_ERROR.js";
-import { objectIdSchema } from "../schemas/comunesSchema.js";
-import { contextoRequerido } from "../services/ContextoService.js";
+import { ForbiddenError } from "../../errors/ForbiddenError.js";
+import { AppError } from "../../errors/AppError.js";
+import { CODIGO_ERROR } from "../../errors/CODIGO_ERROR.js";
+import { objectIdSchema } from "../../schemas/comunesSchema.js";
+import { contextoRequerido } from "../application/ContextoService.js";
 
 const CONTEXTO = "X-Context-Id";
 

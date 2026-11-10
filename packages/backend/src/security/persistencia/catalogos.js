@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { aplicarFormatoJSON } from "./formatoJSON.js";
+import { aplicarFormatoJSON } from "../../models/formatoJSON.js";
 
 const rolSchema = new mongoose.Schema({
   codigo: { type: String, required: true, unique: true },

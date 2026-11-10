@@ -1,15 +1,21 @@
-import { TIPO_CONTEXTO } from "../domain/enums/TIPO_CONTEXTO.js";
-import { ROL_CUENTA } from "../domain/enums/ROL_CUENTA.js";
-import { BadRequestError } from "../errors/BadRequestError.js";
-import { ConflictError } from "../errors/ConflictError.js";
-import { ForbiddenError } from "../errors/ForbiddenError.js";
-import { CODIGO_ERROR } from "../errors/CODIGO_ERROR.js";
-import { mismoId } from "../utils/ids.js";
+import { TIPO_CONTEXTO } from "../autorizacion/enums/TIPO_CONTEXTO.js";
+import { ROL_CUENTA } from "../http/ROL_CUENTA.js";
+import { BadRequestError } from "../../errors/BadRequestError.js";
+import { ConflictError } from "../../errors/ConflictError.js";
+import { ForbiddenError } from "../../errors/ForbiddenError.js";
+import { CODIGO_ERROR } from "../../errors/CODIGO_ERROR.js";
+import { mismoId } from "../../utils/ids.js";
 
 export const contextoRequerido = () =>
   new BadRequestError(
     "Indica con que contexto operas (encabezado X-Context-Id)",
     CODIGO_ERROR.CONTEXTO_REQUERIDO,
+  );
+
+const contextoNoActual = () =>
+  new ConflictError(
+    "Cambiaste de contexto en otra ventana o dispositivo",
+    CODIGO_ERROR.CONTEXTO_NO_ACTUAL,
   );
 
 export class ContextoService {
@@ -19,7 +25,9 @@ export class ContextoService {
     colectivoRepository,
     colaboradorRepository,
     catalogoDeRoles,
+    transacciones,
   }) {
+    this.transacciones = transacciones;
     this.contextoUsuarioRepository = contextoUsuarioRepository;
     this.usuarioRepository = usuarioRepository;
     this.colectivoRepository = colectivoRepository;
@@ -37,14 +45,18 @@ export class ContextoService {
     if (contexto.tipo === TIPO_CONTEXTO.COLECTIVO) {
       return Boolean(await this.colectivoActivo(contexto.colectivoId));
     }
-    return true;
+    if (contexto.tipo !== TIPO_CONTEXTO.COLABORADOR) return false;
+    const colaborador = await this.colaboradorRepository.buscarPorId(
+      contexto.colaboradorId,
+    );
+    return Boolean(colaborador && !colaborador.fechaBaja);
   }
 
-  async validosDe(usuarioId, tipo = null) {
+  async validosDe(usuarioId) {
     const contextos = await this.contextoUsuarioRepository.listarDeUsuario(usuarioId);
     const validos = [];
     for (const contexto of contextos) {
-      if ((!tipo || contexto.tipo === tipo) && (await this.esValido(contexto))) {
+      if (await this.esValido(contexto)) {
         validos.push(contexto);
       }
     }
@@ -52,7 +64,7 @@ export class ContextoService {
   }
 
   async exigirSinModalidad(usuarioId, tipo) {
-    if ((await this.validosDe(usuarioId, tipo)).length > 0) {
+    if (await this.contextoUsuarioRepository.existeActivoDeTipo(usuarioId, tipo)) {
       throw new ConflictError(
         tipo === TIPO_CONTEXTO.COLECTIVO
           ? "La cuenta opera como colectivo: no puede tener ademas un perfil de colaboradora"
@@ -123,12 +135,32 @@ export class ContextoService {
     }
   }
 
+  async exigirSinCambios(contexto, { exigirActual = false } = {}) {
+    const bloqueado = await this.contextoUsuarioRepository.bloquearSi(contexto._id, {
+      usuarioId: contexto.usuarioId,
+      rol: contexto.rol,
+    });
+    if (!bloqueado) {
+      throw new ConflictError("El contexto cambio mientras tanto. Volve a intentarlo.");
+    }
+    if (exigirActual) await this.bloquearActual(contexto);
+  }
+
+  async bloquearActual(contexto) {
+    const bloqueado = await this.usuarioRepository.bloquearSi(contexto.usuarioId, {
+      contextoActualId: contexto._id,
+    });
+    if (!bloqueado) throw contextoNoActual();
+  }
+
   async seleccionar(usuario, contextoId) {
-    const contexto = await this.contextoPropio(usuario, contextoId);
-    await this.exigirValido(contexto);
-    await this.usuarioRepository.fijarContextoActual(usuario._id, contexto._id);
-    usuario.contextoActualId = contexto._id;
-    return this.describir(contexto);
+    return this.transacciones.ejecutar(async () => {
+      const contexto = await this.contextoPropio(usuario, contextoId);
+      await this.exigirValido(contexto);
+      await this.exigirSinCambios(contexto);
+      await this.usuarioRepository.fijarContextoActual(usuario._id, contexto._id);
+      return this.describir(contexto);
+    });
   }
 
   async limpiarActual(usuario) {
@@ -148,10 +180,7 @@ export class ContextoService {
 
     const contexto = await this.contextoPropio(usuario, contextoId);
     if (!mismoId(usuario.contextoActualId, contexto._id)) {
-      throw new ConflictError(
-        "Cambiaste de contexto en otra ventana o dispositivo",
-        CODIGO_ERROR.CONTEXTO_NO_ACTUAL,
-      );
+      throw contextoNoActual();
     }
     await this.exigirValido(contexto);
     return { contexto, implicito: false };

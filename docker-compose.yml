@@ -42,6 +42,7 @@ services:
       # Puerto 8000 de la maquina -> puerto 8000 del contenedor.
       - "8000:8000"
     environment:
+      NODE_ENV: development
       SERVER_PORT: 8000
       # "mongo" es el nombre del servicio: dentro de la red interna de
       # compose, cada servicio se encuentra por su nombre.
@@ -51,7 +52,10 @@ services:
       # de desarrollo corre sin login (AUTH_DESACTIVADA=true por defecto).
       LOGTO_ENDPOINT: ${LOGTO_ENDPOINT:-}
       LOGTO_API_RESOURCE: ${LOGTO_API_RESOURCE:-}
+      LOGTO_ALGORITMOS: ${LOGTO_ALGORITMOS:-ES384}
+      AUTH_PROVEEDORES:
       AUTH_DESACTIVADA: ${AUTH_DESACTIVADA:-true}
+      COMPAT_CONTEXTO_IMPLICITO: ${COMPAT_CONTEXTO_IMPLICITO:-false}
       CORS_ORIGENES: ${CORS_ORIGENES:-}
 
       # Twilio
