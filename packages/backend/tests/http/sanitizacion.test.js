@@ -21,7 +21,11 @@ describe("HTTP · sanitizacion del body", () => {
     const { api } = await armarApp();
     await api
       .post("/colectivos")
-      .send({ nombre: "<script>x</script>", descripcion: "d", tipoColectivo: "FUNDACION" })
+      .send({
+        nombre: "<script>x</script>",
+        descripcion: "d",
+        tipoColectivo: "FUNDACION",
+      })
       .expect(400);
   });
 });

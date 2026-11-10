@@ -1,18 +1,20 @@
 import { DomainError } from "../errors/DomainError.js";
 import { ConflictError } from "../errors/ConflictError.js";
 import { TIPO_NOTIFICACION } from "../domain/enums/TIPO_NOTIFICACION.js";
+import { ESTADO_BUSQUEDA } from "../domain/enums/ESTADO_BUSQUEDA.js";
 import { armarPaginado } from "../utils/paginacion.js";
+import { cumpleHabilidadesRequeridas, estadoDeBusqueda } from "./reglasDeBusqueda.js";
 
 export class ReclutamientoService {
   constructor({
     colaboradorRepository,
-    colectivoRepository,
+    proyectoRepository,
     colaboradorService,
     perfilService,
     notificacionService,
   }) {
     this.colaboradorRepository = colaboradorRepository;
-    this.colectivoRepository = colectivoRepository;
+    this.proyectoRepository = proyectoRepository;
     this.colaboradorService = colaboradorService;
     this.perfilService = perfilService;
     this.notificacionService = notificacionService;
@@ -44,7 +46,7 @@ export class ReclutamientoService {
   async buscarProyectos(colaboradorId, { numeroPagina = 1, limitePorPagina = 10 } = {}) {
     const colaborador = await this.colaboradorService.buscarPorId(colaboradorId);
 
-    const pagina = await this.colectivoRepository.buscarProyectosCompatibles(
+    const pagina = await this.proyectoRepository.buscarCompatibles(
       colaborador,
       numeroPagina,
       limitePorPagina,
@@ -54,17 +56,22 @@ export class ReclutamientoService {
   }
 
   async invitar(proyectoId, perfilId, { colaboradorId, mensaje }) {
-    const { colectivo, proyecto, perfil } =
-      await this.perfilService.buscarPerfilConProyecto(proyectoId, perfilId);
+    const { proyecto, perfil } = await this.perfilService.buscarPerfilConProyecto(
+      proyectoId,
+      perfilId,
+    );
+    const { colectivo } = proyecto;
     const colaborador = await this.colaboradorService.buscarPorId(colaboradorId);
+    this.colaboradorService.exigirActiva(colaborador);
 
-    if (!proyecto.aceptaPostulaciones()) {
+    if (estadoDeBusqueda(perfil, proyecto) !== ESTADO_BUSQUEDA.ABIERTA) {
       throw new ConflictError(
-        "El proyecto no esta recibiendo postulaciones (finalizado o con el cupo completo)",
+        "Este perfil no esta recibiendo postulaciones (proyecto finalizado, busqueda " +
+          "cerrada o cupo completo)",
       );
     }
 
-    if (!perfil.cumpleHabilidadesRequeridas(colaborador)) {
+    if (!cumpleHabilidadesRequeridas(perfil, colaborador)) {
       throw new DomainError(
         "La persona no tiene todas las habilidades requeridas del perfil",
       );

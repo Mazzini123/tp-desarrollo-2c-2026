@@ -14,7 +14,10 @@ export function manejadorErrores(err, _req, res, _next) {
   }
 
   if (err instanceof AppError) {
-    res.status(err.status).json({ message: err.message });
+    const cuerpo = { message: err.message };
+    if (err.codigo) cuerpo.codigo = err.codigo;
+    if (err.detalle) cuerpo.detalle = err.detalle;
+    res.status(err.status).json(cuerpo);
     return;
   }
 

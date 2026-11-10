@@ -1,13 +1,5 @@
 import { rateLimit } from "express-rate-limit";
 
-// Requerimiento adicional 14: "Proteger las busquedas y APIs publicas contra
-// scraping o abuso mediante limites de solicitudes por IP/usuario".
-//
-// Todavia no hay usuarios (llegan con la autenticacion, en la tercera
-// entrega), asi que el limite es por IP. El contador vive en la memoria del
-// proceso: alcanza porque la API corre en un solo contenedor. Con varias
-// replicas habria que compartirlo (por ejemplo en Redis).
-
 const QUINCE_MINUTOS = 15 * 60 * 1000;
 const UN_MINUTO = 60 * 1000;
 
@@ -44,7 +36,6 @@ export function crearLimitadores(limites = {}) {
   };
 }
 
-// Permite ajustar los limites sin tocar codigo (por ejemplo, en la VM).
 export function limitesDesdeEntorno(entorno = process.env) {
   const limites = {};
   if (entorno.LIMITE_SOLICITUDES_GENERAL) {

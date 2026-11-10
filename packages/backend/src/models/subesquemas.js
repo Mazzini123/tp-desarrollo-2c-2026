@@ -1,8 +1,9 @@
 import mongoose from "mongoose";
 import { Habilidad } from "../domain/Habilidad.js";
 import { MedioDeContacto } from "../domain/MedioDeContacto.js";
+import { Ubicacion } from "../domain/Ubicacion.js";
 
-const DE_VALOR = { _id: false, id: false };
+export const DE_VALOR = { _id: false, id: false };
 
 export const redSocialSchema = new mongoose.Schema(
   {
@@ -29,3 +30,12 @@ export const habilidadEmbebidaSchema = new mongoose.Schema(
   DE_VALOR,
 );
 habilidadEmbebidaSchema.loadClass(Habilidad);
+
+export const ubicacionSchema = new mongoose.Schema(
+  {
+    tipoUbicacion: { type: String, required: true },
+    nombre: { type: String, default: null },
+  },
+  DE_VALOR,
+);
+ubicacionSchema.loadClass(Ubicacion);

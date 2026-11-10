@@ -1,7 +1,10 @@
 import { z } from "zod";
 import { crearPerfilSchema } from "./perfilSchema.js";
 import { tieneAlgunCampoDefinido } from "../utils/validaciones.js";
-import { etiquetasSchema, fechaDeCierreSchema as fechaCierreSchema } from "./comunesSchema.js";
+import {
+  etiquetasSchema,
+  fechaDeCierreSchema as fechaCierreSchema,
+} from "./comunesSchema.js";
 
 export const crearProyectoSchema = z
   .object({
@@ -32,3 +35,7 @@ export const anotarColaboradorSchema = z
     esPublica: z.boolean().default(true),
   })
   .strict();
+
+export const publicacionHeadersSchema = z.looseObject({
+  "idempotency-key": z.uuid().toLowerCase().optional(),
+});

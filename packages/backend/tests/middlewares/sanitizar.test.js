@@ -6,7 +6,11 @@ describe("Sanitizacion de textos (req. adicional 11)", () => {
     ["un iframe", "<iframe src='https://malo.com'></iframe>ok", "ok"],
     ["un atributo con codigo", '<img src=x onerror="alert(1)">foto', "foto"],
     ["tags inofensivos", "<b>negrita</b> y <i>cursiva</i>", "negrita y cursiva"],
-    ["un script que se rearma al sacar el de adentro", "<<script></script>script>alert(1)<</script>/script>", ""],
+    [
+      "un script que se rearma al sacar el de adentro",
+      "<<script></script>script>alert(1)<</script>/script>",
+      "",
+    ],
   ])("saca %s", (_caso, entrada, esperado) => {
     expect(limpiarTexto(entrada)).toBe(esperado);
   });

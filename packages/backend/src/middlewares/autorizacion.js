@@ -1,15 +1,12 @@
-import { ROL_CUENTA } from "../domain/enums/ROL_CUENTA.js";
 import { AUTOR_VALORACION } from "../domain/enums/AUTOR_VALORACION.js";
 import { UnauthorizedError } from "../errors/UnauthorizedError.js";
 import { ForbiddenError } from "../errors/ForbiddenError.js";
-import { ConflictError } from "../errors/ConflictError.js";
+import { crearAutenticacion } from "./autenticacion.js";
+import { crearIdentificacion } from "./identificacion.js";
+import { crearAutorizacionContextual } from "./autorizarEnContexto.js";
+import { colaboradorDelContexto, colectivoDelContexto } from "../domain/contexto.js";
 
 const pasar = (_req, _res, next) => next();
-
-function tokenDe(req) {
-  const [esquema, token] = (req.get("Authorization") ?? "").split(" ");
-  return esquema?.toLowerCase() === "bearer" && token ? token : null;
-}
 
 function exigirSesion(req) {
   if (!req.identidad) {
@@ -17,11 +14,10 @@ function exigirSesion(req) {
   }
 }
 
-function exigirRol(req, rol, perfilId) {
+function exigirEntidad(req, entidadDelContexto, id) {
   exigirSesion(req);
-  const mismoPerfil =
-    perfilId === undefined || String(req.cuenta.perfilId) === String(perfilId);
-  if (req.cuenta.rol !== rol || !mismoPerfil) {
+  const propia = entidadDelContexto(req.contexto);
+  if (!propia || (id !== undefined && propia !== String(id))) {
     throw new ForbiddenError("No tenes permiso para hacer esto");
   }
 }
@@ -29,13 +25,17 @@ function exigirRol(req, rol, perfilId) {
 export function autorizacionDesactivada() {
   return {
     activa: false,
-    identificar: (req, _res, next) => {
+    autenticar: (req, _res, next) => {
+      req.autenticacion = null;
+      req.usuario = null;
       req.identidad = null;
-      req.cuenta = null;
+      req.contexto = null;
       next();
     },
-    sesion: pasar,
-    sinPerfil: pasar,
+    exigirAutenticacion: pasar,
+    usuario: () => pasar,
+    permiso: () => pasar,
+    opcional: pasar,
     colaboradoraDe: () => pasar,
     colectivoDe: () => pasar,
     duenoDelProyecto: pasar,
@@ -45,10 +45,29 @@ export function autorizacionDesactivada() {
   };
 }
 
-export function crearAutorizacion({ verificador, cuentaService, proyectoService }) {
-  if (!verificador) {
+export function crearAutorizacion({
+  autenticador,
+  registroService,
+  contextoService,
+  catalogoDeRoles,
+  proyectoService,
+  compatContextoImplicito = false,
+  avisarContextoImplicito,
+}) {
+  if (!autenticador) {
     return autorizacionDesactivada();
   }
+
+  const identificacion = crearIdentificacion({
+    registroService,
+    compat: compatContextoImplicito,
+  });
+  const contextual = crearAutorizacionContextual({
+    contextoService,
+    catalogoDeRoles,
+    compat: compatContextoImplicito,
+    avisar: avisarContextoImplicito,
+  });
 
   const guarda = (comprobar) => async (req, _res, next) => {
     await comprobar(req);
@@ -56,20 +75,22 @@ export function crearAutorizacion({ verificador, cuentaService, proyectoService 
   };
 
   const esDuenoDelProyecto = async (req) => {
-    if (req.cuenta?.rol !== ROL_CUENTA.COLECTIVO) {
+    const colectivoId = colectivoDelContexto(req.contexto);
+    if (!colectivoId) {
       return false;
     }
-    const { colectivo } = await proyectoService.buscarProyectoConColectivo(req.params.id);
-    return String(colectivo.id) === String(req.cuenta.perfilId);
+    const proyecto = await proyectoService.buscarPorId(req.params.id);
+    return String(proyecto.colectivoId) === colectivoId;
   };
 
   const esLaPersonaDeLaColaboracion = async (req) => {
-    if (req.cuenta?.rol !== ROL_CUENTA.COLABORADORA) {
+    const colaboradorId = colaboradorDelContexto(req.contexto);
+    if (!colaboradorId) {
       return false;
     }
-    const { proyecto } = await proyectoService.buscarProyectoConColectivo(req.params.id);
+    const proyecto = await proyectoService.buscarPorId(req.params.id);
     const colaboracion = proyecto.buscarColaboracion(req.params.colaboracionId);
-    return Boolean(colaboracion?.esDe(req.cuenta.perfilId));
+    return Boolean(colaboracion?.esDe(colaboradorId));
   };
 
   const prohibir = () => {
@@ -79,32 +100,24 @@ export function crearAutorizacion({ verificador, cuentaService, proyectoService 
   return {
     activa: true,
 
-    async identificar(req, _res, next) {
-      req.identidad = null;
-      req.cuenta = null;
-      const token = tokenDe(req);
-      if (token) {
-        const { sub } = await verificador.verificar(token);
-        req.identidad = { sub };
-        req.cuenta = await cuentaService.resolver(sub);
-      }
+    autenticar: crearAutenticacion(autenticador),
+
+    exigirAutenticacion: (req, _res, next) => {
+      if (!req.autenticacion) throw identificacion.noAutenticado();
       next();
     },
 
-    sesion: guarda(exigirSesion),
+    usuario: (opciones) => identificacion.exigida(opciones),
 
-    sinPerfil: guarda((req) => {
-      exigirSesion(req);
-      if (req.cuenta.rol) {
-        throw new ConflictError("La cuenta ya tiene un perfil");
-      }
-    }),
+    permiso: (codigo = null) => [identificacion.exigida(), contextual.exigida(codigo)],
+
+    opcional: [identificacion.opcional, contextual.opcional],
 
     colaboradoraDe: (parametro = "id") =>
-      guarda((req) => exigirRol(req, ROL_CUENTA.COLABORADORA, req.params[parametro])),
+      guarda((req) => exigirEntidad(req, colaboradorDelContexto, req.params[parametro])),
 
     colectivoDe: (parametro = "id") =>
-      guarda((req) => exigirRol(req, ROL_CUENTA.COLECTIVO, req.params[parametro])),
+      guarda((req) => exigirEntidad(req, colectivoDelContexto, req.params[parametro])),
 
     duenoDelProyecto: guarda(async (req) => {
       exigirSesion(req);
@@ -114,7 +127,7 @@ export function crearAutorizacion({ verificador, cuentaService, proyectoService 
     }),
 
     colaboradoraDelBody: guarda((req) =>
-      exigirRol(req, ROL_CUENTA.COLABORADORA, req.body.colaboradorId),
+      exigirEntidad(req, colaboradorDelContexto, req.body.colaboradorId),
     ),
 
     participanteDeLaColaboracion: ({ colectivo = true, colaboradora = true } = {}) =>

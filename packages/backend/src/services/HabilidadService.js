@@ -2,7 +2,6 @@ import { DomainError } from "../errors/DomainError.js";
 import { ConflictError } from "../errors/ConflictError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
 import { normalizarASnakeCase } from "../domain/Habilidad.js";
-import { HabilidadModel } from "../models/HabilidadModel.js";
 import { tieneContenido } from "../utils/validaciones.js";
 import { armarPaginado } from "../utils/paginacion.js";
 
@@ -21,10 +20,7 @@ export class HabilidadService {
       throw new ConflictError(`Ya existe una habilidad con el código "${codigo}"`);
     }
 
-    // El codigo lo deriva el schema del titulo (default de HabilidadModel).
-    const habilidad = new HabilidadModel({ titulo, descripcion, usuario });
-
-    return this.habilidadRepository.guardar(habilidad);
+    return this.habilidadRepository.crear({ titulo, codigo, descripcion, usuario });
   }
 
   async listar({ numeroPagina = 1, limitePorPagina = 10 } = {}) {
@@ -44,8 +40,6 @@ export class HabilidadService {
       throw new DomainError("Se debe indicar al menos un código de habilidad");
     }
 
-    // map + async devuelve un array de PROMESAS.
-    // Promise.all espera a todas y devuelve el array de resultados.
     return Promise.all(
       codigos.map(async (codigo) => {
         const habilidad = await this.habilidadRepository.buscarPorCodigo(codigo);

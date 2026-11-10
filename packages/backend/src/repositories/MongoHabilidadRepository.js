@@ -1,6 +1,10 @@
 import { HabilidadModel } from "../models/HabilidadModel.js";
 
 export class MongoHabilidadRepository {
+  async crear(datos) {
+    return new HabilidadModel(datos).save();
+  }
+
   async guardar(habilidad) {
     return habilidad.save();
   }

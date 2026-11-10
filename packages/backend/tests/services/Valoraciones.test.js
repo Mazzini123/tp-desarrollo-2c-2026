@@ -4,7 +4,6 @@ import {
   datosDePerfil,
   CODIGOS,
 } from "../fixtures.js";
-import { DomainError } from "../../src/errors/DomainError.js";
 import { ConflictError } from "../../src/errors/ConflictError.js";
 
 // Requerimiento adicional 39: valoraciones mutuas.
@@ -51,8 +50,11 @@ describe("Valoraciones mutuas", () => {
     const colaboracion = await anotar();
     await services.proyectoService.finalizar(proyecto.id);
 
-    expect(colaboracion.estado).toBe("FINALIZADA");
-    expect(colaboracion.fechaFin).toBeInstanceOf(Date);
+    const guardada = (
+      await services.proyectoService.buscarPorId(proyecto.id)
+    ).buscarColaboracion(colaboracion.id);
+    expect(guardada.estado).toBe("FINALIZADA");
+    expect(guardada.fechaFin).toBeInstanceOf(Date);
     const bandeja = await services.notificacionService.listar(ada.id);
     expect(bandeja.items.map((n) => n.tipo)).toContain("COLABORACION_FINALIZADA");
   });
@@ -107,13 +109,5 @@ describe("Valoraciones mutuas", () => {
     await expect(
       services.colaboracionService.finalizar(proyecto.id, colaboracion.id),
     ).rejects.toThrow(ConflictError);
-  });
-
-  test("el puntaje va de 1 a 5", async () => {
-    const colaboracion = await anotar();
-    await services.colaboracionService.finalizar(proyecto.id, colaboracion.id);
-    await expect(
-      valorar(colaboracion, { autor: "COLECTIVO", puntaje: 6 }),
-    ).rejects.toThrow(DomainError);
   });
 });

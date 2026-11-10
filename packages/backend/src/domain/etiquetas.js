@@ -1,6 +1,3 @@
-// Requerimiento adicional 34: etiquetas en proyectos y organizaciones para
-// optimizar las busquedas.
-
 export function normalizarEtiqueta(texto) {
   return texto
     .trim()

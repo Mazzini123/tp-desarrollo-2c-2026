@@ -5,18 +5,5 @@ export class Colectivo {
 
   darDeBaja(fecha) {
     this.fechaBaja = fecha;
-    this.cuentaId = null;
-    this.mediosDeContacto = [];
-    this.redesSociales = [];
-  }
-
-  agregarProyecto(datos) {
-    const proyecto = this.proyectos.create(datos);
-    this.proyectos.push(proyecto);
-    return proyecto;
-  }
-
-  buscarProyecto(proyectoId) {
-    return this.proyectos.find((p) => p.id === String(proyectoId)) ?? null;
   }
 }

@@ -10,7 +10,7 @@
     "start": "node index.js",
     "dev": "node --watch index.js",
     "test": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js",
-    "test:integracion": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js --config jest.integracion.config.js --runInBand"
+    "test:integracion": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js tests/integracion"
   },
   "license": "ISC",
   "dependencies": {
@@ -24,11 +24,5 @@
     "nodemailer": "^10.0.12",
     "swagger-ui-express": "^5.0.1",
     "zod": "^4.5.4"
-  },
-  "jest": {
-    "testPathIgnorePatterns": [
-      "/node_modules/",
-      "<rootDir>/tests/integracion/"
-    ]
   }
 }

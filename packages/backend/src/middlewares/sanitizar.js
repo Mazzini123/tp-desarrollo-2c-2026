@@ -1,34 +1,5 @@
 import { Parser } from "htmlparser2";
 
-// Requerimiento adicional 11: "asegurarse de que ninguno de los campos
-// textuales que una persona pueda ingresar contengan tags HTML peligrosos,
-// como iframes, scripts, etc."
-//
-// La API guarda texto plano (o Markdown, que es texto con convenciones),
-// nunca HTML. Por eso no hay lista de tags permitidos: se sacan todos.
-//
-// El texto se recorre con htmlparser2, el mismo parser que usan las
-// librerias de sanitizacion: entiende HTML mal formado igual que un
-// navegador, cosa que una expresion regular no puede hacer.
-//
-// ¿Por que no una biblioteca? Evaluamos sanitize-html (2.18, la mas usada en
-// Node, construida sobre htmlparser2) con allowedTags: [] contra los casos de
-// tests/middlewares/sanitizar.test.js. Saca los tags igual de bien, pero
-// devuelve HTML ESCAPADO, porque esta pensada para producir HTML que despues
-// se inserta en una pagina:
-//
-//   "a < b && c > d"            -> "a &lt; b &amp;&amp; c &gt; d"
-//   "?a=1&not=2&copy=3"         -> "?a=1¬=2©=3"  (decodifica entidades)
-//   "if (a < b) ..." (Markdown) -> "if (a &lt; b) ..."
-//
-// La API guarda texto plano o Markdown, y el frontend (React) ya escapa al
-// mostrar: con sanitize-html el texto quedaria escapado dos veces, y las URLs
-// y el codigo de las descripciones se romperian. Con decodeEntities: false
-// las URLs se salvan, pero el resto sigue escapado. Por eso: parser de la
-// biblioteca, pero la regla (sacar tags y dejar el texto tal cual) es propia.
-// DOMPurify tiene el mismo enfoque (devuelve HTML) y en Node necesita un DOM
-// simulado (jsdom).
-
 const SIN_CONTENIDO = new Set([
   "script",
   "style",

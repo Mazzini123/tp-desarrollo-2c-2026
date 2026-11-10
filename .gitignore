@@ -3,6 +3,7 @@ node_modules/
 .env.local
 .env.prod
 .env.*.local
+secrets/
 
 build/
 dist/

@@ -1,226 +1,47 @@
+import mongoose from "mongoose";
 import { ColectivoModel } from "../models/ColectivoModel.js";
-import { aObjectId, esIdValido } from "./ids.js";
+import { ConcurrenciaError } from "../errors/ConcurrenciaError.js";
+import { esIdValido } from "./objectIds.js";
+import { salto } from "../utils/paginacion.js";
 
 const ORDEN = { createdAt: 1, _id: 1 };
 
-const COLABORADORES = { path: "proyectos.colaboraciones.colaborador" };
-
-const lista = (campo) => ({ $ifNull: [campo, []] });
-
-function algunPerfilDisponible(codigosDeLaPersona, ahora) {
-  return {
-    $anyElementTrue: [
-      {
-        $map: {
-          input: lista("$proyectos.perfiles"),
-          as: "perfil",
-          in: {
-            $and: [
-              { $ne: [{ $ifNull: ["$$perfil.busquedaAbierta", true] }, false] },
-              {
-                $or: [
-                  { $eq: [{ $ifNull: ["$$perfil.fechaCierreBusqueda", null] }, null] },
-                  { $gt: ["$$perfil.fechaCierreBusqueda", ahora] },
-                ],
-              },
-              {
-                $or: [
-                  { $eq: [{ $ifNull: ["$$perfil.limiteColaboraciones", null] }, null] },
-                  {
-                    $lt: [
-                      {
-                        $size: {
-                          $filter: {
-                            input: lista("$proyectos.colaboraciones"),
-                            as: "colaboracion",
-                            cond: {
-                              $and: [
-                                { $eq: ["$$colaboracion.estado", "ACEPTADA"] },
-                                { $eq: ["$$colaboracion.perfil", "$$perfil._id"] },
-                              ],
-                            },
-                          },
-                        },
-                      },
-                      "$$perfil.limiteColaboraciones",
-                    ],
-                  },
-                ],
-              },
-              { $gt: [{ $size: lista("$$perfil.habilidadesRequeridas") }, 0] },
-              {
-                $setIsSubset: [
-                  lista("$$perfil.habilidadesRequeridas.codigo"),
-                  codigosDeLaPersona,
-                ],
-              },
-            ],
-          },
-        },
-      },
-    ],
-  };
-}
 export class MongoColectivoRepository {
+  async crear(datos) {
+    return new ColectivoModel(datos).save();
+  }
+
   async guardar(colectivo) {
-    return colectivo.save();
+    try {
+      return await colectivo.save();
+    } catch (error) {
+      if (error instanceof mongoose.Error.VersionError) {
+        throw new ConcurrenciaError();
+      }
+      throw error;
+    }
   }
 
   async buscarPorId(id) {
-    return esIdValido(id) ? ColectivoModel.findById(id).populate(COLABORADORES) : null;
-  }
-
-  async listar() {
-    return ColectivoModel.find().sort(ORDEN).populate(COLABORADORES);
+    return esIdValido(id) ? ColectivoModel.findById(id) : null;
   }
 
   async listarPaginado(numeroPagina, limitePorPagina, { etiqueta } = {}) {
-    const salto = (numeroPagina - 1) * limitePorPagina;
     const filtro = etiqueta ? { etiquetas: etiqueta } : {};
     const [items, total] = await Promise.all([
       ColectivoModel.find(filtro)
         .sort(ORDEN)
-        .skip(salto)
-        .limit(limitePorPagina)
-        .populate(COLABORADORES),
+        .skip(salto(numeroPagina, limitePorPagina))
+        .limit(limitePorPagina),
       ColectivoModel.countDocuments(filtro),
     ]);
 
     return { items, total };
   }
 
-  async buscarProyecto(proyectoId) {
-    if (!esIdValido(proyectoId)) {
-      return null;
-    }
-
-    const colectivo = await ColectivoModel.findOne({
-      "proyectos._id": proyectoId,
-    }).populate(COLABORADORES);
-
-    return colectivo
-      ? { colectivo, proyecto: colectivo.buscarProyecto(proyectoId) }
+  async buscarResumen(id) {
+    return esIdValido(id)
+      ? ColectivoModel.findById(id, { nombre: 1, fechaBaja: 1 })
       : null;
   }
-
-  async buscarPorCuenta(cuentaId) {
-    return ColectivoModel.findOne({ cuentaId });
-  }
-
-  async registrarVisualizacion(proyectoId) {
-    if (!esIdValido(proyectoId)) {
-      return;
-    }
-
-    await ColectivoModel.updateOne(
-      { "proyectos._id": proyectoId },
-      { $inc: { "proyectos.$.visualizaciones": 1 } },
-      { timestamps: false },
-    );
-  }
-
-  async buscarPerfil(proyectoId, perfilId) {
-    const encontrado = await this.buscarProyecto(proyectoId);
-    const perfil = encontrado?.proyecto.buscarPerfil(perfilId);
-
-    return perfil ? { ...encontrado, perfil } : null;
-  }
-
-  async buscarConCierreVencido(ahora) {
-    return ColectivoModel.find({
-      "proyectos.estado": "ABIERTO",
-      "proyectos.fechaCierre": { $lte: ahora },
-    }).populate(COLABORADORES);
-  }
-
-  async buscarColectivosDeColaborador(colaboradorId) {
-    if (!esIdValido(colaboradorId)) {
-      return [];
-    }
-
-    return ColectivoModel.find({ "proyectos.colaboraciones.colaborador": colaboradorId })
-      .sort(ORDEN)
-      .populate(COLABORADORES);
-  }
-
-  async buscarProyectosCompatibles(
-    colaborador,
-    numeroPagina,
-    limitePorPagina,
-    ahora = new Date(),
-  ) {
-    const salto = (numeroPagina - 1) * limitePorPagina;
-    const codigosDeLaPersona = colaborador.habilidades.map((h) => h.codigo);
-
-    const [resultado] = await ColectivoModel.aggregate([
-      { $sort: ORDEN },
-      { $unwind: "$proyectos" },
-      {
-        $match: {
-          "proyectos.estado": "ABIERTO",
-          "proyectos.colaboraciones.colaborador": { $ne: aObjectId(colaborador) },
-          $expr: algunPerfilDisponible(codigosDeLaPersona, ahora),
-        },
-      },
-      {
-        $facet: {
-          items: [{ $skip: salto }, { $limit: limitePorPagina }],
-          total: [{ $count: "cantidad" }],
-        },
-      },
-    ]);
-
-    return {
-      items: await proyectosDesdeAgregacion(resultado.items),
-      total: resultado.total[0]?.cantidad ?? 0,
-    };
-  }
-
-  async listarProyectosPaginado(numeroPagina, limitePorPagina, filtros = {}) {
-    const salto = (numeroPagina - 1) * limitePorPagina;
-    const condiciones = condicionesDeProyectos(filtros);
-    const filtroDeProyectos = condiciones.length ? [{ $match: { $and: condiciones } }] : [];
-    const [resultado] = await ColectivoModel.aggregate([
-      { $sort: ORDEN },
-      { $unwind: "$proyectos" },
-      ...filtroDeProyectos,
-      {
-        $facet: {
-          items: [{ $skip: salto }, { $limit: limitePorPagina }],
-          total: [{ $count: "cantidad" }],
-        },
-      },
-    ]);
-
-    return {
-      items: await proyectosDesdeAgregacion(resultado.items),
-      total: resultado.total[0]?.cantidad ?? 0,
-    };
-  }
-}
-
-function condicionesDeProyectos({ etiqueta, estado, habilidad, tipoColectivo, ubicacion, modalidad }) {
-  const condiciones = [];
-  if (etiqueta) condiciones.push({ "proyectos.etiquetas": etiqueta });
-  if (estado) condiciones.push({ "proyectos.estado": estado });
-  if (tipoColectivo) condiciones.push({ tipoColectivo });
-  if (ubicacion) condiciones.push({ "ubicacion.nombre": ubicacion });
-  if (modalidad) condiciones.push({ "proyectos.perfiles.modalidadColaboracion": modalidad });
-  if (habilidad) {
-    condiciones.push({
-      $or: [
-        { "proyectos.perfiles.habilidadesRequeridas.codigo": habilidad },
-        { "proyectos.perfiles.habilidadesOpcionales.codigo": habilidad },
-      ],
-    });
-  }
-  return condiciones;
-}
-
-export async function proyectosDesdeAgregacion(filas) {
-  const colectivos = filas.map((fila) =>
-    ColectivoModel.hydrate({ ...fila, proyectos: [fila.proyectos] }),
-  );
-  await ColectivoModel.populate(colectivos, COLABORADORES);
-  return colectivos.map((colectivo) => colectivo.proyectos[0]);
 }

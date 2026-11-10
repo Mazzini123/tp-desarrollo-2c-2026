@@ -1,22 +1,21 @@
 import { createHash } from "node:crypto";
-import mongoose from "mongoose";
 import { DomainError } from "../errors/DomainError.js";
-import { ROL_CUENTA } from "../domain/enums/ROL_CUENTA.js";
-import { NotFoundError } from "../errors/NotFoundError.js";
 import { ConflictError } from "../errors/ConflictError.js";
+import { DuplicadoError } from "../errors/DuplicadoError.js";
+import { buscarProyectoOFallar } from "./soporte/buscarOFallar.js";
 import { armarPaginado } from "../utils/paginacion.js";
 import { normalizarEtiquetas } from "../domain/etiquetas.js";
 import { cerrarProyecto, notificarResoluciones } from "./reglasDePostulacion.js";
 
 export class ProyectoService {
   constructor({
-    colectivoRepository,
+    proyectoRepository,
     colectivoService,
     perfilService,
     notificacionService,
     avisoAutomaticoService,
   }) {
-    this.colectivoRepository = colectivoRepository;
+    this.proyectoRepository = proyectoRepository;
     this.colectivoService = colectivoService;
     this.perfilService = perfilService;
     this.notificacionService = notificacionService;
@@ -35,10 +34,6 @@ export class ProyectoService {
     },
     ahora = new Date(),
   ) {
-    if (!Array.isArray(perfiles) || perfiles.length === 0) {
-      throw new DomainError("El proyecto debe tener al menos un perfil");
-    }
-
     const publicacion = claveIdempotencia && {
       clave: claveIdempotencia,
       huella: createHash("sha256")
@@ -47,7 +42,7 @@ export class ProyectoService {
     };
 
     const colectivo = await this.colectivoService.buscarPorId(colectivoId);
-    const existente = buscarPublicacion(colectivo, publicacion);
+    const existente = await this.buscarPublicacion(colectivo, publicacion);
     if (existente) return existente;
 
     this.validarFechaCierre(fechaCierre, ahora);
@@ -59,10 +54,9 @@ export class ProyectoService {
       perfiles.map((datos) => this.perfilService.construirPerfil(datos)),
     );
 
-    const creadaMientras = buscarPublicacion(colectivo, publicacion);
-    if (creadaMientras) return creadaMientras;
-
-    const proyecto = colectivo.agregarProyecto({
+    const proyecto = this.proyectoRepository.nuevo({
+      colectivoId: colectivo._id,
+      datosDelColectivo: datosDelColectivo(colectivo),
       titulo,
       descripcion,
       fechaCierre,
@@ -73,17 +67,15 @@ export class ProyectoService {
 
     perfilesConstruidos.forEach((perfil) => proyecto.agregarPerfil(perfil));
     try {
-      await this.colectivoRepository.guardar(colectivo);
+      await this.proyectoRepository.guardar(proyecto);
     } catch (error) {
-      if (publicacion && error instanceof mongoose.Error.VersionError) {
-        const actualizado = await this.colectivoService.buscarPorId(colectivoId);
-        const ganador = buscarPublicacion(actualizado, publicacion);
+      if (publicacion && error instanceof DuplicadoError) {
+        const ganador = await this.buscarPublicacion(colectivo, publicacion);
         if (ganador) return ganador;
       }
       throw error;
     }
 
-    // Req. adicional 9. Si los avisos fallan, el proyecto igual quedo creado.
     try {
       await this.avisoAutomaticoService.avisarPorProyectoNuevo(proyecto);
     } catch (error) {
@@ -95,7 +87,7 @@ export class ProyectoService {
 
   async listar({ numeroPagina = 1, limitePorPagina = 10, ...filtros } = {}) {
     return armarPaginado(
-      await this.colectivoRepository.listarProyectosPaginado(
+      await this.proyectoRepository.listarPaginado(
         numeroPagina,
         limitePorPagina,
         filtros,
@@ -106,38 +98,27 @@ export class ProyectoService {
   }
 
   async listarPorColectivo(colectivoId) {
-    return (await this.colectivoService.buscarPorId(colectivoId)).proyectos;
+    await this.colectivoService.buscarPorId(colectivoId);
+    return this.proyectoRepository.buscarPorColectivo(colectivoId);
   }
 
-  async buscarProyectoConColectivo(proyectoId) {
-    const resultado = await this.colectivoRepository.buscarProyecto(proyectoId);
+  async verDetalle(proyectoId, colectivoIdDeQuienConsulta = null) {
+    const proyecto = await this.buscarPorId(proyectoId);
+    const esDueno = colectivoIdDeQuienConsulta === String(proyecto.colectivoId);
 
-    if (!resultado) {
-      throw new NotFoundError(`No existe un proyecto con id "${proyectoId}"`);
+    if (esDueno) {
+      return { proyecto, esDueno };
     }
-
-    return resultado;
-  }
-
-  // GET /proyectos/:id: la consulta de una persona cuenta como visualizacion
-  // (req. adicional 17). Los usos internos de buscarPorId no suman.
-  async verDetalle(proyectoId, cuenta = null) {
-    const { colectivo } = await this.buscarProyectoConColectivo(proyectoId);
-    const esDueno =
-      cuenta?.rol === ROL_CUENTA.COLECTIVO && String(cuenta.perfilId) === String(colectivo.id);
-
-    if (!esDueno) {
-      try {
-        await this.colectivoRepository.registrarVisualizacion(proyectoId);
-      } catch (error) {
-        console.error("No se pudo registrar la visualizacion:", error.message);
-      }
+    try {
+      await this.proyectoRepository.registrarVisualizacion(proyectoId);
+    } catch (error) {
+      console.error("No se pudo registrar la visualizacion:", error.message);
     }
-    return this.buscarPorId(proyectoId);
+    return { proyecto: await this.buscarPorId(proyectoId), esDueno };
   }
 
   async buscarPorId(proyectoId) {
-    return (await this.buscarProyectoConColectivo(proyectoId)).proyecto;
+    return buscarProyectoOFallar(this.proyectoRepository, proyectoId);
   }
 
   verificarAbierto(proyecto, accion) {
@@ -151,7 +132,7 @@ export class ProyectoService {
     { titulo, descripcion, etiquetas, fechaCierre },
     ahora = new Date(),
   ) {
-    const { colectivo, proyecto } = await this.buscarProyectoConColectivo(proyectoId);
+    const proyecto = await this.buscarPorId(proyectoId);
     this.verificarAbierto(proyecto, "modificar");
 
     if (titulo !== undefined) {
@@ -171,44 +152,53 @@ export class ProyectoService {
       proyecto.fechaCierre = fechaCierre;
     }
 
-    await this.colectivoRepository.guardar(colectivo);
+    await this.proyectoRepository.guardar(proyecto);
     return proyecto;
   }
 
   async finalizar(proyectoId, ahora = new Date()) {
-    const { colectivo, proyecto } = await this.buscarProyectoConColectivo(proyectoId);
+    const proyecto = await this.buscarPorId(proyectoId);
     this.verificarAbierto(proyecto, "finalizar");
 
-    await this.cerrar(colectivo, [proyecto], ahora);
+    await this.cerrar(proyecto, ahora);
     return proyecto;
   }
 
-  async cerrar(colectivo, proyectos, ahora) {
-    const cambios = proyectos.map((proyecto) => [
-      proyecto,
-      cerrarProyecto(proyecto, ahora),
-    ]);
-    await this.colectivoRepository.guardar(colectivo);
-
-    for (const [proyecto, cambiosDelProyecto] of cambios) {
-      await notificarResoluciones(this.notificacionService, proyecto, cambiosDelProyecto);
-    }
+  async cerrar(proyecto, ahora) {
+    const cambios = cerrarProyecto(proyecto, ahora);
+    await this.proyectoRepository.guardar(proyecto);
+    await notificarResoluciones(this.notificacionService, proyecto, cambios);
   }
 
-  // Requerimiento adicional 10. Lo llama periodicamente el job de
-  // jobs/cierreAutomatico.js. Devuelve los proyectos que cerro.
   async cerrarVencidos(ahora = new Date()) {
-    const colectivos = await this.colectivoRepository.buscarConCierreVencido(ahora);
+    const vencidos = await this.proyectoRepository.buscarConCierreVencido(ahora);
     const cerrados = [];
 
-    for (const colectivo of colectivos) {
-      const vencidos = colectivo.proyectos.filter((p) => p.cierreVencido(ahora));
-      if (vencidos.length === 0) continue;
-      await this.cerrar(colectivo, vencidos, ahora);
-      cerrados.push(...vencidos);
+    for (const proyecto of vencidos) {
+      try {
+        await this.cerrar(proyecto, ahora);
+        cerrados.push(proyecto);
+      } catch (error) {
+        console.error(
+          `Cierre automatico: no se pudo cerrar el proyecto ${proyecto.id}:`,
+          error.message,
+        );
+      }
     }
 
     return cerrados;
+  }
+
+  async buscarPublicacion(colectivo, publicacion) {
+    if (!publicacion) return null;
+    const proyecto = await this.proyectoRepository.buscarPorClaveDePublicacion(
+      colectivo._id,
+      publicacion.clave,
+    );
+    if (proyecto && proyecto.idempotenciaPublicacion.huella !== publicacion.huella) {
+      throw new ConflictError("La clave de publicacion ya se uso con otros datos");
+    }
+    return proyecto;
   }
 
   validarFechaCierre(fechaCierre, ahora) {
@@ -218,13 +208,10 @@ export class ProyectoService {
   }
 }
 
-function buscarPublicacion(colectivo, publicacion) {
-  if (!publicacion) return null;
-  const proyecto = colectivo.proyectos.find(
-    ({ idempotenciaPublicacion }) => idempotenciaPublicacion?.clave === publicacion.clave,
-  );
-  if (proyecto && proyecto.idempotenciaPublicacion.huella !== publicacion.huella) {
-    throw new ConflictError("La clave de publicacion ya se uso con otros datos");
-  }
-  return proyecto;
+export function datosDelColectivo(colectivo) {
+  return {
+    nombre: colectivo.nombre,
+    tipoColectivo: colectivo.tipoColectivo,
+    ubicacion: colectivo.ubicacion ?? null,
+  };
 }

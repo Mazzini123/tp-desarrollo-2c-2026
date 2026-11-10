@@ -1,4 +1,9 @@
-import { armarServices, crearColectivoDePrueba, datosDePerfil, CODIGOS } from "../fixtures.js";
+import {
+  armarServices,
+  crearColectivoDePrueba,
+  datosDePerfil,
+  CODIGOS,
+} from "../fixtures.js";
 
 // Requerimiento adicional 9: notificaciones automaticas.
 describe("Avisos automaticos", () => {
@@ -11,7 +16,11 @@ describe("Avisos automaticos", () => {
   });
 
   const crearPersona = (cuentaGit, habilidades, datos = {}) =>
-    services.colaboradorService.crear({ cuentaGit, codigosHabilidades: habilidades, ...datos });
+    services.colaboradorService.crear({
+      cuentaGit,
+      codigosHabilidades: habilidades,
+      ...datos,
+    });
 
   const crearProyecto = (titulo, requeridas, datos = {}) =>
     services.proyectoService.crear({
@@ -36,7 +45,9 @@ describe("Avisos automaticos", () => {
   });
 
   test("respeta a quien no quiere recibir mensajes", async () => {
-    const ada = await crearPersona("ada", [CODIGOS.node], { recibeMensajeriaInterna: false });
+    const ada = await crearPersona("ada", [CODIGOS.node], {
+      recibeMensajeriaInterna: false,
+    });
     await crearProyecto("API", [CODIGOS.node]);
     expect(await tiposEnLaBandeja(ada)).toEqual([]);
   });

@@ -10,16 +10,6 @@ export class Proyecto {
     this.fechaFinalizacion = fecha;
   }
 
-  cierreVencido(ahora) {
-    return this.estaAbierto() && Boolean(this.fechaCierre) && this.fechaCierre <= ahora;
-  }
-
-  cumpleAlgunPerfil(colaborador) {
-    return this.perfiles.some((perfil) =>
-      perfil.cumpleHabilidadesRequeridas(colaborador),
-    );
-  }
-
   agregarLogro(datos) {
     const logro = this.logros.create(datos);
     this.logros.push(logro);
@@ -48,17 +38,7 @@ export class Proyecto {
     return this.colaboraciones.some((c) => c.esDe(colaborador));
   }
 
-  yaSePostuloAlPerfil(colaborador, perfil) {
-    return this.colaboraciones.some(
-      (c) =>
-        c.esDe(colaborador) &&
-        !c.estaRetirada() &&
-        String(c.perfil) === String(perfil.id),
-    );
-  }
-
-  agregarColaboracion(datos) {
-    const colaboracion = this.colaboraciones.create(datos);
+  agregarColaboracion(colaboracion) {
     this.colaboraciones.push(colaboracion);
     return colaboracion;
   }
@@ -87,15 +67,5 @@ export class Proyecto {
     return this.colaboraciones.filter(
       (c) => c.estaAceptada() && String(c.perfil) === String(perfil.id),
     ).length;
-  }
-
-  aceptaPostulaciones(ahora = new Date()) {
-    return this.estaAbierto() && this.perfiles.some((p) => p.aceptaPostulaciones(ahora));
-  }
-
-  puedeVerContactoDe(colaborador) {
-    return this.colaboraciones.some(
-      (c) => c.esDe(colaborador) && c.estaAceptada() && c.esPublica,
-    );
   }
 }

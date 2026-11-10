@@ -13,6 +13,7 @@ describe("Timeline de un colectivo", () => {
       tipoColectivo: "ASAMBLEA",
     });
     colectivo.fechaAlta = dia(1);
+    await colectivo.save();
 
     const proyecto = await services.proyectoService.crear(
       {
@@ -50,7 +51,9 @@ describe("Timeline de un colectivo", () => {
       dia(3),
     );
     await services.colaboracionService.finalizar(proyecto.id, publica.id, dia(4));
-    proyecto.agregarLogro({ titulo: "Primer mapa", descripcion: "...", fecha: dia(5) });
+    const conLogro = await services.proyectoService.buscarPorId(proyecto.id);
+    conLogro.agregarLogro({ titulo: "Primer mapa", descripcion: "...", fecha: dia(5) });
+    await conLogro.save();
     await services.proyectoService.finalizar(proyecto.id, dia(6));
 
     const eventos = await services.colectivoService.timeline(colectivo.id);

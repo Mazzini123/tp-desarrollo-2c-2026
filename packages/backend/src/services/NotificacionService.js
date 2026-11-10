@@ -1,68 +1,103 @@
-import { NotificacionModel } from "../models/NotificacionModel.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
+import { ESTADO_ENVIO } from "../domain/enums/ESTADO_ENVIO.js";
 import { armarPaginado } from "../utils/paginacion.js";
+import { conLimiteDeTiempo } from "../utils/tiempo.js";
+
+const UN_MINUTO = 60_000;
+
+export const POLITICA_DE_ENVIOS = Object.freeze({
+  maximoDeIntentos: 5,
+  esperaInicialMs: UN_MINUTO,
+  limiteDeTiempoMs: 10_000,
+  reservaMs: 5 * UN_MINUTO,
+});
 
 export class NotificacionService {
-  // Usa el repositorio de colaboradores y no ColaboradorService: el alta de
-  // un colaborador dispara avisos (req. adicional 9), asi que
-  // ColaboradorService depende de este service y no al reves.
-  constructor({ notificacionRepository, colaboradorRepository, canales }) {
+  constructor({
+    notificacionRepository,
+    colaboradorRepository,
+    canales,
+    politica = POLITICA_DE_ENVIOS,
+  }) {
     this.notificacionRepository = notificacionRepository;
     this.colaboradorRepository = colaboradorRepository;
-    // Un canal por tipo de medio de contacto: { EMAIL, WHATSAPP, SMS }.
     this.canales = canales;
+    this.politica = politica;
   }
 
-  // Devuelve null si la persona no acepta mensajeria interna: en ese caso no
-  // se le escribe, ni adentro de la plataforma ni afuera.
   async notificar(colaborador, { tipo, asunto, contenido, referencias = {} }) {
     if (!colaborador.recibeMensajeriaInterna) {
       return null;
     }
 
-    const notificacion = new NotificacionModel({
+    const envios = colaborador.mediosDeContacto
+      .filter((medio) => this.canales[medio.tipo])
+      .map((medio) => ({ canal: medio.tipo, destino: medio.valor }));
+
+    return this.notificacionRepository.crear({
       destinatarioId: colaborador.id,
       tipo,
       asunto,
       contenido,
       referencias,
+      envios,
     });
-
-    notificacion.envios = await this.replicar(colaborador, notificacion);
-    await this.notificacionRepository.guardar(notificacion);
-
-    return notificacion;
   }
 
-  // "Las notificaciones internas deberian poder ser replicadas a traves de los
-  // medios de contacto registrados" — enunciado, segunda entrega.
-  //
-  // allSettled y no all: si falla el SMS igual tiene que salir el email, y un
-  // proveedor caido no puede hacer fallar la operacion que genero el aviso.
-  async replicar(colaborador, notificacion) {
-    const medios = colaborador.mediosDeContacto.filter(
-      (medio) => this.canales[medio.tipo],
-    );
+  async procesarEnviosPendientes(ahora = new Date(), { tope = 50 } = {}) {
+    const resumen = { enviados: 0, reintentos: 0, fallidos: 0 };
+    const reservaHasta = new Date(ahora.getTime() + this.politica.reservaMs);
 
-    const resultados = await Promise.allSettled(
-      medios.map((medio) =>
-        this.canales[medio.tipo].enviar({
-          destino: medio.valor,
+    for (let i = 0; i < tope; i++) {
+      const tomado = await this.notificacionRepository.tomarEnvioPendiente(
+        ahora,
+        reservaHasta,
+      );
+      if (!tomado) break;
+      resumen[await this.enviar(tomado, ahora)] += 1;
+    }
+
+    return resumen;
+  }
+
+  async enviar({ notificacion, envio }, ahora) {
+    const intentos = envio.intentos + 1;
+    try {
+      const canal = this.canales[envio.canal];
+      if (!canal) throw new Error(`No hay un canal configurado para ${envio.canal}`);
+      await conLimiteDeTiempo(
+        canal.enviar({
+          destino: envio.destino,
           asunto: notificacion.asunto,
           contenido: notificacion.contenido,
         }),
-      ),
-    );
-
-    return resultados.map((resultado, i) => {
-      if (resultado.status === "rejected") {
-        console.error(
-          `No se pudo replicar por ${medios[i].tipo}:`,
-          resultado.reason?.message,
-        );
-      }
-      return { canal: medios[i].tipo, exito: resultado.status === "fulfilled" };
-    });
+        this.politica.limiteDeTiempoMs,
+        `El envio por ${envio.canal}`,
+      );
+      await this.notificacionRepository.actualizarEnvio(notificacion._id, envio._id, {
+        estado: ESTADO_ENVIO.ENVIADO,
+        intentos,
+        fechaEnvio: ahora,
+        enProcesoHasta: null,
+        ultimoError: null,
+      });
+      return "enviados";
+    } catch (error) {
+      const agotado = intentos >= this.politica.maximoDeIntentos;
+      const espera = this.politica.esperaInicialMs * 2 ** (intentos - 1);
+      console.error(
+        `No se pudo enviar por ${envio.canal} (intento ${intentos}):`,
+        error.message,
+      );
+      await this.notificacionRepository.actualizarEnvio(notificacion._id, envio._id, {
+        estado: agotado ? ESTADO_ENVIO.FALLIDO : ESTADO_ENVIO.PENDIENTE,
+        intentos,
+        proximoIntento: new Date(ahora.getTime() + espera),
+        enProcesoHasta: null,
+        ultimoError: error.message,
+      });
+      return agotado ? "fallidos" : "reintentos";
+    }
   }
 
   async listar(colaboradorId, { numeroPagina = 1, limitePorPagina = 10, leida } = {}) {
@@ -92,8 +127,6 @@ export class NotificacionService {
   async marcarComoLeida(colaboradorId, notificacionId) {
     const notificacion = await this.notificacionRepository.buscarPorId(notificacionId);
 
-    // Una notificacion ajena responde igual que una inexistente: no se confirma
-    // que exista algo que no es tuyo.
     if (!notificacion || !notificacion.esPara(colaboradorId)) {
       throw new NotFoundError(
         `No existe la notificacion "${notificacionId}" para ese colaborador`,

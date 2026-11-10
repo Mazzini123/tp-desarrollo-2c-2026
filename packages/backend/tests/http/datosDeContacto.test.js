@@ -43,6 +43,8 @@ describe("HTTP · datos de contacto", () => {
       .post(`/proyectos/${proyectoId}/colaboraciones/${postulacion.body.id}/aceptacion`)
       .expect(200);
 
-    await api.get(`/proyectos/${proyectoId}/colaboradores/${colaboradorId}/contacto`).expect(404);
+    await api
+      .get(`/proyectos/${proyectoId}/colaboradores/${colaboradorId}/contacto`)
+      .expect(404);
   });
 });

@@ -22,3 +22,8 @@ export const medioDeContactoSchema = z.discriminatedUnion("tipo", [
 ]);
 
 export const mediosDeContactoSchema = z.array(medioDeContactoSchema).max(10);
+
+export const medioDeContactoEnRutaSchema = z
+  .looseObject({ tipo: z.string(), valor: z.string() })
+  .transform(({ tipo, valor }) => ({ tipo, valor }))
+  .pipe(medioDeContactoSchema);

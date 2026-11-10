@@ -1,32 +1,23 @@
-import {
-  componerApp,
-  crearRepositoriosEnMemoria,
-  crearCanalesEnMemoria,
-} from "../src/composicion.js";
+import { componerApp, crearCanalesEnMemoria } from "../src/composicion.js";
 import { cargarHabilidadesIniciales } from "../src/seed/habilidadesSeed.js";
+import { vaciarBase } from "./soporte/base.js";
 
 /**
- * Arma un juego de services nuevo para cada test, con los repositorios en
- * memoria y el catalogo de habilidades ya sembrado.
+ * Arma un juego de services nuevo para cada test, sobre los repositorios de
+ * MongoDB (los mismos que usa la app) con la base vacia y el catalogo de
+ * habilidades sembrado. La base la levanta mongodb-memory-server (ver
+ * jest.config.js): no hace falta tener un Mongo corriendo.
  *
- * Esta es la razon por la que las implementaciones en memoria NO se borran
- * cuando llegue MongoDB (correccion D2). El profesor dejo la decision colgada
- * de esta condicion: "la de memoria despues se va a borrar, a menos que la
- * necesiten para un test unitario". La necesitamos: sin ella, estos tests
- * requeririan una base levantada.
- *
- * Es async porque el seed lo es: sin el await, el test arrancaria con el
- * catalogo todavia vacio.
+ * Los canales externos si son dobles en memoria: un test no manda emails.
  */
 export async function armarServices() {
+  await vaciarBase();
   const canales = crearCanalesEnMemoria();
-  const { services } = componerApp({
-    repositorios: crearRepositoriosEnMemoria(),
-    canales,
-  });
+  const { services } = componerApp({ canales });
   await cargarHabilidadesIniciales(services.habilidadService);
   // Los canales viajan con los services para que un test pueda revisar que
-  // se envio (services.canales.EMAIL.enviados).
+  // se envio (services.canales.EMAIL.enviados), despues de correr el job
+  // (services.notificacionService.procesarEnviosPendientes()).
   return { ...services, canales };
 }
 

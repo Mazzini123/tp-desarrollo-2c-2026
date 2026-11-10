@@ -1,26 +1,23 @@
-import { ColectivoModel } from "../models/ColectivoModel.js";
 import { buscarProvincia, nombreDeUbicacion } from "../domain/Ubicacion.js";
 import { DomainError } from "../errors/DomainError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
-import { esTipoColectivoValido } from "../domain/enums/TIPO_COLECTIVO.js";
-import { TIPO_UBICACION, esTipoUbicacionValido } from "../domain/enums/TIPO_UBICACION.js";
-import { tieneContenido } from "../utils/validaciones.js";
+import { TIPO_UBICACION } from "../domain/enums/TIPO_UBICACION.js";
 import { armarPaginado } from "../utils/paginacion.js";
 import { construirRedesSociales } from "../domain/RedSocial.js";
 import { normalizarEtiquetas } from "../domain/etiquetas.js";
-import { mismoMedioDeContacto } from "../domain/MedioDeContacto.js";
+import { mismoMedioDeContacto, sinMediosRepetidos } from "../domain/MedioDeContacto.js";
 import { ConflictError } from "../errors/ConflictError.js";
 import { cerrarProyecto, notificarResoluciones } from "./reglasDePostulacion.js";
 import { TIPO_EVENTO_TIMELINE } from "../domain/enums/TIPO_EVENTO_TIMELINE.js";
 
 export class ColectivoService {
-  constructor({ colectivoRepository, notificacionService }) {
+  constructor({ colectivoRepository, proyectoRepository, notificacionService }) {
     this.colectivoRepository = colectivoRepository;
+    this.proyectoRepository = proyectoRepository;
     this.notificacionService = notificacionService;
   }
 
   async crear({
-    cuentaId = null,
     nombre,
     descripcion,
     tipoColectivo,
@@ -29,27 +26,22 @@ export class ColectivoService {
     etiquetas = [],
     mediosDeContacto = [],
   }) {
-    this.validarNombre(nombre);
-    this.validarDescripcion(descripcion);
-    this.validarTipoColectivo(tipoColectivo);
-
-    const colectivo = new ColectivoModel({
-      cuentaId,
+    return this.colectivoRepository.crear({
       nombre,
       descripcion,
       tipoColectivo,
       ubicacion: this.construirUbicacion(ubicacion),
       redesSociales: construirRedesSociales(redesSociales),
       etiquetas: normalizarEtiquetas(etiquetas),
-      mediosDeContacto: this.construirMediosDeContacto(mediosDeContacto),
+      mediosDeContacto: sinMediosRepetidos(mediosDeContacto),
     });
-
-    return this.colectivoRepository.guardar(colectivo);
   }
 
   async listar({ numeroPagina = 1, limitePorPagina = 10, etiqueta } = {}) {
     return armarPaginado(
-      await this.colectivoRepository.listarPaginado(numeroPagina, limitePorPagina, { etiqueta }),
+      await this.colectivoRepository.listarPaginado(numeroPagina, limitePorPagina, {
+        etiqueta,
+      }),
       numeroPagina,
       limitePorPagina,
     );
@@ -70,9 +62,13 @@ export class ColectivoService {
 
   async agregarMedioDeContacto(id, medio) {
     const colectivo = await this.buscarPorId(id);
-    const [nuevo] = this.construirMediosDeContacto([medio]);
+    const [nuevo] = sinMediosRepetidos([medio]);
 
-    if (colectivo.mediosDeContacto.some((existente) => mismoMedioDeContacto(existente, nuevo))) {
+    if (
+      colectivo.mediosDeContacto.some((existente) =>
+        mismoMedioDeContacto(existente, nuevo),
+      )
+    ) {
       throw new ConflictError("El colectivo ya tiene registrado ese medio de contacto");
     }
 
@@ -95,7 +91,10 @@ export class ColectivoService {
     await this.colectivoRepository.guardar(colectivo);
   }
 
-  async actualizar(id, { nombre, descripcion, ubicacion, redesSociales, etiquetas, mediosDeContacto }) {
+  async actualizar(
+    id,
+    { nombre, descripcion, ubicacion, redesSociales, etiquetas, mediosDeContacto },
+  ) {
     const colectivo = await this.buscarPorId(id);
 
     if (colectivo.estaDadoDeBaja()) {
@@ -103,12 +102,10 @@ export class ColectivoService {
     }
 
     if (nombre !== undefined) {
-      this.validarNombre(nombre);
       colectivo.nombre = nombre;
     }
 
     if (descripcion !== undefined) {
-      this.validarDescripcion(descripcion);
       colectivo.descripcion = descripcion;
     }
 
@@ -125,17 +122,16 @@ export class ColectivoService {
     }
 
     if (mediosDeContacto !== undefined) {
-      colectivo.mediosDeContacto = this.construirMediosDeContacto(mediosDeContacto);
+      colectivo.mediosDeContacto = sinMediosRepetidos(mediosDeContacto);
     }
 
-    return this.colectivoRepository.guardar(colectivo);
+    await this.colectivoRepository.guardar(colectivo);
+    if (nombre !== undefined || ubicacion !== undefined) {
+      await this.proyectoRepository.actualizarDatosDelColectivo(colectivo);
+    }
+    return colectivo;
   }
 
-  // Requerimiento adicional 23: el colectivo elimina su cuenta. Sus proyectos
-  // abiertos se cierran con las mismas consecuencias que un cierre manual
-  // (se rechazan las postulaciones pendientes y terminan las colaboraciones
-  // en curso), porque una organizacion que se fue no puede seguir sumando
-  // gente. Lo historico queda: proyectos, logros, colaboraciones.
   async darDeBaja(id, ahora = new Date()) {
     const colectivo = await this.buscarPorId(id);
 
@@ -143,42 +139,42 @@ export class ColectivoService {
       throw new ConflictError("El colectivo ya esta dado de baja");
     }
 
-    const cierres = colectivo.proyectos
-      .filter((proyecto) => proyecto.estaAbierto())
-      .map((proyecto) => [proyecto, cerrarProyecto(proyecto, ahora)]);
-
     colectivo.darDeBaja(ahora);
+    // Al dar de baja se borran los datos de contacto: dejan de ser publicos.
+    colectivo.mediosDeContacto = [];
+    colectivo.redesSociales = [];
     await this.colectivoRepository.guardar(colectivo);
 
-    for (const [proyecto, cambios] of cierres) {
+    const abiertos = (await this.proyectoRepository.buscarPorColectivo(id)).filter(
+      (proyecto) => proyecto.estaAbierto(),
+    );
+    for (const proyecto of abiertos) {
+      const cambios = cerrarProyecto(proyecto, ahora);
+      await this.proyectoRepository.guardar(proyecto);
       await notificarResoluciones(this.notificacionService, proyecto, cambios);
     }
 
     return colectivo;
   }
 
-  // Requerimiento adicional 19: "Vista cronologica que muestre todos los
-  // proyectos creados por un colectivo, logros cargados y colaboraciones
-  // cerradas de una organizacion, a modo de historial publico".
-  //
-  // Ademas de lo que pide, se suman los avances (porcentaje de concrecion):
-  // son el historial de "trazabilidad" que pide la entrega 2 para los logros.
-  //
-  // No se guarda en ningun lado: se arma recorriendo el agregado, porque toda
-  // la informacion ya esta adentro del documento del colectivo.
   async timeline(id) {
     const colectivo = await this.buscarPorId(id);
+    const proyectos = await this.proyectoRepository.buscarPorColectivo(id);
     const eventos = [
       evento(TIPO_EVENTO_TIMELINE.ALTA_DEL_COLECTIVO, colectivo.fechaAlta),
       evento(TIPO_EVENTO_TIMELINE.BAJA_DEL_COLECTIVO, colectivo.fechaBaja),
     ];
 
-    colectivo.proyectos.forEach((proyecto) => {
+    proyectos.forEach((proyecto) => {
       const delProyecto = { proyecto: { id: proyecto.id, titulo: proyecto.titulo } };
 
       eventos.push(
         evento(TIPO_EVENTO_TIMELINE.PROYECTO_CREADO, proyecto.fechaCreacion, delProyecto),
-        evento(TIPO_EVENTO_TIMELINE.PROYECTO_FINALIZADO, proyecto.fechaFinalizacion, delProyecto),
+        evento(
+          TIPO_EVENTO_TIMELINE.PROYECTO_FINALIZADO,
+          proyecto.fechaFinalizacion,
+          delProyecto,
+        ),
         ...proyecto.logros.map((logro) =>
           evento(TIPO_EVENTO_TIMELINE.LOGRO, logro.fecha, {
             ...delProyecto,
@@ -200,7 +196,6 @@ export class ColectivoService {
           .map((c) =>
             evento(TIPO_EVENTO_TIMELINE.COLABORACION_CERRADA, c.fechaFin, {
               ...delProyecto,
-              // Una contribucion anonima figura, pero sin decir de quien.
               colaborador: c.esPublica
                 ? { id: c.colaborador.id, nombre: c.colaborador.nombreParaMostrar() }
                 : null,
@@ -209,21 +204,24 @@ export class ColectivoService {
       );
     });
 
-    return (
-      eventos
-        // Lo guardado antes de esta entrega puede no tener fecha: no se inventa.
-        .filter((e) => e.fecha)
-        // Cronologica: de lo mas viejo a lo mas nuevo.
-        .sort((a, b) => a.fecha - b.fecha)
-    );
+    return eventos.filter((e) => e.fecha).sort((a, b) => a.fecha - b.fecha);
   }
 
-  construirMediosDeContacto(lista) {
-    return lista
-      .map(({ tipo, valor }) => ({ tipo, valor }))
-      .filter(
-        (medio, i, todos) => todos.findIndex((otro) => mismoMedioDeContacto(otro, medio)) === i,
-      );
+  async conProyectos(colectivos) {
+    const lista = Array.isArray(colectivos) ? colectivos : [colectivos];
+    const proyectos = await this.proyectoRepository.buscarPorColectivos(
+      lista.map((c) => c._id),
+    );
+    const vistas = lista.map((colectivo) => ({
+      ...colectivo.toJSON(),
+      proyectos: proyectos
+        .filter((p) => String(p.colectivoId) === String(colectivo._id))
+        .map((p) => {
+          const { colectivo: _, ...json } = p.toJSON();
+          return json;
+        }),
+    }));
+    return Array.isArray(colectivos) ? vistas : vistas[0];
   }
 
   construirUbicacion(datos) {
@@ -231,9 +229,6 @@ export class ColectivoService {
 
     const { tipoUbicacion, nombre } = datos;
 
-    if (!esTipoUbicacionValido(tipoUbicacion)) {
-      throw new DomainError(`Tipo de ubicación inválido: ${tipoUbicacion}`);
-    }
     const provincia =
       tipoUbicacion === TIPO_UBICACION.PROVINCIA ? buscarProvincia(nombre) : null;
     if (tipoUbicacion === TIPO_UBICACION.PROVINCIA && !provincia) {
@@ -241,29 +236,14 @@ export class ColectivoService {
         `Para PROVINCIA, nombre debe ser una de las 23 provincias argentinas. Recibido: ${nombre}`,
       );
     }
-    if (tipoUbicacion === TIPO_UBICACION.LOCALIDAD && !tieneContenido(nombre)) {
+    if (tipoUbicacion === TIPO_UBICACION.LOCALIDAD && !nombre) {
       throw new DomainError("Para LOCALIDAD, nombre es obligatorio");
     }
 
-    return { tipoUbicacion, nombre: nombreDeUbicacion(tipoUbicacion, provincia ?? nombre) };
-  }
-
-  validarNombre(nombre) {
-    if (!tieneContenido(nombre)) {
-      throw new DomainError("El nombre del colectivo es obligatorio");
-    }
-  }
-
-  validarDescripcion(descripcion) {
-    if (!tieneContenido(descripcion)) {
-      throw new DomainError("La descripción del colectivo es obligatoria");
-    }
-  }
-
-  validarTipoColectivo(tipoColectivo) {
-    if (!esTipoColectivoValido(tipoColectivo)) {
-      throw new DomainError(`Tipo de colectivo inválido: ${tipoColectivo}`);
-    }
+    return {
+      tipoUbicacion,
+      nombre: nombreDeUbicacion(tipoUbicacion, provincia ?? nombre),
+    };
   }
 }
 

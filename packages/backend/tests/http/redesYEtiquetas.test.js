@@ -6,7 +6,10 @@ describe("HTTP · redes sociales y etiquetas", () => {
     const { api } = await armarApp();
     await api
       .post("/colaboradores")
-      .send({ cuentaGit: "ada", redesSociales: [{ nombre: "X", url: "javascript:alert(1)" }] })
+      .send({
+        cuentaGit: "ada",
+        redesSociales: [{ nombre: "X", url: "javascript:alert(1)" }],
+      })
       .expect(400);
   });
 
@@ -17,7 +20,12 @@ describe("HTTP · redes sociales y etiquetas", () => {
       .send({ nombre: "F", descripcion: "d", tipoColectivo: "ONG" });
     await api
       .post(`/colectivos/${colectivo.body.id}/proyectos`)
-      .send({ titulo: "Con", descripcion: "d", perfiles: [datosDePerfil()], etiquetas: ["Salud"] })
+      .send({
+        titulo: "Con",
+        descripcion: "d",
+        perfiles: [datosDePerfil()],
+        etiquetas: ["Salud"],
+      })
       .expect(201);
     await api
       .post(`/colectivos/${colectivo.body.id}/proyectos`)

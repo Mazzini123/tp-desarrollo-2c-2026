@@ -1,8 +1,8 @@
 import { jest } from "@jest/globals";
-import mongoose from "mongoose";
 import request from "supertest";
 import { crearApp } from "../../src/app.js";
-import { MongoColectivoRepository } from "../../src/repositories/MongoColectivoRepository.js";
+import { MongoProyectoRepository } from "../../src/repositories/MongoProyectoRepository.js";
+import { ConcurrenciaError } from "../../src/errors/ConcurrenciaError.js";
 import {
   CODIGOS,
   crearColectivoDePrueba,
@@ -26,40 +26,110 @@ beforeEach(async () => {
   s = await armarServicesConMongo();
 });
 
-test("si otro pedido guardo antes, el segundo save() falla en vez de pisarlo", async () => {
-  const { colectivo, proyecto } = await crearProyectoDePrueba(s);
-  const repositorio = new MongoColectivoRepository();
+test("si otro pedido guardo antes, el segundo guardado falla en vez de pisarlo", async () => {
+  const { proyecto } = await crearProyectoDePrueba(s);
+  const repositorio = new MongoProyectoRepository();
 
-  // Dos "pedidos" leen el mismo colectivo.
-  const primero = await repositorio.buscarPorId(colectivo.id);
-  const segundo = await repositorio.buscarPorId(colectivo.id);
+  // Dos "pedidos" leen el mismo proyecto.
+  const primero = await repositorio.buscarPorId(proyecto.id);
+  const segundo = await repositorio.buscarPorId(proyecto.id);
 
-  primero.buscarProyecto(proyecto.id).titulo = "Cambio del primero";
+  primero.titulo = "Cambio del primero";
   await repositorio.guardar(primero);
 
-  segundo.buscarProyecto(proyecto.id).titulo = "Cambio del segundo";
-  await expect(repositorio.guardar(segundo)).rejects.toBeInstanceOf(
-    mongoose.Error.VersionError,
-  );
+  segundo.titulo = "Cambio del segundo";
+  // El repositorio traduce el VersionError de Mongoose a un error propio.
+  await expect(repositorio.guardar(segundo)).rejects.toBeInstanceOf(ConcurrenciaError);
 
-  const enLaBase = await repositorio.buscarPorId(colectivo.id);
-  expect(enLaBase.buscarProyecto(proyecto.id).titulo).toBe("Cambio del primero");
+  const enLaBase = await repositorio.buscarPorId(proyecto.id);
+  expect(enLaBase.titulo).toBe("Cambio del primero");
 });
 
 test("guardar dos veces seguidas el mismo documento funciona", async () => {
   // Despues de un save() exitoso, Mongoose actualiza el __v del documento en
   // memoria: el siguiente save() del MISMO objeto no choca consigo mismo.
-  const { colectivo, proyecto } = await crearProyectoDePrueba(s);
-  const repositorio = new MongoColectivoRepository();
-  const leido = await repositorio.buscarPorId(colectivo.id);
+  const { proyecto } = await crearProyectoDePrueba(s);
+  const repositorio = new MongoProyectoRepository();
+  const leido = await repositorio.buscarPorId(proyecto.id);
 
-  leido.buscarProyecto(proyecto.id).titulo = "Primer cambio";
+  leido.titulo = "Primer cambio";
   await repositorio.guardar(leido);
-  leido.buscarProyecto(proyecto.id).titulo = "Segundo cambio";
+  leido.titulo = "Segundo cambio";
   await repositorio.guardar(leido);
 
-  const enLaBase = await repositorio.buscarPorId(colectivo.id);
-  expect(enLaBase.buscarProyecto(proyecto.id).titulo).toBe("Segundo cambio");
+  const enLaBase = await repositorio.buscarPorId(proyecto.id);
+  expect(enLaBase.titulo).toBe("Segundo cambio");
+});
+
+test("dos aceptaciones simultaneas no superan el limite del perfil", async () => {
+  // Las colaboraciones estan en otra coleccion, pero aceptar una sube la
+  // version del proyecto: el segundo pedido choca y no acepta de mas.
+  const colectivo = await crearColectivoDePrueba(s.colectivoService);
+  const proyecto = await s.proyectoService.crear({
+    colectivoId: colectivo.id,
+    titulo: "Con cupo",
+    descripcion: "d",
+    perfiles: [
+      datosDePerfil({ modoAceptacion: "REVISION_MANUAL", limiteColaboraciones: 1 }),
+    ],
+  });
+  const postular = async (cuentaGit) => {
+    const persona = await s.colaboradorService.crear({
+      cuentaGit,
+      codigosHabilidades: [CODIGOS.node],
+    });
+    return s.colaboracionService.registrar({
+      proyectoId: proyecto.id,
+      perfilId: proyecto.perfiles[0].id,
+      colaboradorId: persona.id,
+    });
+  };
+  const a = await postular("ada");
+  const b = await postular("bea");
+  coordinarDosGuardados(s.proyectoService.proyectoRepository);
+
+  const resultados = await Promise.allSettled([
+    s.colaboracionService.aceptar(proyecto.id, a.id),
+    s.colaboracionService.aceptar(proyecto.id, b.id),
+  ]);
+
+  expect(resultados.map((r) => r.status).sort()).toEqual(["fulfilled", "rejected"]);
+  expect(resultados.find((r) => r.status === "rejected").reason).toBeInstanceOf(
+    ConcurrenciaError,
+  );
+  const guardado = await s.proyectoService.buscarPorId(proyecto.id);
+  expect(guardado.colaboraciones.filter((c) => c.estaAceptada())).toHaveLength(1);
+});
+
+test("postularse a un proyecto no choca con editar otro del mismo colectivo", async () => {
+  // Antes los proyectos vivian dentro del colectivo y cualquier cambio en uno
+  // invalidaba la version de todos.
+  const colectivo = await crearColectivoDePrueba(s.colectivoService);
+  const crear = (titulo) =>
+    s.proyectoService.crear({
+      colectivoId: colectivo.id,
+      titulo,
+      descripcion: "d",
+      perfiles: [datosDePerfil({ modoAceptacion: "REVISION_MANUAL" })],
+    });
+  const uno = await crear("Uno");
+  const otro = await crear("Otro");
+  const persona = await s.colaboradorService.crear({
+    cuentaGit: "ada",
+    codigosHabilidades: [CODIGOS.node],
+  });
+  coordinarDosGuardados(s.proyectoService.proyectoRepository);
+
+  await Promise.all([
+    s.colaboracionService.registrar({
+      proyectoId: uno.id,
+      perfilId: uno.perfiles[0].id,
+      colaboradorId: persona.id,
+    }),
+    s.proyectoService.actualizar(otro.id, { titulo: "Otro, editado" }),
+  ]);
+
+  expect((await s.proyectoService.buscarPorId(otro.id)).titulo).toBe("Otro, editado");
 });
 
 function coordinarDosGuardados(repositorio) {
@@ -85,7 +155,7 @@ test("dos POST simultaneos con la misma clave guardan un proyecto y avisan una s
   const avisar = jest
     .spyOn(s.avisoAutomaticoService, "avisarPorProyectoNuevo")
     .mockResolvedValue(undefined);
-  const guardar = coordinarDosGuardados(s.proyectoService.colectivoRepository);
+  const guardar = coordinarDosGuardados(s.proyectoService.proyectoRepository);
   const publicar = () =>
     api
       .post(`/colectivos/${colectivo.id}/proyectos`)
@@ -106,7 +176,7 @@ test("dos PUT simultáneos con la misma versión solo aplican la edición ganado
   const api = request(
     crearApp(s.controllers, { limites: { general: 10000, busquedas: 10000 } }),
   );
-  const guardar = coordinarDosGuardados(s.perfilService.colectivoRepository);
+  const guardar = coordinarDosGuardados(s.perfilService.proyectoRepository);
   const editar = (descripcion, requerida, opcional) =>
     api.put(`/proyectos/${proyecto.id}/perfiles/${perfil.id}`).send({
       descripcion,

@@ -1,14 +1,17 @@
-export function aplicarFormatoJSON(schema, { ocultar = [], transformar } = {}) {
+export function aplicarFormatoJSON(schema, { campos, transformar } = {}) {
+  if (!Array.isArray(campos) || campos.length === 0) {
+    throw new Error("aplicarFormatoJSON necesita la lista de campos visibles");
+  }
   schema.set("toJSON", {
     virtuals: true,
     versionKey: false,
     transform(documento, salida) {
-      delete salida._id;
-      for (const campo of ocultar) {
-        delete salida[campo];
+      const visible = {};
+      for (const campo of campos) {
+        if (campo in salida) visible[campo] = salida[campo];
       }
-      transformar?.(documento, salida);
-      return salida;
+      transformar?.(documento, visible);
+      return visible;
     },
   });
 }

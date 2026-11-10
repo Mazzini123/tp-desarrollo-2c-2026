@@ -1,7 +1,11 @@
 import { ColaboradorModel } from "../models/ColaboradorModel.js";
-import { aObjectId, esIdValido } from "./ids.js";
+import { aObjectId, esIdValido } from "./objectIds.js";
 
 export class MongoColaboradorRepository {
+  async crear(datos) {
+    return new ColaboradorModel(datos).save();
+  }
+
   async guardar(colaborador) {
     return colaborador.save();
   }
@@ -10,16 +14,11 @@ export class MongoColaboradorRepository {
     return esIdValido(id) ? ColaboradorModel.findById(id) : null;
   }
 
-  async buscarPorCuenta(cuentaId) {
-    return ColaboradorModel.findOne({ cuentaId });
-  }
-
-  async listar() {
-    return ColaboradorModel.find().sort({ _id: 1 });
-  }
-
   async buscarPorHabilidades(codigos) {
-    return ColaboradorModel.find({ "habilidades.codigo": { $all: codigos } }).sort({
+    return ColaboradorModel.find({
+      "habilidades.codigo": { $all: codigos },
+      fechaBaja: null,
+    }).sort({
       _id: 1,
     });
   }
@@ -36,6 +35,7 @@ export class MongoColaboradorRepository {
         $match: {
           "habilidades.codigo": { $all: requeridas },
           _id: { $nin: excluirIds.map(aObjectId) },
+          fechaBaja: null,
         },
       },
       {

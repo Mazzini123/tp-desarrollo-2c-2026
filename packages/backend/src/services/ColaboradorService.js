@@ -1,9 +1,9 @@
-import { ColaboradorModel } from "../models/ColaboradorModel.js";
 import { construirRedesSociales } from "../domain/RedSocial.js";
-import { esTipoMedioContactoValido } from "../domain/enums/TIPOS_MEDIOS_CONTACTO.js";
+import { sinMediosRepetidos } from "../domain/MedioDeContacto.js";
 import { DomainError } from "../errors/DomainError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
 import { ConflictError } from "../errors/ConflictError.js";
+import { CODIGO_ERROR } from "../errors/CODIGO_ERROR.js";
 import { armarPaginado } from "../utils/paginacion.js";
 
 export class ColaboradorService {
@@ -13,54 +13,70 @@ export class ColaboradorService {
     this.avisoAutomaticoService = avisoAutomaticoService;
   }
 
-  async crear({
-    cuentaId = null,
-    nombreFantasia,
-    nombre,
-    apellido,
-    cuentaGit,
-    pronombres,
-    presentacion,
-    codigosHabilidades,
-    recibeMensajeriaInterna = true,
-    mediosDeContacto = [],
-    redesSociales = [],
-  }) {
+  async crear(
+    {
+      nombreFantasia,
+      nombre,
+      apellido,
+      cuentaGit,
+      pronombres,
+      presentacion,
+      codigosHabilidades,
+      recibeMensajeriaInterna = true,
+      mediosDeContacto = [],
+      redesSociales = [],
+    },
+    { avisar = true } = {},
+  ) {
     this.validarIdentificacion({ nombreFantasia, nombre, apellido, cuentaGit });
 
-    const colaborador = new ColaboradorModel({
-      cuentaId,
+    const habilidades =
+      codigosHabilidades && codigosHabilidades.length > 0
+        ? await this.habilidadService.resolverPorCodigos([...new Set(codigosHabilidades)])
+        : [];
+
+    const colaborador = await this.colaboradorRepository.crear({
       nombreFantasia,
       nombre,
       apellido,
       cuentaGit,
       presentacion,
       recibeMensajeriaInterna,
+      pronombres: [...new Set(pronombres ?? [])],
+      mediosDeContacto: sinMediosRepetidos(mediosDeContacto),
+      redesSociales: construirRedesSociales(redesSociales),
+      habilidades: habilidades.map(({ codigo, titulo }) => ({ codigo, titulo })),
     });
-
-    colaborador.redesSociales = construirRedesSociales(redesSociales);
-
-    mediosDeContacto.forEach((datos) => {
-      const medio = this.construirMedioDeContacto(datos);
-      // En el alta un repetido se ignora, igual que los pronombres del payload.
-      if (!colaborador.tieneMedioDeContacto(medio)) {
-        colaborador.agregarMedioDeContacto(medio);
-      }
-    });
-
-    if (pronombres) {
-      colaborador.reemplazarPronombres(pronombres);
+    if (avisar) {
+      await this.avisarAlta(colaborador);
     }
-
-    if (codigosHabilidades && codigosHabilidades.length > 0) {
-      // await ANTES del forEach: resolverPorCodigos ahora devuelve una promesa
-      const habilidades = await this.habilidadService.resolverPorCodigos(codigosHabilidades);
-      habilidades.forEach((h) => colaborador.agregarHabilidad(h));
-    }
-
-    await this.colaboradorRepository.guardar(colaborador);
-    await avisarSinFallar(() => this.avisoAutomaticoService.avisarPorColaboradorNuevo(colaborador));
     return colaborador;
+  }
+
+  async avisarAlta(colaborador) {
+    await avisarSinFallar(() =>
+      this.avisoAutomaticoService.avisarPorColaboradorNuevo(colaborador),
+    );
+  }
+
+  exigirActiva(colaborador) {
+    if (colaborador.fechaBaja) {
+      throw new ConflictError(
+        "El perfil de colaboradora esta dado de baja",
+        CODIGO_ERROR.COLABORADORA_DADA_DE_BAJA,
+      );
+    }
+  }
+
+  async darDeBaja(colaborador, ahora = new Date()) {
+    this.exigirActiva(colaborador);
+    colaborador.fechaBaja = ahora;
+    return this.colaboradorRepository.guardar(colaborador);
+  }
+
+  async reactivar(colaborador) {
+    colaborador.fechaBaja = null;
+    return this.colaboradorRepository.guardar(colaborador);
   }
 
   async listar({ numeroPagina = 1, limitePorPagina = 10 } = {}) {
@@ -86,7 +102,10 @@ export class ColaboradorService {
     return colaborador;
   }
 
-  async actualizar(id, { pronombres, presentacion, recibeMensajeriaInterna, redesSociales }) {
+  async actualizar(
+    id,
+    { pronombres, presentacion, recibeMensajeriaInterna, redesSociales },
+  ) {
     const colaborador = await this.buscarPorId(id);
 
     if (redesSociales !== undefined) {
@@ -141,11 +160,9 @@ export class ColaboradorService {
     return this.colaboradorRepository.guardar(colaborador);
   }
 
-  // Los medios de contacto se registran pero no se muestran (ver el toJSON
-  // de ColaboradorModel): por eso el alta devuelve solo el medio cargado.
   async agregarMedioDeContacto(id, datos) {
     const colaborador = await this.buscarPorId(id);
-    const medio = this.construirMedioDeContacto(datos);
+    const [medio] = sinMediosRepetidos([datos]);
 
     if (colaborador.tieneMedioDeContacto(medio)) {
       throw new ConflictError(`El colaborador ya tiene registrado ese medio de contacto`);
@@ -158,7 +175,7 @@ export class ColaboradorService {
 
   async quitarMedioDeContacto(id, datos) {
     const colaborador = await this.buscarPorId(id);
-    const medio = this.construirMedioDeContacto(datos);
+    const [medio] = sinMediosRepetidos([datos]);
 
     if (!colaborador.tieneMedioDeContacto(medio)) {
       throw new NotFoundError("El colaborador no tiene registrado ese medio de contacto");
@@ -168,30 +185,18 @@ export class ColaboradorService {
     await this.colaboradorRepository.guardar(colaborador);
   }
 
-  construirMedioDeContacto({ tipo, valor }) {
-    if (!esTipoMedioContactoValido(tipo)) {
-      throw new DomainError(`Tipo de medio de contacto invalido: ${tipo}`);
-    }
-    if (typeof valor !== "string" || valor.trim().length === 0) {
-      throw new DomainError("El valor del medio de contacto es obligatorio");
-    }
-    return { tipo, valor: valor.trim() };
-  }
-
   validarIdentificacion({ nombreFantasia, nombre, apellido, cuentaGit }) {
     const tieneNombreYApellido = Boolean(nombre) && Boolean(apellido);
 
     if (!nombreFantasia && !cuentaGit && !tieneNombreYApellido) {
       throw new DomainError(
         "El colaborador debe tener al menos un dato de identificación: " +
-        "nombreFantasia, cuentaGit, o (nombre + apellido)",
+          "nombreFantasia, cuentaGit, o (nombre + apellido)",
       );
     }
   }
 }
 
-// Los avisos automaticos son un efecto secundario del alta: si fallan, el
-// alta igual quedo hecha.
 async function avisarSinFallar(avisar) {
   try {
     await avisar();

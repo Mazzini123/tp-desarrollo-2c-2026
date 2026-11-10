@@ -1,14 +1,26 @@
 import mongoose from "mongoose";
 import { NotificacionInterna } from "../domain/NotificacionInterna.js";
 import { aplicarFormatoJSON } from "./formatoJSON.js";
+import { ESTADO_ENVIO } from "../domain/enums/ESTADO_ENVIO.js";
 
-const envioSchema = new mongoose.Schema(
-  {
-    canal: { type: String, required: true },
-    exito: { type: Boolean, required: true },
+const envioSchema = new mongoose.Schema({
+  canal: { type: String, required: true },
+  destino: { type: String, required: true },
+  estado: {
+    type: String,
+    enum: Object.values(ESTADO_ENVIO),
+    default: ESTADO_ENVIO.PENDIENTE,
   },
-  { _id: false, id: false },
-);
+  intentos: { type: Number, default: 0 },
+  proximoIntento: { type: Date, default: Date.now },
+  enProcesoHasta: { type: Date, default: null },
+  ultimoError: { type: String, default: null },
+  fechaEnvio: { type: Date, default: null },
+});
+envioSchema.virtual("exito").get(function () {
+  return this.estado === ESTADO_ENVIO.ENVIADO;
+});
+aplicarFormatoJSON(envioSchema, { campos: ["canal", "estado", "exito", "intentos"] });
 
 const notificacionSchema = new mongoose.Schema(
   {
@@ -29,7 +41,20 @@ const notificacionSchema = new mongoose.Schema(
 );
 
 notificacionSchema.loadClass(NotificacionInterna);
-aplicarFormatoJSON(notificacionSchema);
+aplicarFormatoJSON(notificacionSchema, {
+  campos: [
+    "id",
+    "destinatarioId",
+    "tipo",
+    "asunto",
+    "contenido",
+    "referencias",
+    "fecha",
+    "esLeida",
+    "envios",
+  ],
+});
 notificacionSchema.index({ destinatarioId: 1, fecha: -1 });
+notificacionSchema.index({ "envios.estado": 1, "envios.proximoIntento": 1 });
 
 export const NotificacionModel = mongoose.model("Notificacion", notificacionSchema);

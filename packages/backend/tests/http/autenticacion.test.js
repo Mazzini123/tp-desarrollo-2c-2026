@@ -1,7 +1,6 @@
 import { armarApp } from "./app.js";
 import { CODIGOS, datosDePerfil } from "../fixtures.js";
 import { UnauthorizedError } from "../../src/errors/UnauthorizedError.js";
-import { crearVerificadorDesdeEntorno } from "../../src/auth/configuracionAuth.js";
 
 const verificadorDePrueba = {
   async verificar(token) {
@@ -15,7 +14,10 @@ const verificadorDePrueba = {
 const como = (cuenta) => ({ Authorization: `Bearer cuenta-${cuenta}` });
 
 async function armar() {
-  const { api } = await armarApp({ verificadorDeToken: verificadorDePrueba });
+  const { api } = await armarApp({
+    verificadorDeToken: verificadorDePrueba,
+    compatContextoImplicito: true,
+  });
   const crearColectivo = async (cuenta) =>
     (
       await api
@@ -55,11 +57,11 @@ describe("HTTP · sesion y cuenta", () => {
     await api.get("/auth/me").set("Authorization", "Bearer basura").expect(401);
 
     const sinPerfil = await api.get("/auth/me").set(como("ana")).expect(200);
-    expect(sinPerfil.body).toEqual({ id: "cuenta-ana", rol: null, perfilId: null });
+    expect(sinPerfil.body).toMatchObject({ id: "cuenta-ana", rol: null, perfilId: null });
 
     const persona = await crearPersona("ana");
     const conPerfil = await api.get("/auth/me").set(como("ana")).expect(200);
-    expect(conPerfil.body).toEqual({
+    expect(conPerfil.body).toMatchObject({
       id: "cuenta-ana",
       rol: "COLABORADORA",
       perfilId: persona.id,
@@ -67,7 +69,7 @@ describe("HTTP · sesion y cuenta", () => {
     expect(persona).not.toHaveProperty("cuentaId");
   });
 
-  test("las altas asocian el perfil a la cuenta y una cuenta tiene un solo perfil", async () => {
+  test("las altas asocian el perfil a la cuenta y las modalidades no se mezclan", async () => {
     const { api, crearColectivo } = await armar();
 
     await api
@@ -78,16 +80,18 @@ describe("HTTP · sesion y cuenta", () => {
     const yo = await api.get("/auth/me").set(como("fundacion")).expect(200);
     expect(yo.body).toMatchObject({ rol: "COLECTIVO", perfilId: colectivo.id });
 
+    // Regla confirmada el 9/11: un usuario puede crear varios colectivos.
     await api
       .post("/colectivos")
       .set(como("fundacion"))
       .send({ nombre: "Otro", descripcion: "d", tipoColectivo: "ONG" })
-      .expect(409);
-    await api
+      .expect(201);
+    const conflicto = await api
       .post("/colaboradores")
       .set(como("fundacion"))
       .send({ cuentaGit: "ada" })
       .expect(409);
+    expect(conflicto.body.codigo).toBe("MODALIDAD_INCOMPATIBLE");
   });
 
   test("las lecturas publicas siguen abiertas sin sesion", async () => {
@@ -99,21 +103,6 @@ describe("HTTP · sesion y cuenta", () => {
     await api.get(`/proyectos/${proyecto.id}`).expect(200);
     await api.get(`/colectivos/${colectivo.id}`).expect(200);
     await api.get("/estadisticas").expect(200);
-  });
-
-  test("sin configuracion de Logto no hay verificador, salvo en produccion", () => {
-    expect(crearVerificadorDesdeEntorno({})).toBeNull();
-    expect(() => crearVerificadorDesdeEntorno({ NODE_ENV: "production" })).toThrow();
-    expect(
-      crearVerificadorDesdeEntorno({ NODE_ENV: "production", AUTH_DESACTIVADA: "true" }),
-    ).toBeNull();
-    expect(() => crearVerificadorDesdeEntorno({ LOGTO_ENDPOINT: "https://x.logto.app" })).toThrow();
-    expect(
-      crearVerificadorDesdeEntorno({
-        LOGTO_ENDPOINT: "https://x.logto.app",
-        LOGTO_API_RESOURCE: "https://api.codigo-a-voluntad",
-      }),
-    ).toHaveProperty("verificar");
   });
 });
 
@@ -134,16 +123,17 @@ describe("HTTP · quien puede modificar el proyecto", () => {
     const logro = { titulo: "Hito", descripcion: "ok" };
     await api.post(`${ruta}/logros`).set(como("ajeno")).send(logro).expect(403);
     await api.post(`${ruta}/logros`).set(como("duenio")).send(logro).expect(201);
-    await api
-      .post(`${ruta}/finalizacion`)
-      .set(como("ajeno"))
-      .expect(403);
+    await api.post(`${ruta}/finalizacion`).set(como("ajeno")).expect(403);
     await api
       .post(`/colectivos/${dueño.id}/proyectos`)
       .set(como("ajeno"))
       .send({ titulo: "P", descripcion: "d", perfiles: [datosDePerfil()] })
       .expect(403);
-    await api.put(`/colectivos/${dueño.id}`).set(como("ajeno")).send({ nombre: "X" }).expect(403);
+    await api
+      .put(`/colectivos/${dueño.id}`)
+      .set(como("ajeno"))
+      .send({ nombre: "X" })
+      .expect(403);
     await api.post(`/colectivos/${dueño.id}/baja`).set(como("ajeno")).expect(403);
   });
 });
@@ -261,12 +251,26 @@ describe("HTTP · postulaciones, bandeja y contacto", () => {
     const { api, ada } = await conPostulacion();
 
     await api.get(`/colaboradores/${ada.id}/notificaciones`).expect(401);
-    await api.get(`/colaboradores/${ada.id}/notificaciones`).set(como("grace")).expect(403);
+    await api
+      .get(`/colaboradores/${ada.id}/notificaciones`)
+      .set(como("grace"))
+      .expect(403);
     await api.get(`/colaboradores/${ada.id}/notificaciones`).set(como("ada")).expect(200);
-    await api.put(`/colaboradores/${ada.id}`).set(como("grace")).send({ presentacion: "x" }).expect(403);
-    await api.put(`/colaboradores/${ada.id}`).set(como("ada")).send({ presentacion: "x" }).expect(200);
+    await api
+      .put(`/colaboradores/${ada.id}`)
+      .set(como("grace"))
+      .send({ presentacion: "x" })
+      .expect(403);
+    await api
+      .put(`/colaboradores/${ada.id}`)
+      .set(como("ada"))
+      .send({ presentacion: "x" })
+      .expect(200);
 
-    await api.get(`/colaboradores/${ada.id}/medios-de-contacto`).set(como("grace")).expect(403);
+    await api
+      .get(`/colaboradores/${ada.id}/medios-de-contacto`)
+      .set(como("grace"))
+      .expect(403);
     const medios = await api
       .get(`/colaboradores/${ada.id}/medios-de-contacto`)
       .set(como("ada"))

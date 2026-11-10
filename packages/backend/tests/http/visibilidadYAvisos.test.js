@@ -12,7 +12,10 @@ const verificadorDePrueba = {
 const como = (cuenta) => ({ Authorization: `Bearer cuenta-${cuenta}` });
 
 async function escenario() {
-  const { api } = await armarApp({ verificadorDeToken: verificadorDePrueba });
+  const { api } = await armarApp({
+    verificadorDeToken: verificadorDePrueba,
+    compatContextoImplicito: true,
+  });
   const colectivo = (
     await api
       .post("/colectivos")

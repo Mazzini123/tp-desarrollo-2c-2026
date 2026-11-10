@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import "./transacciones.js";
 
 export async function conectarBaseDeDatos() {
   const uri = process.env.MONGO_URI;

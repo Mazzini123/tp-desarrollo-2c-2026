@@ -1,4 +1,6 @@
 import { BaseController } from "./BaseController.js";
+import { colectivoDelContexto } from "../domain/contexto.js";
+import { paginaPublica, proyectoPublico } from "../dto/vistasPublicas.js";
 
 export class ProyectoController extends BaseController {
   constructor({ proyectoService, colaboracionService }) {
@@ -8,18 +10,20 @@ export class ProyectoController extends BaseController {
   }
 
   listar = async (req, res) => {
-    const paginacion = this.aPaginacionDeDominio(req.paginacion);
+    const paginacion = this.aPaginacionDeDominio(req.consulta);
     const { etiqueta, estado, habilidad, tipoColectivo, ubicacion, modalidad } =
-      req.paginacion;
+      req.consulta;
     const filtros = { etiqueta, estado, habilidad, tipoColectivo, ubicacion, modalidad };
-    this.responderPaginado(
-      res,
-      await this.proyectoService.listar({ ...paginacion, ...filtros }),
-    );
+    const pagina = await this.proyectoService.listar({ ...paginacion, ...filtros });
+    this.responderPaginado(res, paginaPublica(pagina, proyectoPublico));
   };
 
   obtenerPorId = async (req, res) => {
-    res.status(200).json(await this.proyectoService.verDetalle(req.params.id, req.cuenta));
+    const { proyecto, esDueno } = await this.proyectoService.verDetalle(
+      req.params.id,
+      colectivoDelContexto(req.contexto),
+    );
+    res.status(200).json(esDueno ? proyecto : proyectoPublico(proyecto));
   };
 
   actualizar = async (req, res) => {

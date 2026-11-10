@@ -1,4 +1,5 @@
 import { BaseController } from "./BaseController.js";
+import { colaboradorDelContexto } from "../domain/contexto.js";
 
 // Acciones sobre una colaboracion ya creada (una postulacion).
 export class PostulacionController extends BaseController {
@@ -31,7 +32,7 @@ export class PostulacionController extends BaseController {
           req.params.id,
           req.params.colaboracionId,
           new Date(),
-          { cuenta: req.cuenta },
+          { porLaColaboradora: Boolean(colaboradorDelContexto(req.contexto)) },
         ),
       );
   };

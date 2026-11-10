@@ -11,8 +11,11 @@ const verificadorDePrueba = {
 };
 const como = (cuenta) => ({ Authorization: `Bearer cuenta-${cuenta}` });
 
-test("al darse de baja, la cuenta queda sin perfil y puede crear uno nuevo", async () => {
-  const { api } = await armarApp({ verificadorDeToken: verificadorDePrueba });
+test("al darse de baja, la cuenta queda sin contexto valido y puede pasar a colaboradora", async () => {
+  const { api } = await armarApp({
+    verificadorDeToken: verificadorDePrueba,
+    compatContextoImplicito: true,
+  });
   const colectivo = await api
     .post("/colectivos")
     .set(como("fundacion"))
@@ -25,16 +28,24 @@ test("al darse de baja, la cuenta queda sin perfil y puede crear uno nuevo", asy
     .expect(200);
 
   const yo = await api.get("/auth/me").set(como("fundacion")).expect(200);
-  expect(yo.body).toEqual({ id: "cuenta-fundacion", rol: null, perfilId: null });
+  expect(yo.body).toMatchObject({
+    id: "cuenta-fundacion",
+    rol: null,
+    perfilId: null,
+    contextoActual: null,
+    contextos: [],
+  });
 
   const publico = await api.get(`/colectivos/${colectivo.body.id}`).expect(200);
   expect(publico.body.fechaBaja).toBeTruthy();
 
+  // Ya no le queda ningun contexto valido: sin X-Context-Id no hay a cual
+  // operar, y con el del colectivo dado de baja, el contexto esta inactivo.
   await api
     .put(`/colectivos/${colectivo.body.id}`)
     .set(como("fundacion"))
     .send({ nombre: "Otro" })
-    .expect(403);
+    .expect(400);
   await api
     .post("/colaboradores")
     .set(como("fundacion"))

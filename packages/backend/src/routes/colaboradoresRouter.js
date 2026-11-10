@@ -1,13 +1,20 @@
 import { Router } from "express";
-import { validarBody, validarQuery } from "../middlewares/validar.js";
-import { paginacionSchema, listadoDeNotificacionesSchema } from "../schemas/paginacionSchema.js";
+import { validarBody, validarParams, validarQuery } from "../middlewares/validar.js";
+import {
+  paginacionSchema,
+  listadoDeNotificacionesSchema,
+} from "../schemas/paginacionSchema.js";
 import {
   crearColaboradorSchema,
   actualizarColaboradorSchema,
   agregarPronombreSchema,
   agregarHabilidadColaboradorSchema,
 } from "../schemas/colaboradorSchema.js";
-import { medioDeContactoSchema } from "../schemas/medioDeContactoSchema.js";
+import {
+  medioDeContactoEnRutaSchema,
+  medioDeContactoSchema,
+} from "../schemas/medioDeContactoSchema.js";
+import { PERMISO } from "../domain/enums/PERMISO.js";
 
 export function crearColaboradoresRouter(
   colaboradorController,
@@ -16,88 +23,109 @@ export function crearColaboradoresRouter(
   autorizacion,
 ) {
   const router = Router();
+  const { permiso, colaboradoraDe } = autorizacion;
+  const editarPerfil = [permiso(PERMISO.COLABORADOR_PERFIL_EDITAR), colaboradoraDe()];
 
   router.post(
     "/",
     validarBody(crearColaboradorSchema),
-    autorizacion.sinPerfil,
+    autorizacion.usuario({ registrarSiFalta: true }),
     colaboradorController.crear,
   );
   router.get("/", validarQuery(paginacionSchema), colaboradorController.listar);
   router.get("/:id", colaboradorController.obtenerPorId);
   router.put(
     "/:id",
-    autorizacion.colaboradoraDe(),
+    editarPerfil,
     validarBody(actualizarColaboradorSchema),
     colaboradorController.actualizar,
   );
 
   router.post(
+    "/:id/baja",
+    permiso(PERMISO.COLABORADOR_BAJA),
+    colaboradoraDe(),
+    colaboradorController.darDeBaja,
+  );
+  if (autorizacion.activa) {
+    router.post(
+      "/:id/reactivacion",
+      autorizacion.usuario(),
+      colaboradorController.reactivar,
+    );
+  }
+
+  router.post(
     "/:id/pronombres",
-    autorizacion.colaboradoraDe(),
+    editarPerfil,
     validarBody(agregarPronombreSchema),
     colaboradorController.agregarPronombre,
   );
   router.delete(
     "/:id/pronombres/:pronombre",
-    autorizacion.colaboradoraDe(),
+    editarPerfil,
     colaboradorController.quitarPronombre,
   );
 
   router.post(
     "/:id/habilidades",
-    autorizacion.colaboradoraDe(),
+    editarPerfil,
     validarBody(agregarHabilidadColaboradorSchema),
     colaboradorController.agregarHabilidad,
   );
   router.delete(
     "/:id/habilidades/:codigoHabilidad",
-    autorizacion.colaboradoraDe(),
+    editarPerfil,
     colaboradorController.quitarHabilidad,
   );
 
-  // Los medios de contacto solo los lee la propia persona (con la autenticacion activa).
   if (autorizacion.activa) {
     router.get(
       "/:id/medios-de-contacto",
-      autorizacion.colaboradoraDe(),
+      editarPerfil,
       colaboradorController.mediosDeContacto,
     );
   }
 
   router.post(
     "/:id/medios-de-contacto",
-    autorizacion.colaboradoraDe(),
+    editarPerfil,
     validarBody(medioDeContactoSchema),
     colaboradorController.agregarMedioDeContacto,
   );
   router.delete(
     "/:id/medios-de-contacto/:tipo/:valor",
-    autorizacion.colaboradoraDe(),
+    editarPerfil,
+    validarParams(medioDeContactoEnRutaSchema),
     colaboradorController.quitarMedioDeContacto,
   );
 
-  router.get("/:id/colaboraciones", colaboradorController.listarColaboraciones);
+  router.get(
+    "/:id/colaboraciones",
+    autorizacion.opcional,
+    colaboradorController.listarColaboraciones,
+  );
   router.get("/:id/valoraciones", colaboradorController.listarValoraciones);
 
-  // Busqueda de potenciales proyectos para la persona colaboradora (req. 3.d).
   router.get(
     "/:id/proyectos-potenciales",
-    autorizacion.colaboradoraDe(),
+    permiso(PERMISO.PROYECTOS_POTENCIALES_VER),
+    colaboradoraDe(),
     validarQuery(paginacionSchema),
     reclutamientoController.buscarProyectos,
   );
 
-  // La bandeja de mensajes internos de la persona.
   router.get(
     "/:id/notificaciones",
-    autorizacion.colaboradoraDe(),
+    permiso(PERMISO.NOTIFICACIONES_VER),
+    colaboradoraDe(),
     validarQuery(listadoDeNotificacionesSchema),
     notificacionController.listar,
   );
   router.post(
     "/:id/notificaciones/:notificacionId/lectura",
-    autorizacion.colaboradoraDe(),
+    permiso(PERMISO.NOTIFICACIONES_VER),
+    colaboradoraDe(),
     notificacionController.marcarComoLeida,
   );
 

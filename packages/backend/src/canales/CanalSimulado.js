@@ -8,7 +8,6 @@ export class CanalSimulado {
   }
 }
 
-// Los logs no son privados: no se escribe el contacto completo.
 function enmascarar(valor) {
   return valor.length <= 4 ? "****" : `****${valor.slice(-4)}`;
 }

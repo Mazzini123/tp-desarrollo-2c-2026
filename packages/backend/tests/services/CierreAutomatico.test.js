@@ -80,7 +80,9 @@ describe("Cierre automatico de proyectos", () => {
         PASADO,
       ),
     ).rejects.toThrow(ConflictError);
-    expect(proyecto.estado).toBe("FINALIZADO");
+    expect((await services.proyectoService.buscarPorId(proyecto.id)).estado).toBe(
+      "FINALIZADO",
+    );
   });
 
   test("ni aceptar una postulacion que habia quedado pendiente", async () => {
@@ -91,7 +93,8 @@ describe("Cierre automatico de proyectos", () => {
 
   test("el cierre manual tiene las mismas consecuencias", async () => {
     await services.proyectoService.finalizar(proyecto.id, HOY);
-    expect(pendiente.estado).toBe("RECHAZADA");
+    const guardado = await services.proyectoService.buscarPorId(proyecto.id);
+    expect(guardado.buscarColaboracion(pendiente.id).estado).toBe("RECHAZADA");
   });
 
   test("la fecha de cierre tiene que ser futura, y se puede sacar", async () => {

@@ -19,7 +19,9 @@ describe("HTTP · busqueda de colaboradoras e invitacion", () => {
       .expect(201);
 
     const busqueda = await api
-      .get(`/proyectos/${proyecto.body.id}/perfiles/${perfilId}/colaboradoras-potenciales`)
+      .get(
+        `/proyectos/${proyecto.body.id}/perfiles/${perfilId}/colaboradoras-potenciales`,
+      )
       .expect(200);
     expect(busqueda.body.meta.total).toBe(1);
     expect(busqueda.body.data[0].colaborador.id).toBe(ada.body.id);
@@ -31,12 +33,19 @@ describe("HTTP · busqueda de colaboradoras e invitacion", () => {
 
     // En la bandeja estan la invitacion y el aviso automatico del alta
     // (req. adicional 9: al darse de alta, le avisan que hay un proyecto).
-    const bandeja = await api.get(`/colaboradores/${ada.body.id}/notificaciones`).expect(200);
-    expect(bandeja.body.data.map((n) => n.tipo)).toEqual(["INVITACION", "PROYECTOS_COMPATIBLES"]);
+    const bandeja = await api
+      .get(`/colaboradores/${ada.body.id}/notificaciones`)
+      .expect(200);
+    expect(bandeja.body.data.map((n) => n.tipo)).toEqual([
+      "INVITACION",
+      "PROYECTOS_COMPATIBLES",
+    ]);
     expect(bandeja.body.data[0].esLeida).toBe(false);
 
     const leida = await api
-      .post(`/colaboradores/${ada.body.id}/notificaciones/${bandeja.body.data[0].id}/lectura`)
+      .post(
+        `/colaboradores/${ada.body.id}/notificaciones/${bandeja.body.data[0].id}/lectura`,
+      )
       .expect(200);
     expect(leida.body.esLeida).toBe(true);
   });

@@ -1,0 +1,4 @@
+export const TIPO_CONTEXTO = Object.freeze({
+  COLABORADOR: "COLABORADOR",
+  COLECTIVO: "COLECTIVO",
+});

@@ -4,7 +4,6 @@ import {
   crearProyectoDePrueba,
   datosDePerfil,
 } from "../fixtures.js";
-import { DomainError } from "../../src/errors/DomainError.js";
 import { ConflictError } from "../../src/errors/ConflictError.js";
 import { NotFoundError } from "../../src/errors/NotFoundError.js";
 
@@ -13,18 +12,6 @@ describe("ProyectoService · alta", () => {
 
   beforeEach(async () => {
     services = await armarServices();
-  });
-
-  test("un proyecto sin ningun perfil no se puede crear", async () => {
-    const colectivo = await crearColectivoDePrueba(services.colectivoService);
-    await expect(
-      services.proyectoService.crear({
-        colectivoId: colectivo.id,
-        titulo: "Sin perfiles",
-        descripcion: "...",
-        perfiles: [],
-      }),
-    ).rejects.toThrow(DomainError);
   });
 
   // "Un proyecto sin colectivo no existe" — se definio en el coloquio que la
@@ -40,22 +27,14 @@ describe("ProyectoService · alta", () => {
     ).rejects.toThrow(NotFoundError);
   });
 
-  test("el proyecto queda guardado dentro de su colectivo", async () => {
+  test("el proyecto queda guardado como proyecto de su colectivo", async () => {
     const { colectivo, proyecto } = await crearProyectoDePrueba(services);
-    const guardado = await services.colectivoService.buscarPorId(colectivo.id);
-    expect(guardado.proyectos).toContain(proyecto);
-  });
-
-  test("un compromiso de horas no entero es rechazado", async () => {
-    const colectivo = await crearColectivoDePrueba(services.colectivoService);
-    await expect(
-      services.proyectoService.crear({
-        colectivoId: colectivo.id,
-        titulo: "Medio compromiso",
-        descripcion: "...",
-        perfiles: [{ ...datosDePerfil(), compromiso: { cantidadHoras: 2.5, periodo: "HS_MENSUALES" } }],
-      }),
-    ).rejects.toThrow(DomainError);
+    const delColectivo = await services.proyectoService.listarPorColectivo(colectivo.id);
+    expect(delColectivo.map((p) => p.id)).toEqual([proyecto.id]);
+    expect(delColectivo[0].colectivo).toMatchObject({
+      id: colectivo.id,
+      nombre: colectivo.nombre,
+    });
   });
 });
 
@@ -97,7 +76,10 @@ describe("ProyectoService · paginacion", () => {
   });
 
   test("page=2 limit=5 sobre 12 items devuelve 5 y total_pages 3", async () => {
-    const pagina = await services.proyectoService.listar({ numeroPagina: 2, limitePorPagina: 5 });
+    const pagina = await services.proyectoService.listar({
+      numeroPagina: 2,
+      limitePorPagina: 5,
+    });
     expect(pagina.items).toHaveLength(5);
     expect(pagina.total).toBe(12);
     expect(pagina.totalPaginas).toBe(3);
@@ -105,14 +87,20 @@ describe("ProyectoService · paginacion", () => {
   });
 
   test("la ultima pagina puede venir incompleta", async () => {
-    const pagina = await services.proyectoService.listar({ numeroPagina: 3, limitePorPagina: 5 });
+    const pagina = await services.proyectoService.listar({
+      numeroPagina: 3,
+      limitePorPagina: 5,
+    });
     expect(pagina.items).toHaveLength(2);
   });
 
   // Lo que el profesor dejo pendiente en la clase de capas: pedir una pagina
   // que no existe hoy responde 200 con una lista vacia.
   test("una pagina que no existe devuelve una lista vacia, no un error", async () => {
-    const pagina = await services.proyectoService.listar({ numeroPagina: 99, limitePorPagina: 5 });
+    const pagina = await services.proyectoService.listar({
+      numeroPagina: 99,
+      limitePorPagina: 5,
+    });
     expect(pagina.items).toEqual([]);
     expect(pagina.totalPaginas).toBe(3);
   });

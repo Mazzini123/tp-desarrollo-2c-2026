@@ -7,8 +7,8 @@ export class NotificacionController extends BaseController {
   }
 
   listar = async (req, res) => {
-    const paginacion = this.aPaginacionDeDominio(req.paginacion);
-    const { leida } = req.paginacion;
+    const paginacion = this.aPaginacionDeDominio(req.consulta);
+    const { leida } = req.consulta;
     const { noLeidas, ...pagina } = await this.notificacionService.listar(req.params.id, {
       ...paginacion,
       leida,
@@ -20,7 +20,10 @@ export class NotificacionController extends BaseController {
     res
       .status(200)
       .json(
-        await this.notificacionService.marcarComoLeida(req.params.id, req.params.notificacionId),
+        await this.notificacionService.marcarComoLeida(
+          req.params.id,
+          req.params.notificacionId,
+        ),
       );
   };
 }

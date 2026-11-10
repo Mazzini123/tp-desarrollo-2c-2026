@@ -7,7 +7,24 @@ services:
     # Por defecto usa ~50% de (RAM - 1 GB), con un minimo de 256 MB. Lo
     # fijamos en 256 MB para que sea explicito. Es solo la cache: el proceso
     # mongod entero usa algo mas (conexiones, indices en construccion...).
-    command: ["--wiredTigerCacheSizeGB", "0.25"]
+    #
+    # --replSet: replica set de un solo nodo. Misma disponibilidad que un
+    # mongod suelto, pero habilita las transacciones. --keyFile es obligatorio
+    # cuando hay usuario y contraseña y replica set a la vez (ver README,
+    # "Replica set en produccion"). --oplogSize: 512 MB fijos en vez del 5 %
+    # del disco que reserva por defecto.
+    command:
+      [
+        "--replSet",
+        "rs0",
+        "--keyFile",
+        "/etc/mongo/keyfile",
+        "--bind_ip_all",
+        "--wiredTigerCacheSizeGB",
+        "0.25",
+        "--oplogSize",
+        "512",
+      ]
     # Techo del contenedor entero (cgroups de Linux). Si mongod lo supera, el
     # kernel lo mata y restart lo vuelve a levantar. Medir con
     # "docker stats" antes de bajarlo.
@@ -19,12 +36,19 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?Falta MONGO_PASSWORD en .env}
     volumes:
       - mongo-data:/data/db
+      # Se genera una sola vez en la VM (ver README). Va fuera de git.
+      - ./secrets/mongo-keyfile:/etc/mongo/keyfile:ro
     healthcheck:
-      # ping no requiere autenticacion: solo confirma que mongo ya acepta conexiones.
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      # La primera vez inicia el replica set; despues solo confirma que el
+      # nodo es PRIMARY. La api espera a este healthcheck para arrancar.
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh -u \"$$MONGO_INITDB_ROOT_USERNAME\" -p \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --quiet --eval \"try { quit(rs.status().myState === 1 ? 0 : 1) } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'mongo:27017' }] }); quit(1) }\"",
+        ]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
       start_period: 30s
 
   api:
@@ -37,11 +61,20 @@ services:
       SERVER_PORT: 8000
       # authSource=admin: el usuario root se crea en la base "admin", no en
       # codigo-a-voluntad, asi que hay que decirle a mongo donde buscarlo.
-      MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongo:27017/codigo-a-voluntad?authSource=admin
+      MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongo:27017/codigo-a-voluntad?authSource=admin&replicaSet=rs0
       # Limite de la API (Node), NO de mongo: tope del heap de V8 (los
       # objetos de JavaScript), en MB. El proceso usa mas que eso (codigo,
       # buffers, la pila): con 256 de heap, Node ocupa unos 350-400 MB.
       NODE_OPTIONS: --max-old-space-size=256
+      NODE_ENV: production
+      # Autenticacion: obligatoria. Sin estas variables el compose no levanta
+      # y, si llegaran vacias, la API tampoco arranca (fail closed).
+      LOGTO_ENDPOINT: ${LOGTO_ENDPOINT:?Falta LOGTO_ENDPOINT en .env}
+      LOGTO_API_RESOURCE: ${LOGTO_API_RESOURCE:?Falta LOGTO_API_RESOURCE en .env}
+      LOGTO_ALGORITMOS: ${LOGTO_ALGORITMOS:-ES384}
+      # Origen del front (ej. https://codigo-a-voluntad.ejemplo.org). Sin esto
+      # la API acepta pedidos desde cualquier origen.
+      CORS_ORIGENES: ${CORS_ORIGENES:?Falta CORS_ORIGENES en .env}
       # Opcionales: sin SMTP_URL los emails se simulan (ver .env.prod.example).
       SMTP_URL: ${SMTP_URL:-}
       SMTP_REMITENTE: ${SMTP_REMITENTE:-}
@@ -49,7 +82,8 @@ services:
       # Twilio
       TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
       TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
-      
+      TWILIO_WHATSAPP_REMITENTE: ${TWILIO_WHATSAPP_REMITENTE:-}
+
     # Techo del contenedor de la api (cgroups). Por encima del heap: deja
     # lugar para lo que Node usa fuera de el.
     mem_limit: 512m

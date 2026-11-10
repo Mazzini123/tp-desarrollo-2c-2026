@@ -3,19 +3,30 @@ import { ConflictError } from "../errors/ConflictError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
 import { ForbiddenError } from "../errors/ForbiddenError.js";
 import { AUTOR_VALORACION } from "../domain/enums/AUTOR_VALORACION.js";
-import { ROL_CUENTA } from "../domain/enums/ROL_CUENTA.js";
 import { TIPO_NOTIFICACION } from "../domain/enums/TIPO_NOTIFICACION.js";
-import { aplicarModoDeAceptacion, notificarResoluciones } from "./reglasDePostulacion.js";
+import {
+  aplicarModoDeAceptacion,
+  notificarResoluciones,
+  puedeVerContactoDe,
+  yaSePostuloAlPerfil,
+} from "./reglasDePostulacion.js";
+import {
+  cierreVencido,
+  cumpleHabilidadesRequeridas,
+  perfilAceptaPostulaciones,
+} from "./reglasDeBusqueda.js";
 
 export class ColaboracionService {
   constructor({
-    colectivoRepository,
+    proyectoRepository,
+    colaboracionRepository,
     colectivoService,
     proyectoService,
     colaboradorService,
     notificacionService,
   }) {
-    this.colectivoRepository = colectivoRepository;
+    this.proyectoRepository = proyectoRepository;
+    this.colaboracionRepository = colaboracionRepository;
     this.colectivoService = colectivoService;
     this.proyectoService = proyectoService;
     this.colaboradorService = colaboradorService;
@@ -26,12 +37,12 @@ export class ColaboracionService {
     { proyectoId, perfilId, colaboradorId, esPublica = true },
     ahora = new Date(),
   ) {
-    const { colectivo, proyecto } =
-      await this.proyectoService.buscarProyectoConColectivo(proyectoId);
+    const proyecto = await this.proyectoService.buscarPorId(proyectoId);
     const colaborador = await this.colaboradorService.buscarPorId(colaboradorId);
+    this.colaboradorService.exigirActiva(colaborador);
 
-    if (proyecto.cierreVencido(ahora)) {
-      await this.proyectoService.cerrar(colectivo, [proyecto], ahora);
+    if (cierreVencido(proyecto, ahora)) {
+      await this.proyectoService.cerrar(proyecto, ahora);
     }
 
     if (!proyecto.estaAbierto()) {
@@ -45,29 +56,31 @@ export class ColaboracionService {
       );
     }
 
-    if (!perfil.aceptaPostulaciones(ahora)) {
+    if (!perfilAceptaPostulaciones(perfil, ahora)) {
       throw new ConflictError("La búsqueda de este perfil está cerrada");
     }
 
-    if (!perfil.cumpleHabilidadesRequeridas(colaborador)) {
+    if (!cumpleHabilidadesRequeridas(perfil, colaborador)) {
       throw new DomainError(
         "El colaborador debe cumplir todas las habilidades requeridas del perfil",
       );
     }
 
-    if (proyecto.yaSePostuloAlPerfil(colaborador, perfil)) {
+    if (yaSePostuloAlPerfil(proyecto, colaborador, perfil)) {
       throw new ConflictError("El colaborador ya está anotado en este perfil");
     }
 
-    const colaboracion = proyecto.agregarColaboracion({
-      colaborador,
-      perfil: perfil.id,
-      esPublica,
-      fecha: ahora,
-    });
+    const colaboracion = proyecto.agregarColaboracion(
+      this.proyectoRepository.nuevaColaboracion(proyecto, {
+        colaborador,
+        perfil: perfil.id,
+        esPublica,
+        fecha: ahora,
+      }),
+    );
 
     const cambios = aplicarModoDeAceptacion(proyecto, perfil, ahora);
-    await this.colectivoRepository.guardar(colectivo);
+    await this.proyectoRepository.guardar(proyecto);
 
     await notificarResoluciones(this.notificacionService, proyecto, {
       aceptadas: cambios.aceptadas.filter((c) => c !== colaboracion),
@@ -78,8 +91,7 @@ export class ColaboracionService {
   }
 
   async buscarColaboracion(proyectoId, colaboracionId) {
-    const { colectivo, proyecto } =
-      await this.proyectoService.buscarProyectoConColectivo(proyectoId);
+    const proyecto = await this.proyectoService.buscarPorId(proyectoId);
     const colaboracion = proyecto.buscarColaboracion(colaboracionId);
 
     if (!colaboracion) {
@@ -88,17 +100,17 @@ export class ColaboracionService {
       );
     }
 
-    return { colectivo, proyecto, colaboracion };
+    return { proyecto, colaboracion };
   }
 
   async aceptar(proyectoId, colaboracionId, ahora = new Date()) {
-    const { colectivo, proyecto, colaboracion } = await this.buscarColaboracion(
+    const { proyecto, colaboracion } = await this.buscarColaboracion(
       proyectoId,
       colaboracionId,
     );
 
-    if (proyecto.cierreVencido(ahora)) {
-      await this.proyectoService.cerrar(colectivo, [proyecto], ahora);
+    if (cierreVencido(proyecto, ahora)) {
+      await this.proyectoService.cerrar(proyecto, ahora);
     }
 
     this.verificarPendiente(proyecto, colaboracion, "aceptar");
@@ -112,7 +124,7 @@ export class ColaboracionService {
     colaboracion.aceptar(ahora);
 
     const cambios = aplicarModoDeAceptacion(proyecto, perfil, ahora);
-    await this.colectivoRepository.guardar(colectivo);
+    await this.proyectoRepository.guardar(proyecto);
 
     await notificarResoluciones(this.notificacionService, proyecto, {
       aceptadas: [colaboracion, ...cambios.aceptadas],
@@ -123,7 +135,7 @@ export class ColaboracionService {
   }
 
   async rechazar(proyectoId, colaboracionId, ahora = new Date()) {
-    const { colectivo, proyecto, colaboracion } = await this.buscarColaboracion(
+    const { proyecto, colaboracion } = await this.buscarColaboracion(
       proyectoId,
       colaboracionId,
     );
@@ -131,7 +143,7 @@ export class ColaboracionService {
     this.verificarPendiente(proyecto, colaboracion, "rechazar");
 
     colaboracion.rechazar(ahora);
-    await this.colectivoRepository.guardar(colectivo);
+    await this.proyectoRepository.guardar(proyecto);
 
     await notificarResoluciones(this.notificacionService, proyecto, {
       aceptadas: [],
@@ -142,7 +154,7 @@ export class ColaboracionService {
   }
 
   async finalizar(proyectoId, colaboracionId, ahora = new Date()) {
-    const { colectivo, proyecto, colaboracion } = await this.buscarColaboracion(
+    const { proyecto, colaboracion } = await this.buscarColaboracion(
       proyectoId,
       colaboracionId,
     );
@@ -154,7 +166,7 @@ export class ColaboracionService {
     }
 
     colaboracion.finalizar(ahora);
-    await this.colectivoRepository.guardar(colectivo);
+    await this.proyectoRepository.guardar(proyecto);
     await notificarResoluciones(this.notificacionService, proyecto, {
       finalizadas: [colaboracion],
     });
@@ -162,8 +174,13 @@ export class ColaboracionService {
     return colaboracion;
   }
 
-  async desvincular(proyectoId, colaboracionId, ahora = new Date(), { cuenta = null } = {}) {
-    const { colectivo, colaboracion } = await this.buscarColaboracion(
+  async desvincular(
+    proyectoId,
+    colaboracionId,
+    ahora = new Date(),
+    { porLaColaboradora = false } = {},
+  ) {
+    const { proyecto, colaboracion } = await this.buscarColaboracion(
       proyectoId,
       colaboracionId,
     );
@@ -175,8 +192,8 @@ export class ColaboracionService {
     }
 
     colaboracion.desvincular(ahora);
-    await this.colectivoRepository.guardar(colectivo);
-    if (cuenta?.rol !== ROL_CUENTA.COLABORADORA) {
+    await this.proyectoRepository.guardar(proyecto);
+    if (!porLaColaboradora) {
       await this.notificarDesvinculacion(proyectoId, colaboracion);
     }
 
@@ -184,7 +201,7 @@ export class ColaboracionService {
   }
 
   async retirar(proyectoId, colaboracionId, ahora = new Date()) {
-    const { colectivo, colaboracion } = await this.buscarColaboracion(
+    const { proyecto, colaboracion } = await this.buscarColaboracion(
       proyectoId,
       colaboracionId,
     );
@@ -196,17 +213,16 @@ export class ColaboracionService {
     }
 
     colaboracion.retirar(ahora);
-    await this.colectivoRepository.guardar(colectivo);
+    await this.proyectoRepository.guardar(proyecto);
 
     return colaboracion;
   }
 
   async datosDeContacto(proyectoId, colaboradorId) {
-    const { proyecto } =
-      await this.proyectoService.buscarProyectoConColectivo(proyectoId);
+    const proyecto = await this.proyectoService.buscarPorId(proyectoId);
     const colaborador = await this.colaboradorService.buscarPorId(colaboradorId);
 
-    if (!proyecto.puedeVerContactoDe(colaborador)) {
+    if (!puedeVerContactoDe(proyecto, colaborador)) {
       throw new ForbiddenError(
         "Los datos de contacto solo se comparten con una postulacion aceptada",
       );
@@ -228,26 +244,19 @@ export class ColaboracionService {
     }
   }
 
-  // Requerimiento adicional 39: "Al finalizar una colaboracion, tanto el
-  // colectivo como la colaboradora pueden calificarse mutuamente (puntaje +
-  // comentario breve)". Cada parte, una sola vez.
   async valorar(
     proyectoId,
     colaboracionId,
     { autor, puntaje, comentario },
     ahora = new Date(),
   ) {
-    const { colectivo, colaboracion } = await this.buscarColaboracion(
+    const { proyecto, colaboracion } = await this.buscarColaboracion(
       proyectoId,
       colaboracionId,
     );
 
     if (!colaboracion.estaFinalizada()) {
       throw new ConflictError("Solo se puede valorar una colaboracion finalizada");
-    }
-
-    if (!Number.isInteger(puntaje) || puntaje < 1 || puntaje > 5) {
-      throw new DomainError("El puntaje tiene que ser un entero de 1 a 5");
     }
 
     const campo =
@@ -260,45 +269,53 @@ export class ColaboracionService {
     }
 
     colaboracion[campo] = { puntaje, comentario, fecha: ahora };
-    await this.colectivoRepository.guardar(colectivo);
+    await this.proyectoRepository.guardar(proyecto);
 
     return colaboracion[campo];
   }
 
   async listarValoracionesDeColaborador(colaboradorId) {
     await this.colaboradorService.buscarPorId(colaboradorId);
-    const colectivos =
-      await this.colectivoRepository.buscarColectivosDeColaborador(colaboradorId);
+    const colaboraciones = (
+      await this.colaboracionRepository.buscarDeColaborador(colaboradorId)
+    ).filter((c) => c.esPublica && c.valoracionDelColectivo);
+    const proyectos = await this.proyectosDe(colaboraciones);
 
-    const valoraciones = colectivos.flatMap((colectivo) =>
-      colectivo.proyectos.flatMap((proyecto) =>
-        proyecto.colaboraciones
-          .filter((c) => c.esDe(colaboradorId) && c.esPublica && c.valoracionDelColectivo)
-          .map((c) => ({
-            colectivo: { id: colectivo.id, nombre: colectivo.nombre },
-            proyecto: { id: proyecto.id, titulo: proyecto.titulo },
-            ...c.valoracionDelColectivo.toObject(),
-          })),
-      ),
-    );
+    const valoraciones = colaboraciones.map((c) => {
+      const proyecto = proyectos.get(String(c.proyectoId));
+      return {
+        colectivo: { id: proyecto.colectivo.id, nombre: proyecto.colectivo.nombre },
+        proyecto: { id: proyecto.id, titulo: proyecto.titulo },
+        ...c.valoracionDelColectivo.toObject(),
+      };
+    });
 
     return resumirValoraciones(valoraciones);
   }
 
   async listarValoracionesDeColectivo(colectivoId) {
-    const colectivo = await this.colectivoService.buscarPorId(colectivoId);
+    await this.colectivoService.buscarPorId(colectivoId);
+    const colaboraciones = (
+      await this.colaboracionRepository.buscarDeColectivo(colectivoId)
+    ).filter((c) => c.valoracionDelColaborador);
+    const proyectos = await this.proyectosDe(colaboraciones);
 
-    const valoraciones = colectivo.proyectos.flatMap((proyecto) =>
-      proyecto.colaboraciones
-        .filter((c) => c.valoracionDelColaborador)
-        .map((c) => ({
-          proyecto: { id: proyecto.id, titulo: proyecto.titulo },
-          autor: c.esPublica ? c.colaborador : null,
-          ...c.valoracionDelColaborador.toObject(),
-        })),
-    );
+    const valoraciones = colaboraciones.map((c) => {
+      const proyecto = proyectos.get(String(c.proyectoId));
+      return {
+        proyecto: { id: proyecto.id, titulo: proyecto.titulo },
+        autor: c.esPublica ? c.colaborador : null,
+        ...c.valoracionDelColaborador.toObject(),
+      };
+    });
 
     return resumirValoraciones(valoraciones);
+  }
+
+  async proyectosDe(colaboraciones) {
+    const ids = [...new Set(colaboraciones.map((c) => String(c.proyectoId)))];
+    const proyectos = await this.proyectoRepository.buscarVarios(ids);
+    return new Map(proyectos.map((p) => [p.id, p]));
   }
 
   verificarPendiente(proyecto, colaboracion, accion) {
@@ -319,25 +336,21 @@ export class ColaboracionService {
   }
 
   async listarPorColaborador(colaboradorId, { incluirAnonimas = false } = {}) {
-    const colaborador = await this.colaboradorService.buscarPorId(colaboradorId);
-    const colectivos =
-      await this.colectivoRepository.buscarColectivosDeColaborador(colaboradorId);
-    const proyectos = colectivos.flatMap((colectivo) => colectivo.proyectos);
+    await this.colaboradorService.buscarPorId(colaboradorId);
+    const colaboraciones = (
+      await this.colaboracionRepository.buscarDeColaborador(colaboradorId)
+    ).filter((c) => incluirAnonimas || c.esPublica);
+    const proyectos = await this.proyectosDe(colaboraciones);
 
-    return proyectos.flatMap((proyecto) =>
-      proyecto.colaboraciones
-        .filter((c) => c.esDe(colaborador) && (incluirAnonimas || c.esPublica))
-        .map((c) => ({
-          proyectoId: proyecto.id,
-          proyecto: {
-            id: proyecto.id,
-            titulo: proyecto.titulo,
-            estado: proyecto.estado,
-          },
-          perfil: resumirPerfil(proyecto.buscarPerfil(c.perfil)),
-          colaboracion: c,
-        })),
-    );
+    return colaboraciones.map((c) => {
+      const proyecto = proyectos.get(String(c.proyectoId));
+      return {
+        proyectoId: proyecto.id,
+        proyecto: { id: proyecto.id, titulo: proyecto.titulo, estado: proyecto.estado },
+        perfil: resumirPerfil(proyecto.buscarPerfil(c.perfil)),
+        colaboracion: c,
+      };
+    });
   }
 }
 

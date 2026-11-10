@@ -20,6 +20,8 @@ const habilidadSchema = new mongoose.Schema({
 
 habilidadSchema.loadClass(Habilidad);
 
-aplicarFormatoJSON(habilidadSchema, { ocultar: ["id"] });
+aplicarFormatoJSON(habilidadSchema, {
+  campos: ["codigo", "titulo", "descripcion", "fechaCreacion", "usuario", "activo"],
+});
 
 export const HabilidadModel = mongoose.model("Habilidad", habilidadSchema);

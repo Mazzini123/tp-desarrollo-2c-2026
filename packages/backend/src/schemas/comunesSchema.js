@@ -5,11 +5,18 @@ import { PROYECTO_ESTADO } from "../domain/enums/PROYECTO_ESTADO.js";
 import { TIPO_COLECTIVO } from "../domain/enums/TIPO_COLECTIVO.js";
 import { MODALIDAD_COLABORACION } from "../domain/enums/MODALIDAD_COLABORACION.js";
 
+export const objectIdSchema = z
+  .string()
+  .trim()
+  .regex(/^[a-f\d]{24}$/i, "Id invalido");
+
 const FIN_DEL_DIA_ARGENTINA = "T23:59:59.999-03:00";
 
 export const fechaDeCierreSchema = z
   .union([z.iso.datetime({ offset: true }), z.iso.date()])
-  .transform((texto) => new Date(texto.length === 10 ? texto + FIN_DEL_DIA_ARGENTINA : texto))
+  .transform(
+    (texto) => new Date(texto.length === 10 ? texto + FIN_DEL_DIA_ARGENTINA : texto),
+  )
   .nullable();
 
 export const redSocialSchema = z

@@ -12,12 +12,17 @@ import { autorizacionDesactivada } from "../middlewares/autorizacion.js";
 export function crearRouter(controllers, autorizacion = autorizacionDesactivada()) {
   const router = Router();
 
-  router.use(autorizacion.identificar);
+  router.use(autorizacion.autenticar);
 
   router.use("/health", crearHealthRouter());
   router.use(
     "/colectivos",
-    crearColectivosRouter(controllers.colectivo, controllers.estadistica, autorizacion),
+    crearColectivosRouter(
+      controllers.colectivo,
+      controllers.estadistica,
+      autorizacion,
+      controllers.membresia,
+    ),
   );
   router.use("/catalogos", crearCatalogosRouter());
   router.use("/estadisticas", crearEstadisticasRouter(controllers.estadistica));

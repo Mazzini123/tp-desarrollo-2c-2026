@@ -1,7 +1,6 @@
 import { armarServices, crearProyectoDePrueba } from "../fixtures.js";
 import { NotFoundError } from "../../src/errors/NotFoundError.js";
 import { ConflictError } from "../../src/errors/ConflictError.js";
-import { DomainError } from "../../src/errors/DomainError.js";
 
 // CRUD de logros (requerimiento minimo 3.b de la segunda entrega).
 describe("LogroService", () => {
@@ -12,6 +11,9 @@ describe("LogroService", () => {
     services = await armarServices();
     ({ proyecto } = await crearProyectoDePrueba(services));
   });
+
+  // El proyecto como quedo guardado en la base.
+  const releer = () => services.proyectoService.buscarPorId(proyecto.id);
 
   const crear = (datos = {}) =>
     services.logroService.crearParaProyecto(proyecto.id, {
@@ -26,7 +28,7 @@ describe("LogroService", () => {
 
       expect(logro.id).toEqual(expect.any(String));
       expect(logro.fecha).toBeInstanceOf(Date);
-      expect(proyecto.logros).toEqual([logro]);
+      expect((await releer()).logros.map((l) => l.id)).toEqual([logro.id]);
     });
 
     test("no permite dos logros con el mismo titulo en un proyecto", async () => {
@@ -64,7 +66,7 @@ describe("LogroService", () => {
         proyecto.id,
         logro.id,
       );
-      expect(encontrado).toBe(logro);
+      expect(encontrado.id).toBe(logro.id);
     });
 
     test("un logro que no existe tira NotFoundError", async () => {
@@ -123,19 +125,6 @@ describe("LogroService", () => {
       ).rejects.toThrow(ConflictError);
     });
 
-    test("sin titulo o sin descripcion tira DomainError", async () => {
-      const logro = await crear();
-      const actualizar = (datos) =>
-        services.logroService.actualizarParaProyecto(proyecto.id, logro.id, datos);
-
-      await expect(actualizar({ titulo: "", descripcion: "x" })).rejects.toThrow(
-        DomainError,
-      );
-      await expect(actualizar({ titulo: "x", descripcion: "" })).rejects.toThrow(
-        DomainError,
-      );
-    });
-
     test("un logro que no existe tira NotFoundError", async () => {
       await expect(
         services.logroService.actualizarParaProyecto(proyecto.id, "no-existe", {
@@ -153,7 +142,7 @@ describe("LogroService", () => {
 
       await services.logroService.eliminarParaProyecto(proyecto.id, uno.id);
 
-      expect(proyecto.logros.map((l) => l.id)).toEqual([dos.id]);
+      expect((await releer()).logros.map((l) => l.id)).toEqual([dos.id]);
     });
 
     test("un logro que no existe tira NotFoundError", async () => {

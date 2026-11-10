@@ -19,9 +19,24 @@ const colaboradorSchema = new mongoose.Schema({
   mediosDeContacto: { type: [medioDeContactoSchema], default: [] },
   redesSociales: { type: [redSocialSchema], default: [] },
   habilidades: { type: [habilidadEmbebidaSchema], default: [] },
+  fechaBaja: { type: Date, default: null },
 });
 colaboradorSchema.loadClass(Colaborador);
-aplicarFormatoJSON(colaboradorSchema, { ocultar: ["mediosDeContacto", "cuentaId"] });
+aplicarFormatoJSON(colaboradorSchema, {
+  campos: [
+    "id",
+    "nombreFantasia",
+    "nombre",
+    "apellido",
+    "cuentaGit",
+    "presentacion",
+    "pronombres",
+    "recibeMensajeriaInterna",
+    "redesSociales",
+    "habilidades",
+    "fechaBaja",
+  ],
+});
 colaboradorSchema.index(
   { cuentaId: 1 },
   { unique: true, partialFilterExpression: { cuentaId: { $type: "string" } } },

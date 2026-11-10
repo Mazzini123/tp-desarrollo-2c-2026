@@ -1,5 +1,3 @@
-import { esValorDeEnum } from "../../utils/validaciones.js";
-
 export const COLABORACION_ESTADO = Object.freeze({
   PENDIENTE: "PENDIENTE",
   ACEPTADA: "ACEPTADA",
@@ -8,6 +6,3 @@ export const COLABORACION_ESTADO = Object.freeze({
   DESVINCULADA: "DESVINCULADA",
   RETIRADA: "RETIRADA",
 });
-
-export const esColaboracionEstadoValido = (valor) =>
-  esValorDeEnum(COLABORACION_ESTADO, valor);

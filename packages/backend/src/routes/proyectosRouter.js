@@ -15,6 +15,7 @@ import { listadoDeProyectosSchema } from "../schemas/comunesSchema.js";
 import { valoracionSchema } from "../schemas/valoracionSchema.js";
 import { crearLogroSchema, actualizarLogroSchema } from "../schemas/logroSchema.js";
 import { crearAvanceSchema } from "../schemas/avanceSchema.js";
+import { PERMISO } from "../domain/enums/PERMISO.js";
 
 export function crearProyectosRouter(
   proyectoController,
@@ -26,25 +27,30 @@ export function crearProyectosRouter(
   autorizacion,
 ) {
   const router = Router();
+  const { permiso, duenoDelProyecto } = autorizacion;
+  const delDueno = (codigo) => [permiso(codigo), duenoDelProyecto];
+  const editar = delDueno(PERMISO.PROYECTO_EDITAR);
+  const reclutar = delDueno(PERMISO.RECLUTAMIENTO_GESTIONAR);
+  const resolverPostulacion = delDueno(PERMISO.POSTULACION_RESOLVER);
 
   router.get("/", validarQuery(listadoDeProyectosSchema), proyectoController.listar);
-  router.get("/:id", proyectoController.obtenerPorId);
+  router.get("/:id", autorizacion.opcional, proyectoController.obtenerPorId);
   router.put(
     "/:id",
-    autorizacion.duenoDelProyecto,
+    editar,
     validarBody(actualizarProyectoSchema),
     proyectoController.actualizar,
   );
 
   router.post(
     "/:id/finalizacion",
-    autorizacion.duenoDelProyecto,
+    delDueno(PERMISO.PROYECTO_FINALIZAR),
     proyectoController.finalizar,
   );
 
   router.post(
     "/:id/perfiles",
-    autorizacion.duenoDelProyecto,
+    editar,
     validarBody(crearPerfilSchema),
     perfilController.crear,
   );
@@ -52,50 +58,45 @@ export function crearProyectosRouter(
   router.get("/:id/perfiles/:perfilId", perfilController.obtenerPorId);
   router.put(
     "/:id/perfiles/:perfilId",
-    autorizacion.duenoDelProyecto,
+    editar,
     validarBody(actualizarPerfilSchema),
     perfilController.actualizar,
   );
-  router.delete(
-    "/:id/perfiles/:perfilId",
-    autorizacion.duenoDelProyecto,
-    perfilController.eliminar,
-  );
+  router.delete("/:id/perfiles/:perfilId", editar, perfilController.eliminar);
 
   router.post(
     "/:id/perfiles/:perfilId/habilidades-requeridas",
-    autorizacion.duenoDelProyecto,
+    editar,
     validarBody(agregarHabilidadPerfilSchema),
     perfilController.agregarHabilidadRequerida,
   );
   router.delete(
     "/:id/perfiles/:perfilId/habilidades-requeridas/:codigoHabilidad",
-    autorizacion.duenoDelProyecto,
+    editar,
     perfilController.quitarHabilidadRequerida,
   );
 
   router.post(
     "/:id/perfiles/:perfilId/habilidades-opcionales",
-    autorizacion.duenoDelProyecto,
+    editar,
     validarBody(agregarHabilidadPerfilSchema),
     perfilController.agregarHabilidadOpcional,
   );
   router.delete(
     "/:id/perfiles/:perfilId/habilidades-opcionales/:codigoHabilidad",
-    autorizacion.duenoDelProyecto,
+    editar,
     perfilController.quitarHabilidadOpcional,
   );
 
-  // Busqueda de potenciales colaboradoras para un perfil, e invitacion.
   router.get(
     "/:id/perfiles/:perfilId/colaboradoras-potenciales",
-    autorizacion.duenoDelProyecto,
+    reclutar,
     validarQuery(paginacionSchema),
     reclutamientoController.buscarColaboradoras,
   );
   router.post(
     "/:id/perfiles/:perfilId/invitaciones",
-    autorizacion.duenoDelProyecto,
+    reclutar,
     validarBody(invitacionSchema),
     reclutamientoController.invitar,
   );
@@ -103,42 +104,49 @@ export function crearProyectosRouter(
   router.post(
     "/:id/colaboraciones",
     validarBody(anotarColaboradorSchema),
+    permiso(PERMISO.POSTULACION_CREAR),
     autorizacion.colaboradoraDelBody,
     proyectoController.anotarColaborador,
   );
-  router.get("/:id/colaboraciones", proyectoController.listarColaboraciones);
+  router.get(
+    "/:id/colaboraciones",
+    resolverPostulacion,
+    proyectoController.listarColaboraciones,
+  );
 
-  // Resolucion manual de una postulacion (req. adicional 8).
   router.post(
     "/:id/colaboraciones/:colaboracionId/aceptacion",
-    autorizacion.duenoDelProyecto,
+    resolverPostulacion,
     postulacionController.aceptar,
   );
   router.post(
     "/:id/colaboraciones/:colaboracionId/rechazo",
-    autorizacion.duenoDelProyecto,
+    resolverPostulacion,
     postulacionController.rechazar,
   );
   router.post(
     "/:id/colaboraciones/:colaboracionId/retiro",
+    permiso(PERMISO.POSTULACION_RETIRAR),
     autorizacion.participanteDeLaColaboracion({ colectivo: false }),
     postulacionController.retirar,
   );
   router.post(
     "/:id/colaboraciones/:colaboracionId/desvinculacion",
+    permiso(PERMISO.COLABORACION_DESVINCULAR),
     autorizacion.participanteDeLaColaboracion(),
     postulacionController.desvincular,
   );
 
-  // Fin de una colaboracion y valoraciones mutuas (req. adicional 39).
   router.post(
     "/:id/colaboraciones/:colaboracionId/finalizacion",
+    permiso(PERMISO.COLABORACION_FINALIZAR),
     autorizacion.participanteDeLaColaboracion(),
     postulacionController.finalizar,
   );
   router.post(
     "/:id/colaboraciones/:colaboracionId/valoraciones",
     validarBody(valoracionSchema),
+    permiso(PERMISO.COLABORACION_VALORAR),
     autorizacion.autorDeLaValoracion,
     postulacionController.valorar,
   );
@@ -146,7 +154,7 @@ export function crearProyectosRouter(
   // Logros
   router.post(
     "/:id/logros",
-    autorizacion.duenoDelProyecto,
+    editar,
     validarBody(crearLogroSchema),
     logroController.crearParaProyecto,
   );
@@ -157,21 +165,17 @@ export function crearProyectosRouter(
 
   router.put(
     "/:id/logros/:logroId",
-    autorizacion.duenoDelProyecto,
+    editar,
     validarBody(actualizarLogroSchema),
     logroController.actualizarParaProyecto,
   );
 
-  router.delete(
-    "/:id/logros/:logroId",
-    autorizacion.duenoDelProyecto,
-    logroController.eliminarParaProyecto,
-  );
+  router.delete("/:id/logros/:logroId", editar, logroController.eliminarParaProyecto);
 
   // Avances
   router.post(
     "/:id/avances",
-    autorizacion.duenoDelProyecto,
+    editar,
     validarBody(crearAvanceSchema),
     avanceController.registrarAvanceParaProyecto,
   );
@@ -183,7 +187,7 @@ export function crearProyectosRouter(
   if (autorizacion.activa) {
     router.get(
       "/:id/colaboradores/:colaboradorId/contacto",
-      autorizacion.duenoDelProyecto,
+      delDueno(PERMISO.CONTACTO_COLABORADORA_VER),
       proyectoController.datosDeContacto,
     );
   }

@@ -44,14 +44,17 @@ describe("Baja de un colectivo", () => {
     expect(guardado.mediosDeContacto).toEqual([]);
     expect(guardado.redesSociales).toEqual([]);
     expect(guardado.nombre).toBe("Huerta");
-    expect(guardado.proyectos).toHaveLength(1);
+    expect(await services.proyectoService.listarPorColectivo(colectivo.id)).toHaveLength(
+      1,
+    );
   });
 
   test("cierra los proyectos abiertos, con sus consecuencias", async () => {
     await services.colectivoService.darDeBaja(colectivo.id);
 
-    expect(proyecto.estado).toBe("FINALIZADO");
-    expect(postulacion.estado).toBe("RECHAZADA");
+    const guardado = await services.proyectoService.buscarPorId(proyecto.id);
+    expect(guardado.estado).toBe("FINALIZADO");
+    expect(guardado.buscarColaboracion(postulacion.id).estado).toBe("RECHAZADA");
   });
 
   test("despues no puede publicar proyectos, ni modificarse, ni darse de baja otra vez", async () => {

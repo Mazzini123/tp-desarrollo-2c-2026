@@ -36,9 +36,7 @@ export const actualizarColaboradorSchema = z
     message: "Se debe indicar al menos un campo para actualizar",
   });
 
-export const agregarPronombreSchema = z
-  .object({ pronombre: pronombreSchema })
-  .strict();
+export const agregarPronombreSchema = z.object({ pronombre: pronombreSchema }).strict();
 
 export const agregarHabilidadColaboradorSchema = z
   .object({ codigoHabilidad: z.string().trim().min(1) })

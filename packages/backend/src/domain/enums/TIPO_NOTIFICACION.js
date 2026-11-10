@@ -1,5 +1,3 @@
-import { esValorDeEnum } from "../../utils/validaciones.js";
-
 export const TIPO_NOTIFICACION = Object.freeze({
   INVITACION: "INVITACION",
   PROYECTOS_COMPATIBLES: "PROYECTOS_COMPATIBLES",
@@ -8,6 +6,3 @@ export const TIPO_NOTIFICACION = Object.freeze({
   COLABORACION_FINALIZADA: "COLABORACION_FINALIZADA",
   DESVINCULACION: "DESVINCULACION",
 });
-
-export const esTipoNotificacionValido = (valor) =>
-  esValorDeEnum(TIPO_NOTIFICACION, valor);
