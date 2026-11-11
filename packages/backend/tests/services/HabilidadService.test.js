@@ -41,7 +41,7 @@ describe("HabilidadService", () => {
 
   test("una habilidad dada de baja no se puede usar", async () => {
     const [node] = await habilidadService.resolverPorCodigos([CODIGOS.node]);
-    node.desactivar();
+    node.activo = false;
     await node.save();
     await expect(habilidadService.resolverPorCodigos([CODIGOS.node])).rejects.toThrow(
       DomainError,

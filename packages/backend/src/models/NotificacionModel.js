@@ -14,6 +14,7 @@ const envioSchema = new mongoose.Schema({
   intentos: { type: Number, default: 0 },
   proximoIntento: { type: Date, default: Date.now },
   enProcesoHasta: { type: Date, default: null },
+  reservaId: { type: String, default: null },
   ultimoError: { type: String, default: null },
   fechaEnvio: { type: Date, default: null },
 });
@@ -29,6 +30,7 @@ const notificacionSchema = new mongoose.Schema(
       ref: "Colaborador",
       required: true,
     },
+    clave: { type: String },
     tipo: { type: String, required: true },
     asunto: { type: String, required: true },
     contenido: { type: String, required: true },
@@ -54,7 +56,11 @@ aplicarFormatoJSON(notificacionSchema, {
     "envios",
   ],
 });
-notificacionSchema.index({ destinatarioId: 1, fecha: -1 });
+notificacionSchema.index(
+  { clave: 1 },
+  { unique: true, partialFilterExpression: { clave: { $type: "string" } } },
+);
+notificacionSchema.index({ destinatarioId: 1, fecha: -1, _id: 1 });
 notificacionSchema.index({ "envios.estado": 1, "envios.proximoIntento": 1 });
 
 export const NotificacionModel = mongoose.model("Notificacion", notificacionSchema);

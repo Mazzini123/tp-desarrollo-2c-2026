@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import "./transacciones.js";
+import { registro } from "./registro.js";
 
 export async function conectarBaseDeDatos() {
   const uri = process.env.MONGO_URI;
@@ -16,7 +17,7 @@ export async function conectarBaseDeDatos() {
     );
   }
 
-  console.log(`Conectado a MongoDB (base: ${mongoose.connection.name})`);
+  registro.info("base_conectada", { base: mongoose.connection.name });
 }
 
 export async function asegurarIndices() {

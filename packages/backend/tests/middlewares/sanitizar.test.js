@@ -49,6 +49,28 @@ describe("Sanitizacion de textos (req. adicional 11)", () => {
   });
 });
 
+describe("Sanitizacion · texto con angulos que no es HTML", () => {
+  test.each([
+    ["una comparacion sin espacios", "si x<y entonces z>w"],
+    ["un generico", "Uso Array<string> y Map<K,V>"],
+    ["un generico cerrado", "List<T> y Set<T></T>"],
+    ["un placeholder", "Escribi <nombre> y <apellido>"],
+  ])("conserva %s", (_caso, texto) => {
+    expect(limpiarTexto(texto)).toBe(texto);
+  });
+
+  test.each([
+    ["un manejador en un tag inventado", "<y onclick=alert(1)>hola</y>", "hola"],
+    ["un manejador sin valor", "<y onmouseover>hola", "hola"],
+    ["un atributo con valor", '<y style="position:fixed">hola', "hola"],
+    ["un elemento personalizado", "<mi-widget>hola</mi-widget>", "hola"],
+    ["image, que el navegador trata como img", "<image src=x onerror=a()>hola", "hola"],
+    ["un tag inventado dentro de un script", "<script><y>x</y></script>fin", "fin"],
+  ])("igual saca %s", (_caso, entrada, esperado) => {
+    expect(limpiarTexto(entrada)).toBe(esperado);
+  });
+});
+
 describe("Sanitizacion · casos rebuscados", () => {
   test.each([
     ["tag partido para esquivar un filtro", "<scr<script>ipt>alert(1)</script>fin"],

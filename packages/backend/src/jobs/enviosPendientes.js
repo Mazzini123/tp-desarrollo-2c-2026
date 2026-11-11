@@ -1,16 +1,18 @@
 import { iniciarTareaPeriodica } from "./tareaPeriodica.js";
+import { registro } from "../config/registro.js";
 
-export function iniciarEnviosPendientes(notificacionService, { intervaloMs }) {
+export function iniciarEnviosPendientes(
+  notificacionService,
+  { intervaloMs, avisoAutomaticoService },
+) {
   return iniciarTareaPeriodica(
     "Envios de notificaciones",
-    async () => {
+    async (debeDetenerse) => {
+      await avisoAutomaticoService?.procesarPendientes(new Date(), { debeDetenerse });
       const { enviados, reintentos, fallidos } =
-        await notificacionService.procesarEnviosPendientes();
+        await notificacionService.procesarEnviosPendientes(new Date(), { debeDetenerse });
       if (enviados + reintentos + fallidos > 0) {
-        console.log(
-          `Envios de notificaciones: ${enviados} enviado(s), ${reintentos} a reintentar, ` +
-            `${fallidos} fallido(s)`,
-        );
+        registro.info("envios_procesados", { enviados, reintentos, fallidos });
       }
     },
     { intervaloMs },

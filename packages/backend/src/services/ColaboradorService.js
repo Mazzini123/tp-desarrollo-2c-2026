@@ -3,11 +3,17 @@ import { sinMediosRepetidos } from "../domain/MedioDeContacto.js";
 import { DomainError } from "../errors/DomainError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
 import { ConflictError } from "../errors/ConflictError.js";
-import { CODIGO_ERROR } from "../errors/CODIGO_ERROR.js";
 import { armarPaginado } from "../utils/paginacion.js";
+import { CODIGO_ERROR } from "../errors/CODIGO_ERROR.js";
 
 export class ColaboradorService {
-  constructor({ colaboradorRepository, habilidadService, avisoAutomaticoService }) {
+  constructor({
+    colaboradorRepository,
+    habilidadService,
+    avisoAutomaticoService,
+    transacciones,
+  }) {
+    this.transacciones = transacciones;
     this.colaboradorRepository = colaboradorRepository;
     this.habilidadService = habilidadService;
     this.avisoAutomaticoService = avisoAutomaticoService;
@@ -28,39 +34,41 @@ export class ColaboradorService {
     },
     { avisar = true } = {},
   ) {
-    this.validarIdentificacion({ nombreFantasia, nombre, apellido, cuentaGit });
+    return this.transacciones.ejecutar(async () => {
+      this.validarIdentificacion({ nombreFantasia, nombre, apellido, cuentaGit });
 
-    const habilidades =
-      codigosHabilidades && codigosHabilidades.length > 0
-        ? await this.habilidadService.resolverPorCodigos([...new Set(codigosHabilidades)])
-        : [];
+      const habilidades =
+        codigosHabilidades && codigosHabilidades.length > 0
+          ? await this.habilidadService.resolverPorCodigos([
+              ...new Set(codigosHabilidades),
+            ])
+          : [];
 
-    const colaborador = await this.colaboradorRepository.crear({
-      nombreFantasia,
-      nombre,
-      apellido,
-      cuentaGit,
-      presentacion,
-      recibeMensajeriaInterna,
-      pronombres: [...new Set(pronombres ?? [])],
-      mediosDeContacto: sinMediosRepetidos(mediosDeContacto),
-      redesSociales: construirRedesSociales(redesSociales),
-      habilidades: habilidades.map(({ codigo, titulo }) => ({ codigo, titulo })),
+      const colaborador = await this.colaboradorRepository.crear({
+        nombreFantasia,
+        nombre,
+        apellido,
+        cuentaGit,
+        presentacion,
+        recibeMensajeriaInterna,
+        pronombres: [...new Set(pronombres ?? [])],
+        mediosDeContacto: sinMediosRepetidos(mediosDeContacto),
+        redesSociales: construirRedesSociales(redesSociales),
+        habilidades: habilidades.map(({ codigo, titulo }) => ({ codigo, titulo })),
+      });
+      if (avisar) {
+        await this.avisarAlta(colaborador);
+      }
+      return colaborador;
     });
-    if (avisar) {
-      await this.avisarAlta(colaborador);
-    }
-    return colaborador;
   }
 
   async avisarAlta(colaborador) {
-    await avisarSinFallar(() =>
-      this.avisoAutomaticoService.avisarPorColaboradorNuevo(colaborador),
-    );
+    return this.avisoAutomaticoService.avisarPorColaboradorNuevo(colaborador);
   }
 
   exigirActiva(colaborador) {
-    if (colaborador.fechaBaja) {
+    if (colaborador.estaDadaDeBaja()) {
       throw new ConflictError(
         "El perfil de colaboradora esta dado de baja",
         CODIGO_ERROR.COLABORADORA_DADA_DE_BAJA,
@@ -70,16 +78,13 @@ export class ColaboradorService {
 
   async darDeBaja(colaborador, ahora = new Date()) {
     this.exigirActiva(colaborador);
-    colaborador.fechaBaja = ahora;
+    colaborador.darDeBaja(ahora);
     return this.colaboradorRepository.guardar(colaborador);
   }
 
   async listar({ numeroPagina = 1, limitePorPagina = 10 } = {}) {
-    return armarPaginado(
-      await this.colaboradorRepository.listarPaginado(numeroPagina, limitePorPagina),
-      numeroPagina,
-      limitePorPagina,
-    );
+    const pagina = { numeroPagina, limitePorPagina };
+    return armarPaginado(await this.colaboradorRepository.listarPaginado(pagina), pagina);
   }
 
   async mediosDeContacto(id) {
@@ -191,13 +196,5 @@ export class ColaboradorService {
           "nombreFantasia, cuentaGit, o (nombre + apellido)",
       );
     }
-  }
-}
-
-async function avisarSinFallar(avisar) {
-  try {
-    await avisar();
-  } catch (error) {
-    console.error("No se pudieron enviar los avisos automaticos:", error.message);
   }
 }

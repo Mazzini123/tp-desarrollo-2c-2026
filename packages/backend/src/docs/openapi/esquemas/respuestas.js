@@ -114,7 +114,12 @@ export const respuestas = {
       ubicacion: {
         oneOf: [{ $ref: "#/components/schemas/Ubicacion" }, { type: "null" }],
       },
-      proyectos: { type: "array", items: { $ref: "#/components/schemas/Proyecto" } },
+      proyectos: {
+        type: "array",
+        maxItems: 20,
+        items: { $ref: "#/components/schemas/ResumenProyecto" },
+      },
+      proyectosMeta: META_PAGINACION,
       redesSociales: {
         type: "array",
         items: { $ref: "#/components/schemas/RedSocial" },
@@ -168,6 +173,11 @@ export const respuestas = {
       },
       busquedaAbierta: { type: "boolean" },
       fechaCierreBusqueda: { type: "string", format: "date-time", nullable: true },
+      cantidadAceptadas: {
+        type: "integer",
+        description:
+          "Total exacto de aceptadas por perfil en el detalle, independiente de la página; ausente en resúmenes.",
+      },
       limiteColaboraciones: {
         type: "integer",
         nullable: true,
@@ -205,6 +215,12 @@ export const respuestas = {
         type: "array",
         items: { $ref: "#/components/schemas/Colaboracion" },
       },
+      colaboracionesMeta: {
+        ...META_PAGINACION,
+        description:
+          "Página embebida del detalle; privadas indica si se usó la vista del dueño.",
+        properties: { ...META_PAGINACION.properties, privadas: { type: "boolean" } },
+      },
       logros: { type: "array", items: { $ref: "#/components/schemas/Logro" } },
       avances: { type: "array", items: { $ref: "#/components/schemas/Avance" } },
       porcentajeConcrecion: { type: "number" },
@@ -223,8 +239,7 @@ export const respuestas = {
       },
       visualizaciones: {
         type: "integer",
-        description:
-          "Cantidad de GET /proyectos/{id}, incluidos los del colectivo dueño.",
+        description: "Visitas al detalle salvo las del contexto del colectivo dueño.",
       },
     },
   },
@@ -244,7 +259,7 @@ export const respuestas = {
   Avance: {
     type: "object",
     description:
-      "El porcentaje es decimal y tiene que superar al del proyecto (400 si no). Los avances " +
+      "El porcentaje es decimal y tiene que superar al del proyecto (422 si no). Los avances " +
       "no se editan ni se eliminan.",
     properties: {
       id: OBJECT_ID,
@@ -359,12 +374,15 @@ export const respuestas = {
         type: "array",
         description:
           "Replica por cada medio de contacto. La manda un job fuera del pedido: nace " +
-          "PENDIENTE y termina ENVIADO, o FALLIDO despues de 5 intentos.",
+          "PENDIENTE y termina ENVIADO, SIMULADO (sin proveedor real) o FALLIDO después de 5 intentos.",
         items: {
           type: "object",
           properties: {
             canal: { type: "string", enum: ["EMAIL", "WHATSAPP", "SMS"] },
-            estado: { type: "string", enum: ["PENDIENTE", "ENVIADO", "FALLIDO"] },
+            estado: {
+              type: "string",
+              enum: ["PENDIENTE", "ENVIADO", "SIMULADO", "FALLIDO"],
+            },
             exito: { type: "boolean", description: "true si quedo ENVIADO." },
             intentos: { type: "integer" },
           },
@@ -532,5 +550,65 @@ export const respuestas = {
       porProyecto: { type: "array", items: { type: "object" } },
       generadoEn: { type: "string", format: "date-time" },
     },
+  },
+};
+
+// Proyecciones explícitas: no prometen historiales ausentes en las consultas de listado.
+const camposResumen = [
+  "id",
+  "titulo",
+  "descripcion",
+  "estado",
+  "porcentajeConcrecion",
+  "etiquetas",
+  "fechaCreacion",
+  "fechaCierre",
+  "colectivo",
+  "perfiles",
+];
+respuestas.ResumenProyecto = {
+  type: "object",
+  properties: {
+    ...Object.fromEntries(
+      camposResumen.map((campo) => [campo, respuestas.Proyecto.properties[campo]]),
+    ),
+    postulacionesPendientes: {
+      type: "integer",
+      description: "Solo en la lista propia del colectivo.",
+    },
+  },
+};
+respuestas.ResumenColectivo = {
+  type: "object",
+  properties: {
+    ...Object.fromEntries(
+      Object.entries(respuestas.Colectivo.properties).filter(
+        ([campo]) => !["proyectos", "proyectosMeta"].includes(campo),
+      ),
+    ),
+    cantidadProyectos: { type: "integer" },
+  },
+};
+respuestas.PostulacionPendiente = {
+  type: "object",
+  properties: {
+    proyecto: {
+      type: "object",
+      properties: {
+        id: OBJECT_ID,
+        titulo: { type: "string" },
+        estado: { type: "string" },
+      },
+    },
+    perfil: {
+      type: "object",
+      nullable: true,
+      properties: {
+        id: OBJECT_ID,
+        titulo: { type: "string", nullable: true },
+        descripcion: { type: "string" },
+      },
+    },
+    colaboracion: { $ref: "#/components/schemas/Colaboracion" },
   },
 };

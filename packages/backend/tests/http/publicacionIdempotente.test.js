@@ -1,5 +1,5 @@
 import { jest } from "@jest/globals";
-import { datosDePerfil } from "../fixtures.js";
+import { datosDePerfil, proyectosDelColectivo } from "../fixtures.js";
 import { armarApp } from "./app.js";
 
 const CLAVE = "534f50df-fb88-4d48-8a55-274a469228f8";
@@ -44,8 +44,8 @@ test("recupera la publicacion con la misma clave y rechaza reutilizarla con otro
   expect(original.body).not.toHaveProperty("idempotenciaPublicacion");
   expect(repetido.body).not.toHaveProperty("idempotenciaPublicacion");
   const listado = await api.get(ruta).expect(200);
-  expect(listado.body).toHaveLength(1);
-  expect(listado.body[0]).not.toHaveProperty("idempotenciaPublicacion");
+  expect(listado.body.data).toHaveLength(1);
+  expect(listado.body.data[0]).not.toHaveProperty("idempotenciaPublicacion");
   expect(avisar).toHaveBeenCalledTimes(1);
 });
 
@@ -71,5 +71,5 @@ test("rechaza una clave invalida y permite usar la misma clave en colectivos dis
   const original = await publicar(primero.id, CLAVE).expect(201);
   const otro = await publicar(segundo.id, CLAVE).expect(201);
   expect(otro.body.id).not.toBe(original.body.id);
-  expect(await services.proyectoService.listarPorColectivo(primero.id)).toHaveLength(1);
+  expect(await proyectosDelColectivo(primero.id)).toHaveLength(1);
 });

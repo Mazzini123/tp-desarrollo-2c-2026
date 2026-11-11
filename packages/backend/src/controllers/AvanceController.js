@@ -3,26 +3,17 @@ export class AvanceController {
     this.avanceService = avanceService;
   }
 
-  registrarAvanceParaProyecto = async (req, res) => {
-    res
-      .status(201)
-      .json(
-        await this.avanceService.registrarAvanceParaProyecto(req.params.id, req.body),
-      );
+  registrar = async (req, res) => {
+    res.status(201).json(await this.avanceService.registrar(req.params.id, req.body));
   };
 
-  listarParaProyecto = async (req, res) => {
-    res.status(200).json(await this.avanceService.listarParaProyecto(req.params.id));
+  listar = async (req, res) => {
+    res.status(200).json(await this.avanceService.listar(req.params.id));
   };
 
-  buscarPorIdParaProyecto = async (req, res) => {
+  buscarPorId = async (req, res) => {
     res
       .status(200)
-      .json(
-        await this.avanceService.buscarPorIdParaProyecto(
-          req.params.id,
-          req.params.avanceId,
-        ),
-      );
+      .json(await this.avanceService.buscarPorId(req.params.id, req.params.avanceId));
   };
 }

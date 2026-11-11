@@ -6,9 +6,12 @@ import { ConcurrenciaError } from "../errors/ConcurrenciaError.js";
 import { PROYECTO_ESTADO } from "../domain/enums/PROYECTO_ESTADO.js";
 import { errorDeDuplicado, esDuplicado } from "./duplicados.js";
 import { esIdValido } from "./objectIds.js";
-import { salto } from "../utils/paginacion.js";
+import { paginar } from "./paginar.js";
+import { COLABORACION_ESTADO } from "../domain/enums/COLABORACION_ESTADO.js";
 
 const ORDEN = { fechaCreacion: 1, _id: 1 };
+const CAMPOS_DE_RESUMEN =
+  "titulo descripcion estado porcentajeConcrecion perfiles etiquetas fechaCreacion fechaCierre colectivoId datosDelColectivo";
 
 export class MongoProyectoRepository {
   nuevo(datos) {
@@ -24,6 +27,10 @@ export class MongoProyectoRepository {
   }
 
   async guardar(proyecto) {
+    if (typeof proyecto.save !== "function")
+      throw new Error(
+        "Guardar requiere un proyecto completo, no una respuesta de lectura",
+      );
     const cambiadas = proyecto.colaboraciones.filter((c) => c.isNew || c.isModified());
     const guardar = async () => {
       for (const perfil of proyecto.perfiles) {
@@ -46,6 +53,18 @@ export class MongoProyectoRepository {
     return cambiadas.length ? transaccionesMongo.ejecutar(guardar) : guardar();
   }
 
+  async ultimoId() {
+    return (await ProyectoModel.findOne().sort({ _id: -1 }).select("_id"))?._id ?? null;
+  }
+
+  async buscarSinColaboraciones(id) {
+    return esIdValido(id) ? ProyectoModel.findById(id) : null;
+  }
+
+  async buscarParaDetalle(id) {
+    return esIdValido(id) ? ProyectoModel.findById(id).lean() : null;
+  }
+
   async buscarPorId(id) {
     if (!esIdValido(id)) return null;
     const proyecto = await ProyectoModel.findById(id);
@@ -53,18 +72,59 @@ export class MongoProyectoRepository {
   }
 
   async buscarVarios(ids) {
-    return ProyectoModel.find({ _id: { $in: ids } }).sort(ORDEN);
+    return ProyectoModel.find({ _id: { $in: ids } })
+      .select("titulo estado colectivoId datosDelColectivo perfiles")
+      .sort(ORDEN);
+  }
+
+  async buscarTitulos(ids) {
+    return ProyectoModel.find({ _id: { $in: ids } }).select(
+      "titulo colectivoId datosDelColectivo",
+    );
+  }
+
+  async buscarParaTimeline(colectivoId) {
+    if (!esIdValido(colectivoId)) return [];
+    return ProyectoModel.find({ colectivoId })
+      .select("titulo fechaCreacion fechaFinalizacion logros avances")
+      .sort(ORDEN)
+      .lean();
+  }
+
+  async buscarColectivoId(id) {
+    if (!esIdValido(id)) return null;
+    const proyecto = await ProyectoModel.findById(id).select("colectivoId").lean();
+    return proyecto?.colectivoId ?? null;
+  }
+
+  async contarPerfilesAbiertos(colectivoId, ahora = new Date()) {
+    const resultado = await ProyectoModel.aggregate([
+      {
+        $match: {
+          colectivoId: new mongoose.Types.ObjectId(colectivoId),
+          estado: PROYECTO_ESTADO.ABIERTO,
+          $or: [{ fechaCierre: null }, { fechaCierre: { $gt: ahora } }],
+        },
+      },
+      { $unwind: "$perfiles" },
+      {
+        $match: {
+          "perfiles.busquedaAbierta": { $ne: false },
+          "perfiles.cupoCompleto": { $ne: true },
+          $or: [
+            { "perfiles.fechaCierreBusqueda": null },
+            { "perfiles.fechaCierreBusqueda": { $gt: ahora } },
+          ],
+        },
+      },
+      { $count: "total" },
+    ]);
+    return resultado[0]?.total ?? 0;
   }
 
   async buscarPorColectivo(colectivoId) {
     if (!esIdValido(colectivoId)) return [];
     return this.conColaboraciones(await ProyectoModel.find({ colectivoId }).sort(ORDEN));
-  }
-
-  async buscarPorColectivos(colectivoIds) {
-    return this.conColaboraciones(
-      await ProyectoModel.find({ colectivoId: { $in: colectivoIds } }).sort(ORDEN),
-    );
   }
 
   async buscarPorClaveDePublicacion(colectivoId, clave) {
@@ -76,17 +136,22 @@ export class MongoProyectoRepository {
   }
 
   async buscarConCierreVencido(ahora) {
-    return this.conColaboraciones(
-      await ProyectoModel.find({
-        estado: PROYECTO_ESTADO.ABIERTO,
-        fechaCierre: { $lte: ahora },
-      }).sort(ORDEN),
-    );
+    return ProyectoModel.find({
+      estado: PROYECTO_ESTADO.ABIERTO,
+      fechaCierre: { $lte: ahora },
+    })
+      .select("_id")
+      .sort(ORDEN);
   }
 
   async registrarVisualizacion(proyectoId) {
     if (!esIdValido(proyectoId)) return;
-    await ProyectoModel.updateOne({ _id: proyectoId }, { $inc: { visualizaciones: 1 } });
+    const actualizado = await ProyectoModel.findByIdAndUpdate(
+      proyectoId,
+      { $inc: { visualizaciones: 1 } },
+      { returnDocument: "after", projection: { visualizaciones: 1 } },
+    );
+    return actualizado?.visualizaciones;
   }
 
   async actualizarDatosDelColectivo(colectivo) {
@@ -104,25 +169,41 @@ export class MongoProyectoRepository {
     );
   }
 
-  async listarPaginado(numeroPagina, limitePorPagina, filtros = {}) {
-    return this.paginar(filtroDeListado(filtros), numeroPagina, limitePorPagina);
+  async listarPaginado(pagina, filtros = {}) {
+    return this.paginarResumenes(filtroDeListado(filtros), pagina);
   }
 
-  async buscarCompatibles(
-    colaborador,
-    numeroPagina,
-    limitePorPagina,
-    ahora = new Date(),
-  ) {
+  async contarPorColectivos(ids) {
+    const filas = await ProyectoModel.aggregate([
+      { $match: { colectivoId: { $in: ids } } },
+      { $group: { _id: "$colectivoId", cantidad: { $sum: 1 } } },
+    ]);
+    return new Map(filas.map((fila) => [String(fila._id), fila.cantidad]));
+  }
+
+  async listarPorColectivoPaginado(colectivoId, pagina) {
+    return this.paginarResumenes({ colectivoId }, pagina);
+  }
+
+  async paginarResumenes(filtro, pagina) {
+    return paginar(ProyectoModel, filtro, pagina, {
+      orden: ORDEN,
+      ajustar: (consulta) => consulta.select(CAMPOS_DE_RESUMEN).lean(),
+    });
+  }
+
+  async buscarCompatibles(colaborador, pagina, { ahora = new Date(), hastaId } = {}) {
     const codigos = colaborador.habilidades.map((h) => h.codigo);
-    const yaSePostulo = await ColaboracionModel.distinct("proyectoId", {
+    const perfilesOcupados = await ColaboracionModel.distinct("perfil", {
       colaborador: colaborador._id,
+      estado: { $ne: COLABORACION_ESTADO.RETIRADA },
     });
     const filtro = {
       estado: PROYECTO_ESTADO.ABIERTO,
-      _id: { $nin: yaSePostulo },
+      $or: [{ fechaCierre: null }, { fechaCierre: { $gt: ahora } }],
       perfiles: {
         $elemMatch: {
+          _id: { $nin: perfilesOcupados },
           busquedaAbierta: { $ne: false },
           cupoCompleto: { $ne: true },
           $or: [{ fechaCierreBusqueda: null }, { fechaCierreBusqueda: { $gt: ahora } }],
@@ -131,18 +212,8 @@ export class MongoProyectoRepository {
         },
       },
     };
-    return this.paginar(filtro, numeroPagina, limitePorPagina);
-  }
-
-  async paginar(filtro, numeroPagina, limitePorPagina) {
-    const [items, total] = await Promise.all([
-      ProyectoModel.find(filtro)
-        .sort(ORDEN)
-        .skip(salto(numeroPagina, limitePorPagina))
-        .limit(limitePorPagina),
-      ProyectoModel.countDocuments(filtro),
-    ]);
-    return { items: await this.conColaboraciones(items), total };
+    if (hastaId) filtro._id = { $lte: hastaId };
+    return this.paginarResumenes(filtro, pagina);
   }
 
   async conColaboraciones(proyectos) {
@@ -152,11 +223,14 @@ export class MongoProyectoRepository {
     })
       .sort({ fecha: 1, _id: 1 })
       .populate("colaborador");
-    for (const proyecto of proyectos) {
-      proyecto.colaboraciones = colaboraciones.filter(
-        (c) => String(c.proyectoId) === String(proyecto._id),
-      );
+    const porProyecto = new Map();
+    for (const colaboracion of colaboraciones) {
+      const id = String(colaboracion.proyectoId);
+      if (!porProyecto.has(id)) porProyecto.set(id, []);
+      porProyecto.get(id).push(colaboracion);
     }
+    for (const proyecto of proyectos)
+      proyecto.colaboraciones = porProyecto.get(proyecto.id) ?? [];
     return proyectos;
   }
 }

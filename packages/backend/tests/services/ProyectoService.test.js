@@ -3,6 +3,7 @@ import {
   crearColectivoDePrueba,
   crearProyectoDePrueba,
   datosDePerfil,
+  proyectosDelColectivo,
 } from "../fixtures.js";
 import { ConflictError } from "../../src/errors/ConflictError.js";
 import { NotFoundError } from "../../src/errors/NotFoundError.js";
@@ -29,7 +30,7 @@ describe("ProyectoService · alta", () => {
 
   test("el proyecto queda guardado como proyecto de su colectivo", async () => {
     const { colectivo, proyecto } = await crearProyectoDePrueba(services);
-    const delColectivo = await services.proyectoService.listarPorColectivo(colectivo.id);
+    const delColectivo = await proyectosDelColectivo(colectivo.id);
     expect(delColectivo.map((p) => p.id)).toEqual([proyecto.id]);
     expect(delColectivo[0].colectivo).toMatchObject({
       id: colectivo.id,

@@ -18,7 +18,7 @@ describe("AvanceService", () => {
   const releer = () => services.proyectoService.buscarPorId(proyecto.id);
 
   const registrar = (porcentajeConcrecion, enlaces = {}) =>
-    services.avanceService.registrarAvanceParaProyecto(proyecto.id, {
+    services.avanceService.registrar(proyecto.id, {
       porcentajeConcrecion,
       urlSistema: "https://sistema.example.org",
       urlRepositorio: "https://github.com/ejemplo/repo",
@@ -79,7 +79,7 @@ describe("AvanceService", () => {
 
     test("en un proyecto que no existe tira NotFoundError", async () => {
       await expect(
-        services.avanceService.registrarAvanceParaProyecto("no-existe", {
+        services.avanceService.registrar("no-existe", {
           porcentajeConcrecion: 30,
         }),
       ).rejects.toThrow(NotFoundError);
@@ -91,26 +91,23 @@ describe("AvanceService", () => {
       const primero = await registrar(30);
       const segundo = await registrar(70);
 
-      const avances = await services.avanceService.listarParaProyecto(proyecto.id);
+      const avances = await services.avanceService.listar(proyecto.id);
       expect(avances.map((a) => a.id)).toEqual([primero.id, segundo.id]);
     });
 
     test("un proyecto sin avances devuelve una lista vacia", async () => {
-      expect(await services.avanceService.listarParaProyecto(proyecto.id)).toEqual([]);
+      expect(await services.avanceService.listar(proyecto.id)).toEqual([]);
     });
 
     test("busca un avance por id", async () => {
       const avance = await registrar(30);
-      const encontrado = await services.avanceService.buscarPorIdParaProyecto(
-        proyecto.id,
-        avance.id,
-      );
+      const encontrado = await services.avanceService.buscarPorId(proyecto.id, avance.id);
       expect(encontrado.id).toBe(avance.id);
     });
 
     test("un avance que no existe tira NotFoundError", async () => {
       await expect(
-        services.avanceService.buscarPorIdParaProyecto(proyecto.id, "no-existe"),
+        services.avanceService.buscarPorId(proyecto.id, "no-existe"),
       ).rejects.toThrow(NotFoundError);
     });
 
@@ -118,9 +115,7 @@ describe("AvanceService", () => {
       await registrar(30);
       await services.proyectoService.finalizar(proyecto.id);
 
-      expect(await services.avanceService.listarParaProyecto(proyecto.id)).toHaveLength(
-        1,
-      );
+      expect(await services.avanceService.listar(proyecto.id)).toHaveLength(1);
     });
   });
 });

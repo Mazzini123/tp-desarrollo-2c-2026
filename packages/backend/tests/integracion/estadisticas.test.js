@@ -39,12 +39,12 @@ async function escenario(s) {
     colaboradorId: ada.id,
     esPublica: false,
   });
-  await s.avanceService.registrarAvanceParaProyecto(api.id, {
+  await s.avanceService.registrar(api.id, {
     porcentajeConcrecion: 50,
     urlSistema: "https://api.org",
     urlRepositorio: "https://github.com/x/api",
   });
-  await s.logroService.crearParaProyecto(api.id, { titulo: "Hito", descripcion: "..." });
+  await s.logroService.crear(api.id, { titulo: "Hito", descripcion: "..." });
   await s.proyectoService.finalizar(front.id);
   await s.proyectoService.verDetalle(api.id);
   await s.proyectoService.verDetalle(api.id);

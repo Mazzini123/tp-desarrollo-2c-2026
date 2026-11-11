@@ -1,12 +1,13 @@
+import { armarPaginado } from "../utils/paginacion.js";
+import { notificarResoluciones } from "./soporte/notificarResoluciones.js";
+import { proyectosPorId } from "./soporte/proyectosPorId.js";
 import { DomainError } from "../errors/DomainError.js";
 import { ConflictError } from "../errors/ConflictError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
 import { ForbiddenError } from "../errors/ForbiddenError.js";
-import { AUTOR_VALORACION } from "../domain/enums/AUTOR_VALORACION.js";
 import { TIPO_NOTIFICACION } from "../domain/enums/TIPO_NOTIFICACION.js";
 import {
   aplicarModoDeAceptacion,
-  notificarResoluciones,
   puedeVerContactoDe,
   yaSePostuloAlPerfil,
 } from "./reglasDePostulacion.js";
@@ -47,7 +48,7 @@ export class ColaboracionService {
       const proyecto = await this.proyectoService.buscarPorId(proyectoId);
 
       if (cierreVencido(proyecto, ahora)) {
-        await this.proyectoService.cerrar(proyecto, ahora, { propagarError: true });
+        await this.proyectoService.cerrar(proyecto, ahora);
         return null;
       }
       if (!proyecto.estaAbierto()) {
@@ -84,19 +85,18 @@ export class ColaboracionService {
       );
       const cambios = aplicarModoDeAceptacion(proyecto, perfil, ahora);
       await this.proyectoRepository.guardar(proyecto);
-      return { proyecto, colaboracion, cambios };
+      await notificarResoluciones(this.notificacionService, proyecto, {
+        aceptadas: cambios.aceptadas.filter((c) => c !== colaboracion),
+        rechazadas: cambios.rechazadas.filter((c) => c !== colaboracion),
+      });
+      return colaboracion;
     });
 
     if (!resultado) {
       throw new ConflictError("No se puede anotar a un proyecto que ya está finalizado");
     }
 
-    const { proyecto, colaboracion, cambios } = resultado;
-    await notificarResoluciones(this.notificacionService, proyecto, {
-      aceptadas: cambios.aceptadas.filter((c) => c !== colaboracion),
-      rechazadas: cambios.rechazadas.filter((c) => c !== colaboracion),
-    });
-    return colaboracion;
+    return resultado;
   }
 
   async buscarColaboracion(proyectoId, colaboracionId) {
@@ -113,100 +113,114 @@ export class ColaboracionService {
   }
 
   async aceptar(proyectoId, colaboracionId, ahora = new Date()) {
-    const { proyecto, colaboracion } = await this.buscarColaboracion(
-      proyectoId,
-      colaboracionId,
-    );
+    const resultado = await this.transacciones.ejecutar(async () => {
+      const { proyecto, colaboracion } = await this.buscarColaboracion(
+        proyectoId,
+        colaboracionId,
+      );
 
-    if (cierreVencido(proyecto, ahora)) {
-      await this.proyectoService.cerrar(proyecto, ahora);
-    }
+      if (cierreVencido(proyecto, ahora)) {
+        await this.proyectoService.cerrar(proyecto, ahora);
+        return null;
+      }
 
-    this.verificarPendiente(proyecto, colaboracion, "aceptar");
+      this.verificarPendiente(proyecto, colaboracion, "aceptar");
 
-    const perfil = proyecto.buscarPerfil(colaboracion.perfil);
+      const perfil = proyecto.buscarPerfil(colaboracion.perfil);
+      if (!perfil) throw new ConflictError("El perfil de la postulación ya no existe");
 
-    if (perfil.limiteAlcanzado(proyecto.cantidadAceptadas(perfil))) {
-      throw new ConflictError("El perfil ya alcanzó su límite de colaboraciones");
-    }
+      if (perfil.limiteAlcanzado(proyecto.cantidadAceptadas(perfil))) {
+        throw new ConflictError("El perfil ya alcanzó su límite de colaboraciones");
+      }
 
-    colaboracion.aceptar(ahora);
+      colaboracion.aceptar(ahora);
 
-    const cambios = aplicarModoDeAceptacion(proyecto, perfil, ahora);
-    await this.proyectoRepository.guardar(proyecto);
+      const cambios = aplicarModoDeAceptacion(proyecto, perfil, ahora);
+      await this.proyectoRepository.guardar(proyecto);
 
-    await notificarResoluciones(this.notificacionService, proyecto, {
-      aceptadas: [colaboracion, ...cambios.aceptadas],
-      rechazadas: cambios.rechazadas,
+      await notificarResoluciones(this.notificacionService, proyecto, {
+        aceptadas: [colaboracion, ...cambios.aceptadas],
+        rechazadas: cambios.rechazadas,
+      });
+
+      return colaboracion;
     });
-
-    return colaboracion;
+    if (!resultado)
+      throw new ConflictError(
+        "No se puede aceptar una postulación de un proyecto vencido",
+      );
+    return resultado;
   }
 
   async rechazar(proyectoId, colaboracionId, ahora = new Date()) {
-    const { proyecto, colaboracion } = await this.buscarColaboracion(
-      proyectoId,
-      colaboracionId,
-    );
+    return this.transacciones.ejecutar(async () => {
+      const { proyecto, colaboracion } = await this.buscarColaboracion(
+        proyectoId,
+        colaboracionId,
+      );
 
-    this.verificarPendiente(proyecto, colaboracion, "rechazar");
+      this.verificarPendiente(proyecto, colaboracion, "rechazar");
 
-    colaboracion.rechazar(ahora);
-    await this.proyectoRepository.guardar(proyecto);
+      colaboracion.rechazar(ahora);
+      await this.proyectoRepository.guardar(proyecto);
 
-    await notificarResoluciones(this.notificacionService, proyecto, {
-      aceptadas: [],
-      rechazadas: [colaboracion],
+      await notificarResoluciones(this.notificacionService, proyecto, {
+        aceptadas: [],
+        rechazadas: [colaboracion],
+      });
+
+      return colaboracion;
     });
-
-    return colaboracion;
   }
 
   async finalizar(proyectoId, colaboracionId, ahora = new Date()) {
-    const { proyecto, colaboracion } = await this.buscarColaboracion(
-      proyectoId,
-      colaboracionId,
-    );
-
-    if (!colaboracion.estaAceptada()) {
-      throw new ConflictError(
-        `Solo se puede finalizar una colaboracion aceptada (esta esta ${colaboracion.estado})`,
+    return this.transacciones.ejecutar(async () => {
+      const { proyecto, colaboracion } = await this.buscarColaboracion(
+        proyectoId,
+        colaboracionId,
       );
-    }
 
-    colaboracion.finalizar(ahora);
-    await this.proyectoRepository.guardar(proyecto);
-    await notificarResoluciones(this.notificacionService, proyecto, {
-      finalizadas: [colaboracion],
+      if (!colaboracion.estaAceptada()) {
+        throw new ConflictError(
+          `Solo se puede finalizar una colaboracion aceptada (esta esta ${colaboracion.estado})`,
+        );
+      }
+
+      colaboracion.finalizar(ahora);
+      await this.proyectoRepository.guardar(proyecto);
+      await notificarResoluciones(this.notificacionService, proyecto, {
+        finalizadas: [colaboracion],
+      });
+
+      return colaboracion;
     });
-
-    return colaboracion;
   }
 
   async desvincular(
     proyectoId,
     colaboracionId,
-    ahora = new Date(),
-    { porLaColaboradora = false } = {},
+    { porLaColaboradora = false, ahora = new Date() } = {},
   ) {
-    const { proyecto, colaboracion } = await this.buscarColaboracion(
-      proyectoId,
-      colaboracionId,
-    );
-
-    if (!colaboracion.estaAceptada()) {
-      throw new ConflictError(
-        `Solo se puede desvincular una colaboracion aceptada (esta esta ${colaboracion.estado})`,
+    return this.transacciones.ejecutar(async () => {
+      const { proyecto, colaboracion } = await this.buscarColaboracion(
+        proyectoId,
+        colaboracionId,
       );
-    }
 
-    colaboracion.desvincular(ahora);
-    await this.proyectoRepository.guardar(proyecto);
-    if (!porLaColaboradora) {
-      await this.notificarDesvinculacion(proyectoId, colaboracion);
-    }
+      if (!colaboracion.estaAceptada()) {
+        throw new ConflictError(
+          `Solo se puede desvincular una colaboracion aceptada (esta esta ${colaboracion.estado})`,
+        );
+      }
 
-    return colaboracion;
+      colaboracion.desvincular(ahora);
+      await this.proyectoRepository.guardar(proyecto);
+      if (!porLaColaboradora) {
+        await this.notificarDesvinculacion(proyectoId, colaboracion);
+      }
+
+      return colaboracion;
+    });
   }
 
   async retirar(proyectoId, colaboracionId, ahora = new Date()) {
@@ -241,90 +255,18 @@ export class ColaboracionService {
   }
 
   async notificarDesvinculacion(proyectoId, colaboracion) {
-    try {
-      await this.notificacionService.notificar(colaboracion.colaborador, {
-        tipo: TIPO_NOTIFICACION.DESVINCULACION,
-        asunto: "Ya no formás parte de un proyecto",
-        contenido: "Tu colaboración en el proyecto terminó por una desvinculación.",
-        referencias: { proyectoId, colaboracionId: colaboracion.id },
-      });
-    } catch (error) {
-      console.error("No se pudo notificar la desvinculacion:", error.message);
-    }
-  }
-
-  async valorar(
-    proyectoId,
-    colaboracionId,
-    { autor, puntaje, comentario },
-    ahora = new Date(),
-  ) {
-    const { proyecto, colaboracion } = await this.buscarColaboracion(
-      proyectoId,
-      colaboracionId,
-    );
-
-    if (!colaboracion.estaFinalizada()) {
-      throw new ConflictError("Solo se puede valorar una colaboracion finalizada");
-    }
-
-    const campo =
-      autor === AUTOR_VALORACION.COLECTIVO
-        ? "valoracionDelColectivo"
-        : "valoracionDelColaborador";
-
-    if (colaboracion[campo] !== null) {
-      throw new ConflictError("Esa parte ya valoro esta colaboracion");
-    }
-
-    colaboracion[campo] = { puntaje, comentario, fecha: ahora };
-    await this.proyectoRepository.guardar(proyecto);
-
-    return colaboracion[campo];
-  }
-
-  async listarValoracionesDeColaborador(colaboradorId) {
-    await this.colaboradorService.buscarPorId(colaboradorId);
-    const colaboraciones = (
-      await this.colaboracionRepository.buscarDeColaborador(colaboradorId)
-    ).filter((c) => c.esPublica && c.valoracionDelColectivo);
-    const proyectos = await this.proyectosDe(colaboraciones);
-
-    const valoraciones = colaboraciones.map((c) => {
-      const proyecto = proyectos.get(String(c.proyectoId));
-      return {
-        colectivo: { id: proyecto.colectivo.id, nombre: proyecto.colectivo.nombre },
-        proyecto: { id: proyecto.id, titulo: proyecto.titulo },
-        ...c.valoracionDelColectivo.toObject(),
-      };
+    return this.notificacionService.notificar(colaboracion.colaborador, {
+      tipo: TIPO_NOTIFICACION.DESVINCULACION,
+      asunto: "Ya no formás parte de un proyecto",
+      contenido: "Tu colaboración en el proyecto terminó por una desvinculación.",
+      referencias: { proyectoId, colaboracionId: colaboracion.id },
     });
-
-    return resumirValoraciones(valoraciones);
-  }
-
-  async listarValoracionesDeColectivo(colectivoId) {
-    await this.colectivoService.buscarPorId(colectivoId);
-    const colaboraciones = (
-      await this.colaboracionRepository.buscarDeColectivo(colectivoId)
-    ).filter((c) => c.valoracionDelColaborador);
-    const proyectos = await this.proyectosDe(colaboraciones);
-
-    const valoraciones = colaboraciones.map((c) => {
-      const proyecto = proyectos.get(String(c.proyectoId));
-      return {
-        proyecto: { id: proyecto.id, titulo: proyecto.titulo },
-        autor: c.esPublica ? c.colaborador : null,
-        ...c.valoracionDelColaborador.toObject(),
-      };
-    });
-
-    return resumirValoraciones(valoraciones);
   }
 
   async proyectosDe(colaboraciones) {
-    const ids = [...new Set(colaboraciones.map((c) => String(c.proyectoId)))];
-    const proyectos = await this.proyectoRepository.buscarVarios(ids);
-    return new Map(proyectos.map((p) => [p.id, p]));
+    return proyectosPorId(colaboraciones, (ids) =>
+      this.proyectoRepository.buscarVarios(ids),
+    );
   }
 
   verificarPendiente(proyecto, colaboracion, accion) {
@@ -340,8 +282,51 @@ export class ColaboracionService {
     }
   }
 
-  async listarPorProyecto(proyectoId) {
-    return (await this.proyectoService.buscarPorId(proyectoId)).colaboraciones;
+  async listarPendientesDeColectivo(
+    colectivoId,
+    { numeroPagina = 1, limitePorPagina = 20 } = {},
+  ) {
+    await this.colectivoService.buscarPorId(colectivoId);
+    const paginado = { numeroPagina, limitePorPagina };
+    const pagina = await this.colaboracionRepository.pendientesDeColectivo(
+      colectivoId,
+      paginado,
+    );
+    const proyectos = await this.proyectosDe(pagina.items);
+    return armarPaginado(
+      {
+        total: pagina.total,
+        items: pagina.items.map((colaboracion) => {
+          const proyecto = proyectos.get(String(colaboracion.proyectoId));
+          return {
+            proyecto: {
+              id: proyecto.id,
+              titulo: proyecto.titulo,
+              estado: proyecto.estado,
+            },
+            perfil: resumirPerfil(proyecto.buscarPerfil(colaboracion.perfil)),
+            colaboracion,
+          };
+        }),
+      },
+      paginado,
+    );
+  }
+
+  async listarPaginaPorProyecto(
+    proyectoId,
+    { numeroPagina = 1, limitePorPagina = 20, privadas = false, estado } = {},
+  ) {
+    if (!(await this.proyectoRepository.buscarSinColaboraciones(proyectoId)))
+      throw new NotFoundError("No existe ese proyecto");
+    const pagina = { numeroPagina, limitePorPagina };
+    return armarPaginado(
+      await this.colaboracionRepository.listarDeProyecto(proyectoId, pagina, {
+        privadas,
+        estado,
+      }),
+      pagina,
+    );
   }
 
   async listarPorColaborador(colaboradorId, { incluirAnonimas = false } = {}) {
@@ -367,15 +352,4 @@ function resumirPerfil(perfil) {
   return perfil
     ? { id: perfil.id, titulo: perfil.titulo ?? null, descripcion: perfil.descripcion }
     : null;
-}
-
-function resumirValoraciones(valoraciones) {
-  const cantidad = valoraciones.length;
-  const suma = valoraciones.reduce((total, v) => total + v.puntaje, 0);
-
-  return {
-    cantidad,
-    promedio: cantidad === 0 ? null : Math.round((suma / cantidad) * 10) / 10,
-    valoraciones: valoraciones.sort((a, b) => b.fecha - a.fecha),
-  };
 }

@@ -1,10 +1,17 @@
+import { registro } from "../config/registro.js";
+
 export class CanalSimulado {
   constructor(nombre) {
     this.nombre = nombre;
   }
 
   async enviar({ destino, asunto }) {
-    console.log(`[${this.nombre} simulado] a ${enmascarar(destino)}: ${asunto}`);
+    registro.info("envio_simulado", {
+      canal: this.nombre,
+      destino: enmascarar(destino),
+      asunto,
+    });
+    return { simulado: true };
   }
 }
 

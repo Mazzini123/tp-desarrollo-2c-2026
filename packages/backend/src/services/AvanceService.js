@@ -1,17 +1,21 @@
-import { DomainError } from "../errors/DomainError.js";
-import { ConflictError } from "../errors/ConflictError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
-import { buscarProyectoOFallar } from "./soporte/buscarOFallar.js";
+import { DomainError } from "../errors/DomainError.js";
+import {
+  buscarProyectoAbiertoOFallar,
+  buscarProyectoOFallar,
+} from "./soporte/buscarOFallar.js";
 
 export class AvanceService {
   constructor({ proyectoRepository }) {
     this.proyectoRepository = proyectoRepository;
   }
 
-  async registrarAvanceParaProyecto(proyectoId, datos) {
-    const proyecto = await this.buscarProyectoAbierto(proyectoId);
-    this.validarPorcentajeConcrecionParaProyecto(proyecto, datos.porcentajeConcrecion);
-
+  async registrar(proyectoId, datos) {
+    const proyecto = await buscarProyectoAbiertoOFallar(
+      this.proyectoRepository,
+      proyectoId,
+    );
+    this.validarPorcentajeMayor(proyecto, datos.porcentajeConcrecion);
     const avance = proyecto.agregarAvance({
       porcentajeConcrecion: datos.porcentajeConcrecion,
       urlSistema: datos.urlSistema,
@@ -22,17 +26,25 @@ export class AvanceService {
     return avance;
   }
 
-  async listarParaProyecto(proyectoId) {
+  validarPorcentajeMayor(proyecto, porcentajeConcrecion) {
+    if (porcentajeConcrecion <= proyecto.porcentajeConcrecion) {
+      throw new DomainError(
+        `El porcentaje de concrecion a registrar debe ser mayor al porcentaje de concrecion que tiene el proyecto de id "${proyecto.id}"`,
+      );
+    }
+  }
+
+  async listar(proyectoId) {
     return (await buscarProyectoOFallar(this.proyectoRepository, proyectoId)).avances;
   }
 
-  async buscarPorIdParaProyecto(proyectoId, avanceId) {
+  async buscarPorId(proyectoId, avanceId) {
     const proyecto = await buscarProyectoOFallar(this.proyectoRepository, proyectoId);
 
-    return this.buscarAvanceDeProyectoOrThrow(proyecto, avanceId);
+    return this.buscarAvanceOFallar(proyecto, avanceId);
   }
 
-  buscarAvanceDeProyectoOrThrow(proyecto, avanceId) {
+  buscarAvanceOFallar(proyecto, avanceId) {
     const avance = proyecto.avances.find((a) => a.id === avanceId);
 
     if (!avance) {
@@ -42,23 +54,5 @@ export class AvanceService {
     }
 
     return avance;
-  }
-
-  async buscarProyectoAbierto(proyectoId) {
-    const proyecto = await buscarProyectoOFallar(this.proyectoRepository, proyectoId);
-    if (!proyecto.estaAbierto()) {
-      throw new ConflictError(
-        `El proyecto con id "${proyectoId}" no se encuentra abierto`,
-      );
-    }
-    return proyecto;
-  }
-
-  validarPorcentajeConcrecionParaProyecto(proyecto, porcentajeConcrecion) {
-    if (proyecto.porcentajeConcrecion >= porcentajeConcrecion) {
-      throw new DomainError(
-        `El porcentaje de concrecion a registrar debe ser mayor al porcentaje de concrecion que tiene el proyecto de id "${proyecto.id}"`,
-      );
-    }
   }
 }

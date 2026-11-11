@@ -1,6 +1,10 @@
 import { Router } from "express";
+import { validarIdsDeRuta } from "../middlewares/validarIds.js";
 import { validarBody, validarQuery } from "../middlewares/validar.js";
-import { paginacionSchema } from "../schemas/paginacionSchema.js";
+import {
+  paginacionSchema,
+  listadoDeColaboracionesSchema,
+} from "../schemas/paginacionSchema.js";
 import {
   actualizarProyectoSchema,
   anotarColaboradorSchema,
@@ -17,16 +21,16 @@ import { crearLogroSchema, actualizarLogroSchema } from "../schemas/logroSchema.
 import { crearAvanceSchema } from "../schemas/avanceSchema.js";
 import { PERMISO } from "../security/autorizacion/enums/PERMISO.js";
 
-export function crearProyectosRouter(
-  proyectoController,
-  perfilController,
-  reclutamientoController,
-  postulacionController,
-  logroController,
-  avanceController,
-  autorizacion,
-) {
-  const router = Router();
+export function crearProyectosRouter(controllers, autorizacion) {
+  const {
+    proyecto: proyectoController,
+    perfil: perfilController,
+    reclutamiento: reclutamientoController,
+    postulacion: postulacionController,
+    logro: logroController,
+    avance: avanceController,
+  } = controllers;
+  const router = validarIdsDeRuta(Router());
   const { permiso, duenoDelProyecto } = autorizacion;
   const delDueno = (codigo) => [permiso(codigo), duenoDelProyecto];
   const editar = delDueno(PERMISO.PROYECTO_EDITAR);
@@ -53,6 +57,11 @@ export function crearProyectosRouter(
     editar,
     validarBody(crearPerfilSchema),
     perfilController.crear,
+  );
+  router.get(
+    "/:id/participaciones",
+    validarQuery(paginacionSchema),
+    proyectoController.listarParticipaciones,
   );
   router.get("/:id/perfiles", perfilController.listar);
   router.get("/:id/perfiles/:perfilId", perfilController.obtenerPorId);
@@ -111,6 +120,7 @@ export function crearProyectosRouter(
   router.get(
     "/:id/colaboraciones",
     resolverPostulacion,
+    validarQuery(listadoDeColaboracionesSchema),
     proyectoController.listarColaboraciones,
   );
 
@@ -156,41 +166,40 @@ export function crearProyectosRouter(
     "/:id/logros",
     editar,
     validarBody(crearLogroSchema),
-    logroController.crearParaProyecto,
+    logroController.crear,
   );
 
-  router.get("/:id/logros", logroController.conseguirTodosDeProyecto);
+  router.get("/:id/logros", logroController.listar);
 
-  router.get("/:id/logros/:logroId", logroController.conseguirPorIdParaProyecto);
+  router.get("/:id/logros/:logroId", logroController.buscarPorId);
 
   router.put(
     "/:id/logros/:logroId",
     editar,
     validarBody(actualizarLogroSchema),
-    logroController.actualizarParaProyecto,
+    logroController.actualizar,
   );
 
-  router.delete("/:id/logros/:logroId", editar, logroController.eliminarParaProyecto);
+  router.delete("/:id/logros/:logroId", editar, logroController.eliminar);
 
   // Avances
   router.post(
     "/:id/avances",
     editar,
     validarBody(crearAvanceSchema),
-    avanceController.registrarAvanceParaProyecto,
+    avanceController.registrar,
   );
 
-  router.get("/:id/avances", avanceController.listarParaProyecto);
+  router.get("/:id/avances", avanceController.listar);
 
-  router.get("/:id/avances/:avanceId", avanceController.buscarPorIdParaProyecto);
+  router.get("/:id/avances/:avanceId", avanceController.buscarPorId);
 
-  if (autorizacion.activa) {
-    router.get(
-      "/:id/colaboradores/:colaboradorId/contacto",
-      delDueno(PERMISO.CONTACTO_COLABORADORA_VER),
-      proyectoController.datosDeContacto,
-    );
-  }
+  router.get(
+    "/:id/colaboradores/:colaboradorId/contacto",
+    autorizacion.soloConAutenticacion,
+    delDueno(PERMISO.CONTACTO_COLABORADORA_VER),
+    proyectoController.datosDeContacto,
+  );
 
   return router;
 }

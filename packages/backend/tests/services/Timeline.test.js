@@ -56,7 +56,7 @@ describe("Timeline de un colectivo", () => {
     await conLogro.save();
     await services.proyectoService.finalizar(proyecto.id, dia(6));
 
-    const eventos = await services.colectivoService.timeline(colectivo.id);
+    const eventos = await services.timelineService.timeline(colectivo.id);
 
     expect(eventos.map((e) => e.tipo)).toEqual([
       "ALTA_DEL_COLECTIVO",
@@ -89,16 +89,16 @@ describe("Timeline de un colectivo", () => {
       urlSistema: "https://mapa.example.org",
       urlRepositorio: "https://github.com/huerta/mapa",
     };
-    await services.avanceService.registrarAvanceParaProyecto(proyecto.id, {
+    await services.avanceService.registrar(proyecto.id, {
       porcentajeConcrecion: 30,
       ...enlaces,
     });
-    await services.avanceService.registrarAvanceParaProyecto(proyecto.id, {
+    await services.avanceService.registrar(proyecto.id, {
       porcentajeConcrecion: 70,
       ...enlaces,
     });
 
-    const avances = (await services.colectivoService.timeline(colectivo.id)).filter(
+    const avances = (await services.timelineService.timeline(colectivo.id)).filter(
       (e) => e.tipo === "AVANCE",
     );
 
@@ -109,7 +109,7 @@ describe("Timeline de un colectivo", () => {
 
   test("un colectivo que no existe tira NotFoundError", async () => {
     const services = await armarServices();
-    await expect(services.colectivoService.timeline("no-existe")).rejects.toThrow(
+    await expect(services.timelineService.timeline("no-existe")).rejects.toThrow(
       NotFoundError,
     );
   });

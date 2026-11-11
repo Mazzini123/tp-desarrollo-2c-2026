@@ -1,4 +1,7 @@
-import { createHash } from "node:crypto";
+import { PERIODO_COMPROMISO } from "../domain/enums/PERIODO_COMPROMISO.js";
+import { MODALIDAD_COLABORACION } from "../domain/enums/MODALIDAD_COLABORACION.js";
+import { validarModoDeAceptacion } from "../services/reglasDePostulacion.js";
+import { versionDePerfil } from "../utils/versionDePerfil.js";
 import mongoose from "mongoose";
 import { Proyecto } from "../domain/Proyecto.js";
 import { Perfil } from "../domain/Perfil.js";
@@ -10,8 +13,13 @@ import { estadoDeBusqueda } from "../services/reglasDeBusqueda.js";
 
 const compromisoSchema = new mongoose.Schema(
   {
-    cantidadHoras: { type: Number, required: true },
-    periodo: { type: String, required: true },
+    cantidadHoras: {
+      type: Number,
+      required: true,
+      min: 1,
+      validate: Number.isSafeInteger,
+    },
+    periodo: { type: String, required: true, enum: Object.values(PERIODO_COMPROMISO) },
   },
   DE_VALOR,
 );
@@ -20,12 +28,26 @@ const perfilSchema = new mongoose.Schema({
   titulo: { type: String, default: null },
   descripcion: { type: String, required: true },
   compromiso: { type: compromisoSchema, required: true },
-  modalidadColaboracion: { type: String, required: true },
-  habilidadesRequeridas: { type: [habilidadEmbebidaSchema], default: [] },
+  modalidadColaboracion: {
+    type: String,
+    required: true,
+    enum: Object.values(MODALIDAD_COLABORACION),
+  },
+  habilidadesRequeridas: {
+    type: [habilidadEmbebidaSchema],
+    default: [],
+    validate: (lista) =>
+      lista.length > 0 && new Set(lista.map((h) => h.codigo)).size === lista.length,
+  },
   habilidadesOpcionales: { type: [habilidadEmbebidaSchema], default: [] },
   busquedaAbierta: { type: Boolean, default: true },
   fechaCierreBusqueda: { type: Date, default: null },
-  limiteColaboraciones: { type: Number, default: null },
+  limiteColaboraciones: {
+    type: Number,
+    default: null,
+    min: 1,
+    validate: (v) => v == null || Number.isSafeInteger(v),
+  },
   modoAceptacion: {
     type: String,
     enum: Object.values(MODO_ACEPTACION),
@@ -34,28 +56,31 @@ const perfilSchema = new mongoose.Schema({
   cupoCompleto: { type: Boolean, default: false },
 });
 perfilSchema.loadClass(Perfil);
-perfilSchema.virtual("versionEdicion").get(function () {
-  return createHash("sha256")
-    .update(
-      JSON.stringify([
-        this.id,
-        this.titulo,
-        this.descripcion,
-        this.compromiso?.cantidadHoras,
-        this.compromiso?.periodo,
-        this.modalidadColaboracion,
-        this.busquedaAbierta,
-        this.fechaCierreBusqueda,
-        this.limiteColaboraciones,
-        this.modoAceptacion,
-        this.codigosRequeridos(),
-        this.codigosOpcionales(),
-      ]),
-    )
-    .digest("hex");
+perfilSchema.pre("validate", function () {
+  try {
+    validarModoDeAceptacion(this.modoAceptacion, this.limiteColaboraciones);
+  } catch (error) {
+    this.invalidate("modoAceptacion", error.message);
+  }
+  const requeridas = new Set(this.habilidadesRequeridas.map((h) => h.codigo));
+  const opcionales = this.habilidadesOpcionales.map((h) => h.codigo);
+  if (
+    new Set(opcionales).size !== opcionales.length ||
+    opcionales.some((c) => requeridas.has(c))
+  ) {
+    this.invalidate(
+      "habilidadesOpcionales",
+      "Las habilidades deben ser únicas y no pueden pertenecer a ambos grupos",
+    );
+  }
 });
-// Campo calculado que el front pide en cada perfil. La regla vive en
-// services/reglasDeBusqueda.js; el modelo solo la expone al serializar.
+perfilSchema.virtual("cantidadAceptadas").get(function () {
+  const proyecto = this.parent?.();
+  return proyecto?.cantidadAceptadas(this);
+});
+perfilSchema.virtual("versionEdicion").get(function () {
+  return versionDePerfil(this);
+});
 perfilSchema.virtual("estadoBusqueda").get(function () {
   const proyecto = this.parent?.();
   return proyecto ? estadoDeBusqueda(this, proyecto) : null;
@@ -74,6 +99,7 @@ aplicarFormatoJSON(perfilSchema, {
     "limiteColaboraciones",
     "modoAceptacion",
     "versionEdicion",
+    "cantidadAceptadas",
     "estadoBusqueda",
   ],
 });
@@ -119,10 +145,14 @@ const proyectoSchema = new mongoose.Schema(
       enum: Object.values(PROYECTO_ESTADO),
       default: PROYECTO_ESTADO.ABIERTO,
     },
-    porcentajeConcrecion: { type: Number, default: 0 },
+    porcentajeConcrecion: { type: Number, default: 0, min: 0, max: 100 },
     urlSistema: { type: String, default: null },
     urlRepositorio: { type: String, default: null },
-    perfiles: { type: [perfilSchema], default: [] },
+    perfiles: {
+      type: [perfilSchema],
+      default: [],
+      validate: (lista) => lista.length > 0,
+    },
     logros: { type: [logroSchema], default: [] },
     avances: { type: [avanceSchema], default: [] },
     etiquetas: { type: [String], default: [] },

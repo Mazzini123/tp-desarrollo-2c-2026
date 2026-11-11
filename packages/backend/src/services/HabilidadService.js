@@ -24,11 +24,8 @@ export class HabilidadService {
   }
 
   async listar({ numeroPagina = 1, limitePorPagina = 10 } = {}) {
-    return armarPaginado(
-      await this.habilidadRepository.listarPaginado(numeroPagina, limitePorPagina),
-      numeroPagina,
-      limitePorPagina,
-    );
+    const pagina = { numeroPagina, limitePorPagina };
+    return armarPaginado(await this.habilidadRepository.listarPaginado(pagina), pagina);
   }
 
   async listarTodas() {
@@ -40,17 +37,17 @@ export class HabilidadService {
       throw new DomainError("Se debe indicar al menos un código de habilidad");
     }
 
-    return Promise.all(
-      codigos.map(async (codigo) => {
-        const habilidad = await this.habilidadRepository.buscarPorCodigo(codigo);
-        if (!habilidad) {
-          throw new NotFoundError(`No existe una habilidad con el código "${codigo}"`);
-        }
-        if (!habilidad.activo) {
-          throw new DomainError(`La habilidad "${codigo}" está dada de baja`);
-        }
-        return habilidad;
-      }),
-    );
+    const habilidades = await this.habilidadRepository.buscarPorCodigos(codigos);
+    const porCodigo = new Map(habilidades.map((h) => [h.codigo, h]));
+    return codigos.map((codigo) => {
+      const habilidad = porCodigo.get(codigo);
+      if (!habilidad) {
+        throw new NotFoundError(`No existe una habilidad con el código "${codigo}"`);
+      }
+      if (!habilidad.activo) {
+        throw new DomainError(`La habilidad "${codigo}" está dada de baja`);
+      }
+      return habilidad;
+    });
   }
 }

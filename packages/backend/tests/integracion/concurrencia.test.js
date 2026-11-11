@@ -1,3 +1,4 @@
+import { ConflictError } from "../../src/errors/ConflictError.js";
 import { jest } from "@jest/globals";
 import request from "supertest";
 import { crearApp } from "../../src/app.js";
@@ -8,6 +9,7 @@ import {
   crearColectivoDePrueba,
   crearProyectoDePrueba,
   datosDePerfil,
+  proyectosDelColectivo,
 } from "../fixtures.js";
 import { armarServicesConMongo, usarBaseDeTest } from "./baseDeTest.js";
 
@@ -95,7 +97,7 @@ test("dos aceptaciones simultaneas no superan el limite del perfil", async () =>
 
   expect(resultados.map((r) => r.status).sort()).toEqual(["fulfilled", "rejected"]);
   expect(resultados.find((r) => r.status === "rejected").reason).toBeInstanceOf(
-    ConcurrenciaError,
+    ConflictError,
   );
   const guardado = await s.proyectoService.buscarPorId(proyecto.id);
   expect(guardado.colaboraciones.filter((c) => c.estaAceptada())).toHaveLength(1);
@@ -167,7 +169,7 @@ test("dos POST simultaneos con la misma clave guardan un proyecto y avisan una s
   const [primero, segundo] = await Promise.all([publicar(), publicar()]);
   expect(primero.body.id).toBe(segundo.body.id);
   expect(guardar).toHaveBeenCalledTimes(1);
-  expect(await s.proyectoService.listarPorColectivo(colectivo.id)).toHaveLength(1);
+  expect(await proyectosDelColectivo(colectivo.id)).toHaveLength(1);
   expect(avisar).toHaveBeenCalledTimes(1);
 });
 

@@ -66,11 +66,11 @@ test("una postulacion anonima no muestra quien la hizo", async () => {
     .expect(201);
 
   const colaboraciones = await api.get(`/proyectos/${proyecto.body.id}/colaboraciones`);
-  expect(colaboraciones.body).toHaveLength(1);
-  expect(colaboraciones.body[0].colaborador).toBeNull();
+  expect(colaboraciones.body.data).toHaveLength(1);
+  expect(colaboraciones.body.data[0].colaborador).toBeNull();
 });
 
-test("un id que no existe o con formato invalido responde 404", async () => {
+test("un id que no existe responde 404 y uno con formato invalido, 400", async () => {
   await api.get("/colectivos/aaaaaaaaaaaaaaaaaaaaaaaa").expect(404);
-  await api.get("/colectivos/no-es-un-id").expect(404);
+  await api.get("/colectivos/no-es-un-id").expect(400);
 });

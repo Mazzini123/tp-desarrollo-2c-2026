@@ -1,24 +1,30 @@
+import { registro } from "../config/registro.js";
+
 export function iniciarTareaPeriodica(nombre, tarea, { intervaloMs }) {
   let temporizador = null;
   let detenido = false;
+  let ejecucionEnCurso;
 
   const correr = async () => {
     try {
-      await tarea();
+      await tarea(() => detenido);
     } catch (error) {
-      console.error(`${nombre}: fallo la revision`, error.message);
+      registro.error("tarea_periodica_fallida", { tarea: nombre, error: error.message });
     } finally {
       if (!detenido) {
-        temporizador = setTimeout(correr, intervaloMs);
+        temporizador = setTimeout(() => {
+          ejecucionEnCurso = correr();
+        }, intervaloMs);
         temporizador.unref();
       }
     }
   };
 
-  correr();
+  ejecucionEnCurso = correr();
 
-  return () => {
+  return async () => {
     detenido = true;
     clearTimeout(temporizador);
+    await ejecucionEnCurso;
   };
 }

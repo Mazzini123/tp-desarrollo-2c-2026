@@ -11,4 +11,4 @@ COPY packages/backend ./packages/backend
 
 EXPOSE 8000
 
-CMD ["npm", "run", "start:backend"]
+CMD ["node", "packages/backend/index.js"]

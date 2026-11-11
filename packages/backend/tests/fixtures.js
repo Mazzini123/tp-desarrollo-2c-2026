@@ -1,6 +1,7 @@
 import { componerApp, crearCanalesEnMemoria } from "../src/composicion.js";
 import { cargarHabilidadesIniciales } from "../src/seed/habilidadesSeed.js";
 import { vaciarBase } from "./soporte/base.js";
+import { MongoProyectoRepository } from "../src/repositories/MongoProyectoRepository.js";
 
 /**
  * Arma un juego de services nuevo para cada test, sobre los repositorios de
@@ -73,4 +74,8 @@ export function crearColaboradorDePrueba(
     cuentaGit,
     codigosHabilidades: habilidades,
   });
+}
+
+export function proyectosDelColectivo(colectivoId) {
+  return new MongoProyectoRepository().buscarPorColectivo(colectivoId);
 }

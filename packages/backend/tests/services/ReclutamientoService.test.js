@@ -223,6 +223,7 @@ describe("ReclutamientoService · invitar", () => {
       mediosDeContacto: [{ tipo: "EMAIL", valor: "ada@mail.com" }],
     });
 
+    await services.avisoAutomaticoService.procesarPendientes(new Date(), { tope: 100 });
     const notificacion = await invitar(ada.id);
 
     expect(notificacion.tipo).toBe("INVITACION");

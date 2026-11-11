@@ -31,7 +31,7 @@ describe("ColaboracionService · anotar un colaborador", () => {
 
     expect(colaboracion.colaborador.id).toBe(colaborador.id);
     expect(
-      await services.colaboracionService.listarPorProyecto(proyecto.id),
+      (await services.proyectoService.buscarPorId(proyecto.id)).colaboraciones,
     ).toHaveLength(1);
   });
 
@@ -63,7 +63,7 @@ describe("ColaboracionService · anotar un colaborador", () => {
     await anotar();
     await expect(anotar()).rejects.toThrow(ConflictError);
     expect(
-      await services.colaboracionService.listarPorProyecto(proyecto.id),
+      (await services.proyectoService.buscarPorId(proyecto.id)).colaboraciones,
     ).toHaveLength(1);
   });
 

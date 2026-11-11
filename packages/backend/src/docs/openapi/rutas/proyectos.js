@@ -24,7 +24,7 @@ export const rutasProyectos = {
         "Todos los proyectos de todos los colectivos, en orden de creacion. " +
         "Los filtros se combinan con AND.",
       parameters: [...paramsPaginacion, ...paramsFiltroDeProyectos],
-      responses: listado("Proyecto"),
+      responses: listado("ResumenProyecto"),
     },
   },
 
@@ -34,8 +34,9 @@ export const rutasProyectos = {
       tags: ["Proyectos"],
       summary: "Obtener proyecto",
       description:
-        "Cada consulta suma una visualizacion (req. adicional 17), tambien las del propio " +
-        "colectivo: el back todavia no sabe quien consulta.",
+        "Devuelve la primera página de 20 participaciones y colaboracionesMeta. El dueño ve " +
+        "postulaciones privadas; el público solo ACEPTADA/FINALIZADA. Los anónimos nunca " +
+        "revelan identidad. Las visitas del contexto del colectivo dueño no suman visualizaciones.",
       responses: { ...recurso("Proyecto"), 404: errores[404] },
     },
     put: {
@@ -43,11 +44,12 @@ export const rutasProyectos = {
       summary: "Actualizar proyecto",
       description:
         "Todos los campos son opcionales. `fechaCierre: null` saca la fecha " +
-        "de cierre. Un proyecto finalizado no se puede modificar: responde 409.",
+        "de cierre; si viene, tiene que ser futura (422). Un proyecto finalizado no se puede modificar: responde 409.",
       requestBody: body("ActualizarProyecto"),
       responses: {
         ...recurso("Proyecto"),
         400: errores[400],
+        422: errores[422],
         404: errores[404],
         409: errores[409],
       },
@@ -94,12 +96,13 @@ export const rutasProyectos = {
       summary: "Agregar un perfil al proyecto",
       description:
         "Las habilidades se indican por codigo y tienen que existir en el catalogo (404) y " +
-        "estar activas (400). Una habilidad no puede ser requerida y opcional a la vez (400). " +
+        "estar activas (422). Una habilidad no puede ser requerida y opcional a la vez (422). " +
         "Si el proyecto esta finalizado, 409.",
       requestBody: body("CrearPerfil"),
       responses: {
         ...recurso("Perfil", 201, "Perfil creado."),
         400: errores[400],
+        422: errores[422],
         404: errores[404],
         409: errores[409],
       },
@@ -124,15 +127,16 @@ export const rutasProyectos = {
       description:
         "Actualizacion parcial: se manda solo lo que cambia, pero al menos un campo (400 si " +
         "viene vacio). Para reemplazar habilidades, enviar ambos grupos de codigos y la " +
-        "`versionEdicion` del perfil leído. Los grupos y los otros campos se guardan juntos. " +
+        "`versionEdicion` del perfil leído (400 si falta alguno). Los grupos y los otros campos se guardan juntos. " +
         "Una version desactualizada responde 409. Cambiar " +
         "`modoAceptacion` o `limiteColaboraciones` resuelve las postulaciones pendientes del " +
         "perfil con las reglas nuevas; el limite no puede quedar por debajo de las ya " +
-        "aceptadas (400). Si el proyecto esta finalizado, 409.",
+        "aceptadas (422). Si el proyecto esta finalizado, 409.",
       requestBody: body("ActualizarPerfil"),
       responses: {
         ...recurso("Perfil"),
         400: errores[400],
+        422: errores[422],
         404: errores[404],
         409: errores[409],
       },
@@ -141,11 +145,12 @@ export const rutasProyectos = {
       tags: ["Perfiles"],
       summary: "Eliminar un perfil",
       description:
-        "El proyecto tiene que conservar al menos un perfil: borrar el ultimo responde 400. " +
-        "Si el proyecto esta finalizado, 409.",
+        "El proyecto tiene que conservar al menos un perfil: borrar el ultimo responde 422. " +
+        "Si el proyecto está finalizado o el perfil tiene historial de colaboraciones, 409.",
       responses: {
         204: { description: "Perfil eliminado." },
         400: errores[400],
+        422: errores[422],
         404: errores[404],
         409: errores[409],
       },
@@ -159,11 +164,12 @@ export const rutasProyectos = {
       summary: "Agregar una habilidad requerida",
       description:
         "409 si la habilidad ya es requerida u opcional en el perfil. 404 si el codigo no " +
-        "existe en el catalogo.",
+        "existe en el catalogo y 422 si esta dado de baja.",
       requestBody: body("HabilidadDePerfil"),
       responses: {
         ...recurso("Perfil", 200, "Perfil actualizado."),
         400: errores[400],
+        422: errores[422],
         404: errores[404],
         409: errores[409],
       },
@@ -177,10 +183,11 @@ export const rutasProyectos = {
       summary: "Quitar una habilidad requerida",
       description:
         "El perfil tiene que conservar al menos una habilidad requerida: quitar la ultima " +
-        "responde 400. 404 si la habilidad no es requerida en el perfil.",
+        "responde 422. 404 si la habilidad no es requerida en el perfil.",
       responses: {
         ...recurso("Perfil", 200, "Perfil actualizado."),
         400: errores[400],
+        422: errores[422],
         404: errores[404],
         409: errores[409],
       },
@@ -194,11 +201,12 @@ export const rutasProyectos = {
       summary: "Agregar una habilidad opcional",
       description:
         "409 si la habilidad ya es opcional o requerida en el perfil. 404 si el codigo no " +
-        "existe en el catalogo.",
+        "existe en el catalogo y 422 si esta dado de baja.",
       requestBody: body("HabilidadDePerfil"),
       responses: {
         ...recurso("Perfil", 200, "Perfil actualizado."),
         400: errores[400],
+        422: errores[422],
         404: errores[404],
         409: errores[409],
       },
@@ -290,12 +298,13 @@ export const rutasProyectos = {
       description:
         "Agrega una entrada al historial de avances y actualiza el porcentaje de concrecion " +
         "y los enlaces actuales del proyecto. Los avances no se editan ni se borran: son la " +
-        "trazabilidad del proyecto. El porcentaje tiene que superar al actual (400). Si el " +
+        "trazabilidad del proyecto. El porcentaje tiene que superar al actual (422). Si el " +
         "proyecto esta finalizado, 409.",
       requestBody: body("CrearAvance"),
       responses: {
         ...recurso("Avance", 201, "Avance registrado."),
         400: errores[400],
+        422: errores[422],
         404: errores[404],
         409: errores[409],
       },
@@ -359,39 +368,59 @@ export const rutasProyectos = {
         "proyecto tiene que estar abierto (409 si no; si la fecha de cierre ya paso, se " +
         "cierra en el momento), el perfil tiene que existir (404) y tener la busqueda " +
         "abierta y sin vencer (409), la persona tiene que tener **todas** las habilidades " +
-        "requeridas de ese perfil (400 si no), y no puede haberse postulado antes al " +
-        "proyecto (409). La colaboracion queda PENDIENTE o se resuelve en el momento segun " +
+        "requeridas de ese perfil (422 si no), y no puede haberse postulado antes al " +
+        "mismo perfil, salvo RETIRADA (409). La colaboracion queda PENDIENTE o se resuelve en el momento segun " +
         "el `modoAceptacion` del perfil. Con " +
         "`esPublica: false` la contribucion es anonima: figura, pero con `colaborador: null`.",
       requestBody: body("AnotarColaborador"),
       responses: {
         ...recurso("Colaboracion", 201, "Colaboracion registrada."),
         400: errores[400],
+        422: errores[422],
         404: errores[404],
         409: errores[409],
       },
     },
     get: {
-      tags: ["Proyectos"],
-      summary: "Listar postulaciones y colaboraciones del proyecto",
+      tags: ["Postulaciones"],
+      summary: "Listar postulaciones del proyecto, paginadas",
       description:
-        "Solo para el colectivo dueño (permiso POSTULACION_RESOLVER). Todas, en cualquier " +
-        "estado; las anonimas vienen con `colaborador: null`. En el detalle publico del " +
-        "proyecto solo figuran las ACEPTADA y FINALIZADA.",
-      responses: {
-        200: {
-          description: "Colaboraciones registradas.",
-          content: {
-            "application/json": {
-              schema: {
-                type: "array",
-                items: { $ref: "#/components/schemas/Colaboracion" },
-              },
-            },
+        "Solo el colectivo dueño con POSTULACION_RESOLVER. Incluye cualquier estado; oculta autores anónimos.",
+      security: [{ bearerAuth: [], contexto: [] }],
+      parameters: [
+        ...paramsPaginacion,
+        {
+          name: "estado",
+          in: "query",
+          schema: {
+            type: "string",
+            enum: [
+              "PENDIENTE",
+              "ACEPTADA",
+              "RECHAZADA",
+              "FINALIZADA",
+              "DESVINCULADA",
+              "RETIRADA",
+            ],
           },
         },
+      ],
+      responses: {
+        ...listado("Colaboracion"),
+        401: errores[401],
+        403: errores[403],
         404: errores[404],
       },
+    },
+  },
+  "/proyectos/{id}/participaciones": {
+    get: {
+      tags: ["Postulaciones"],
+      summary: "Participaciones públicas paginadas",
+      description:
+        "Solo ACEPTADA/FINALIZADA. Las contribuciones anónimas figuran con colaborador null.",
+      parameters: [paramId, ...paramsPaginacion],
+      responses: { ...listado("Colaboracion"), 404: errores[404] },
     },
   },
 
@@ -532,12 +561,13 @@ export const rutasProyectos = {
       summary: "Invitar a una persona a un perfil",
       description:
         "Le manda una notificacion interna (replicada por sus medios de contacto). La " +
-        "persona tiene que cumplir el perfil (400), no haberse postulado ya y aceptar " +
+        "persona tiene que cumplir el perfil (422), no haberse postulado ya y aceptar " +
         "mensajeria interna (409), y el proyecto tiene que estar abierto (409).",
       requestBody: body("Invitacion"),
       responses: {
         ...recurso("Notificacion", 201, "Invitacion enviada."),
         400: errores[400],
+        422: errores[422],
         404: errores[404],
         409: errores[409],
       },

@@ -1,4 +1,5 @@
 import { NotFoundError } from "../../errors/NotFoundError.js";
+import { ConflictError } from "../../errors/ConflictError.js";
 
 export async function buscarProyectoOFallar(proyectoRepository, proyectoId) {
   const proyecto = await proyectoRepository.buscarPorId(proyectoId);
@@ -17,4 +18,12 @@ export async function buscarPerfilOFallar(proyectoRepository, proyectoId, perfil
     );
   }
   return { proyecto, perfil };
+}
+
+export async function buscarProyectoAbiertoOFallar(proyectoRepository, proyectoId) {
+  const proyecto = await buscarProyectoOFallar(proyectoRepository, proyectoId);
+  if (!proyecto.estaAbierto()) {
+    throw new ConflictError(`El proyecto con id "${proyectoId}" no se encuentra abierto`);
+  }
+  return proyecto;
 }

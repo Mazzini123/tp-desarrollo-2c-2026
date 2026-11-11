@@ -28,9 +28,9 @@ function urlHttp(valor, produccion) {
   const url = new URL(valor);
   return Boolean(
     !url.username &&
-      !url.password &&
-      !valor.includes("#") &&
-      (!produccion || url.protocol === "https:"),
+    !url.password &&
+    !valor.includes("#") &&
+    (!produccion || url.protocol === "https:"),
   );
 }
 
@@ -162,8 +162,4 @@ export function crearAutenticador(proveedores, codigosActivos = null) {
     );
   }
   return new RegistroDeProveedores(habilitados);
-}
-
-export function crearAutenticadorDesdeEntorno(entorno = process.env) {
-  return crearAutenticador(proveedoresDesdeEntorno(entorno));
 }

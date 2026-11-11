@@ -1,4 +1,4 @@
-import { CODIGOS, datosDePerfil } from "../fixtures.js";
+import { CODIGOS, datosDePerfil, proyectosDelColectivo } from "../fixtures.js";
 import { armarServicesConMongo, usarBaseDeTest } from "./baseDeTest.js";
 import {
   cumpleHabilidadesRequeridas,
@@ -147,6 +147,7 @@ describe("proyectos potenciales segun las habilidades de una persona", () => {
     await s.colaboracionService.aceptar(i.id, enI.id);
 
     const persona = await crearPersona("persona", nodo);
+    await s.avisoAutomaticoService.procesarPendientes(new Date(), { tope: 100 });
     const bandeja = await s.notificacionService.listar(persona.id);
     expect(bandeja.items[0].asunto).toBe(
       "Hay 3 proyecto(s) que coinciden con tus habilidades",
@@ -166,7 +167,7 @@ describe("proyectos potenciales segun las habilidades de una persona", () => {
     expect(pagina.total).toBe(2);
 
     const titulosEncontrados = new Set(pagina.items.map((p) => p.titulo));
-    const todos = await s.proyectoService.listarPorColectivo(colectivo.id);
+    const todos = await proyectosDelColectivo(colectivo.id);
     const ahora = new Date();
     for (const proyecto of todos) {
       const segunDominio =

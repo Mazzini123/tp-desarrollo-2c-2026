@@ -1,3 +1,4 @@
+import { notificarResoluciones } from "./soporte/notificarResoluciones.js";
 import { buscarProvincia, nombreDeUbicacion } from "../domain/Ubicacion.js";
 import { DomainError } from "../errors/DomainError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
@@ -5,10 +6,11 @@ import { TIPO_UBICACION } from "../domain/enums/TIPO_UBICACION.js";
 import { armarPaginado } from "../utils/paginacion.js";
 import { construirRedesSociales } from "../domain/RedSocial.js";
 import { normalizarEtiquetas } from "../domain/etiquetas.js";
-import { mismoMedioDeContacto, sinMediosRepetidos } from "../domain/MedioDeContacto.js";
+import { sinMediosRepetidos } from "../domain/MedioDeContacto.js";
 import { ConflictError } from "../errors/ConflictError.js";
-import { cerrarProyecto, notificarResoluciones } from "./reglasDePostulacion.js";
-import { TIPO_EVENTO_TIMELINE } from "../domain/enums/TIPO_EVENTO_TIMELINE.js";
+import { cerrarProyecto } from "./reglasDePostulacion.js";
+import { paginaDeResumenes } from "../dto/resumenDeProyecto.js";
+import { PRIMERA_PAGINA, metaDePrimeraPagina } from "../dto/paginacion.js";
 
 export class ColectivoService {
   constructor({
@@ -44,12 +46,10 @@ export class ColectivoService {
   }
 
   async listar({ numeroPagina = 1, limitePorPagina = 10, etiqueta } = {}) {
+    const pagina = { numeroPagina, limitePorPagina };
     return armarPaginado(
-      await this.colectivoRepository.listarPaginado(numeroPagina, limitePorPagina, {
-        etiqueta,
-      }),
-      numeroPagina,
-      limitePorPagina,
+      await this.colectivoRepository.listarPaginado(pagina, { etiqueta }),
+      pagina,
     );
   }
 
@@ -72,72 +72,59 @@ export class ColectivoService {
     const colectivo = await this.buscarPorId(id);
     const [nuevo] = sinMediosRepetidos([medio]);
 
-    if (
-      colectivo.mediosDeContacto.some((existente) =>
-        mismoMedioDeContacto(existente, nuevo),
-      )
-    ) {
+    if (colectivo.tieneMedioDeContacto(nuevo)) {
       throw new ConflictError("El colectivo ya tiene registrado ese medio de contacto");
     }
 
-    colectivo.mediosDeContacto.push(nuevo);
+    colectivo.agregarMedioDeContacto(nuevo);
     await this.colectivoRepository.guardar(colectivo);
     return nuevo;
   }
 
   async quitarMedioDeContacto(id, medio) {
     const colectivo = await this.buscarPorId(id);
-    const restantes = colectivo.mediosDeContacto.filter(
-      (existente) => !mismoMedioDeContacto(existente, medio),
-    );
-
-    if (restantes.length === colectivo.mediosDeContacto.length) {
+    if (!colectivo.tieneMedioDeContacto(medio)) {
       throw new NotFoundError("El colectivo no tiene registrado ese medio de contacto");
     }
 
-    colectivo.mediosDeContacto = restantes;
+    colectivo.quitarMedioDeContacto(medio);
     await this.colectivoRepository.guardar(colectivo);
   }
 
-  async actualizar(
-    id,
-    { nombre, descripcion, ubicacion, redesSociales, etiquetas, mediosDeContacto },
-  ) {
-    const colectivo = await this.buscarPorId(id);
+  async actualizar(id, { nombre, descripcion, ubicacion, redesSociales, etiquetas }) {
+    return this.transacciones.ejecutar(async () => {
+      const colectivo = await this.buscarPorId(id);
 
-    if (colectivo.estaDadoDeBaja()) {
-      throw new ConflictError("No se puede modificar un colectivo dado de baja");
-    }
+      if (colectivo.estaDadoDeBaja()) {
+        throw new ConflictError("No se puede modificar un colectivo dado de baja");
+      }
 
-    if (nombre !== undefined) {
-      colectivo.nombre = nombre;
-    }
+      if (nombre !== undefined) {
+        colectivo.nombre = nombre;
+      }
 
-    if (descripcion !== undefined) {
-      colectivo.descripcion = descripcion;
-    }
+      if (descripcion !== undefined) {
+        colectivo.descripcion = descripcion;
+      }
 
-    if (ubicacion !== undefined) {
-      colectivo.ubicacion = this.construirUbicacion(ubicacion);
-    }
+      if (ubicacion !== undefined) {
+        colectivo.ubicacion = this.construirUbicacion(ubicacion);
+      }
 
-    if (redesSociales !== undefined) {
-      colectivo.redesSociales = construirRedesSociales(redesSociales);
-    }
+      if (redesSociales !== undefined) {
+        colectivo.redesSociales = construirRedesSociales(redesSociales);
+      }
 
-    if (etiquetas !== undefined) {
-      colectivo.etiquetas = normalizarEtiquetas(etiquetas);
-    }
+      if (etiquetas !== undefined) {
+        colectivo.etiquetas = normalizarEtiquetas(etiquetas);
+      }
 
-    if (mediosDeContacto !== undefined) {
-      colectivo.mediosDeContacto = sinMediosRepetidos(mediosDeContacto);
-    }
-
-    await this.colectivoRepository.guardar(colectivo);
-    if (nombre !== undefined || ubicacion !== undefined) {
-      await this.proyectoRepository.actualizarDatosDelColectivo(colectivo);
-    }
-    return colectivo;
+      await this.colectivoRepository.guardar(colectivo);
+      if (nombre !== undefined || ubicacion !== undefined) {
+        await this.proyectoRepository.actualizarDatosDelColectivo(colectivo);
+      }
+      return colectivo;
+    });
   }
 
   async darDeBaja(id, ahora = new Date()) {
@@ -149,7 +136,6 @@ export class ColectivoService {
       }
 
       colectivo.darDeBaja(ahora);
-      // Al dar de baja se borran los datos de contacto: dejan de ser publicos.
       colectivo.mediosDeContacto = [];
       colectivo.redesSociales = [];
       await this.colectivoRepository.guardar(colectivo);
@@ -160,81 +146,35 @@ export class ColectivoService {
       for (const proyecto of abiertos) {
         const cambios = cerrarProyecto(proyecto, ahora);
         await this.proyectoRepository.guardar(proyecto);
-        // La notificación se encola en Mongo. El job la ve después del commit.
-        await notificarResoluciones(this.notificacionService, proyecto, cambios, {
-          propagarError: true,
-        });
+        await notificarResoluciones(this.notificacionService, proyecto, cambios);
       }
 
       return colectivo;
     });
   }
 
-  async timeline(id) {
-    const colectivo = await this.buscarPorId(id);
-    const proyectos = await this.proyectoRepository.buscarPorColectivo(id);
-    const eventos = [
-      evento(TIPO_EVENTO_TIMELINE.ALTA_DEL_COLECTIVO, colectivo.fechaAlta),
-      evento(TIPO_EVENTO_TIMELINE.BAJA_DEL_COLECTIVO, colectivo.fechaBaja),
-    ];
-
-    proyectos.forEach((proyecto) => {
-      const delProyecto = { proyecto: { id: proyecto.id, titulo: proyecto.titulo } };
-
-      eventos.push(
-        evento(TIPO_EVENTO_TIMELINE.PROYECTO_CREADO, proyecto.fechaCreacion, delProyecto),
-        evento(
-          TIPO_EVENTO_TIMELINE.PROYECTO_FINALIZADO,
-          proyecto.fechaFinalizacion,
-          delProyecto,
-        ),
-        ...proyecto.logros.map((logro) =>
-          evento(TIPO_EVENTO_TIMELINE.LOGRO, logro.fecha, {
-            ...delProyecto,
-            logro: { titulo: logro.titulo, descripcion: logro.descripcion },
-          }),
-        ),
-        ...proyecto.avances.map((avance) =>
-          evento(TIPO_EVENTO_TIMELINE.AVANCE, avance.fecha, {
-            ...delProyecto,
-            avance: {
-              porcentajeConcrecion: avance.porcentajeConcrecion,
-              urlSistema: avance.urlSistema,
-              urlRepositorio: avance.urlRepositorio,
-            },
-          }),
-        ),
-        ...proyecto.colaboraciones
-          .filter((c) => c.estaFinalizada())
-          .map((c) =>
-            evento(TIPO_EVENTO_TIMELINE.COLABORACION_CERRADA, c.fechaFin, {
-              ...delProyecto,
-              colaborador: c.esPublica
-                ? { id: c.colaborador.id, nombre: c.colaborador.nombreParaMostrar() }
-                : null,
-            }),
-          ),
-      );
-    });
-
-    return eventos.filter((e) => e.fecha).sort((a, b) => a.fecha - b.fecha);
+  async conCantidadDeProyectos(colectivos) {
+    const cantidades = await this.proyectoRepository.contarPorColectivos(
+      colectivos.map((c) => c._id),
+    );
+    return colectivos.map((c) => ({
+      ...c.toJSON(),
+      cantidadProyectos: cantidades.get(c.id) ?? 0,
+    }));
   }
 
-  async conProyectos(colectivos) {
-    const lista = Array.isArray(colectivos) ? colectivos : [colectivos];
-    const proyectos = await this.proyectoRepository.buscarPorColectivos(
-      lista.map((c) => c._id),
+  async conPrimerosProyectos(colectivo) {
+    const pagina = paginaDeResumenes(
+      await this.proyectoRepository.listarPorColectivoPaginado(
+        colectivo._id,
+        PRIMERA_PAGINA,
+      ),
     );
-    const vistas = lista.map((colectivo) => ({
+    return {
       ...colectivo.toJSON(),
-      proyectos: proyectos
-        .filter((p) => String(p.colectivoId) === String(colectivo._id))
-        .map((p) => {
-          const { colectivo: _, ...json } = p.toJSON();
-          return json;
-        }),
-    }));
-    return Array.isArray(colectivos) ? vistas : vistas[0];
+      proyectos: pagina.items.map(({ colectivo: _colectivo, ...proyecto }) => proyecto),
+      proyectosMeta: metaDePrimeraPagina(pagina.total),
+    };
   }
 
   construirUbicacion(datos) {
@@ -258,8 +198,4 @@ export class ColectivoService {
       nombre: nombreDeUbicacion(tipoUbicacion, provincia ?? nombre),
     };
   }
-}
-
-function evento(tipo, fecha, datos = {}) {
-  return { tipo, fecha, ...datos };
 }

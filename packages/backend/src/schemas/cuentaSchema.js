@@ -12,7 +12,7 @@ export const nombreDeUsuarioSchema = z
   .strict();
 
 export const seleccionarContextoSchema = z
-  .object({ contextoId: z.string().trim().min(1) })
+  .object({ contextoId: objectIdSchema })
   .strict();
 
 export const transferirLiderazgoSchema = z

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { crearPerfilSchema } from "./perfilSchema.js";
 import { tieneAlgunCampoDefinido } from "../utils/validaciones.js";
 import {
+  objectIdSchema,
   etiquetasSchema,
   fechaDeCierreSchema as fechaCierreSchema,
 } from "./comunesSchema.js";
@@ -30,8 +31,8 @@ export const actualizarProyectoSchema = z
 
 export const anotarColaboradorSchema = z
   .object({
-    colaboradorId: z.string().trim().min(1),
-    perfilId: z.string().trim().min(1),
+    colaboradorId: objectIdSchema,
+    perfilId: objectIdSchema,
     esPublica: z.boolean().default(true),
   })
   .strict();

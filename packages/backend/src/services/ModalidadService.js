@@ -55,7 +55,7 @@ export class ModalidadService {
         );
       }
 
-      const nuevo = await this.colaboradorService.crear(datos, { avisar: false });
+      const nuevo = await this.colaboradorService.crear(datos);
       const contexto = await this.contextoUsuarioRepository.crear({
         usuarioId: usuario._id,
         tipo: TIPO_CONTEXTO.COLABORADOR,
@@ -66,7 +66,6 @@ export class ModalidadService {
       return nuevo;
     });
 
-    await this.colaboradorService.avisarAlta(colaborador);
     return colaborador;
   }
 

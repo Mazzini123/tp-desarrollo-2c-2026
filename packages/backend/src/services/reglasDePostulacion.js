@@ -1,6 +1,5 @@
 import { DomainError } from "../errors/DomainError.js";
 import { MODO_ACEPTACION } from "../domain/enums/MODO_ACEPTACION.js";
-import { TIPO_NOTIFICACION } from "../domain/enums/TIPO_NOTIFICACION.js";
 
 export function aplicarModoDeAceptacion(proyecto, perfil, fecha) {
   const aceptadas = [];
@@ -97,47 +96,4 @@ export function puedeVerContactoDe(proyecto, colaborador) {
   return proyecto.colaboraciones.some(
     (c) => c.esDe(colaborador) && c.estaAceptada() && c.esPublica,
   );
-}
-
-export async function notificarResoluciones(
-  notificacionService,
-  proyecto,
-  { aceptadas = [], rechazadas = [], finalizadas = [] },
-  { propagarError = false } = {},
-) {
-  const titulo = `"${proyecto.titulo}"`;
-  const avisos = [
-    ...aceptadas.map((c) => [
-      c,
-      TIPO_NOTIFICACION.POSTULACION_ACEPTADA,
-      `Tu postulacion a ${titulo} fue aceptada`,
-    ]),
-    ...rechazadas.map((c) => [
-      c,
-      TIPO_NOTIFICACION.POSTULACION_RECHAZADA,
-      `Tu postulacion a ${titulo} fue rechazada`,
-    ]),
-    ...finalizadas.map((c) => [
-      c,
-      TIPO_NOTIFICACION.COLABORACION_FINALIZADA,
-      `Tu colaboracion en ${titulo} finalizo: ya podes valorar al colectivo`,
-    ]),
-  ];
-
-  for (const [colaboracion, tipo, asunto] of avisos) {
-    try {
-      await notificacionService.notificar(colaboracion.colaborador, {
-        tipo,
-        asunto,
-        contenido: `${asunto}.`,
-        referencias: { proyectoId: proyecto.id, colaboracionId: colaboracion.id },
-      });
-    } catch (error) {
-      if (propagarError) throw error;
-      console.error(
-        "No se pudo notificar la resolucion de una postulacion:",
-        error.message,
-      );
-    }
-  }
 }

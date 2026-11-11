@@ -1,6 +1,6 @@
 import { BaseController } from "./BaseController.js";
 import { colectivoDelContexto } from "../security/http/contexto.js";
-import { paginaPublica, proyectoPublico } from "../dto/vistasPublicas.js";
+import { proyectoPublico } from "../dto/vistasPublicas.js";
 
 export class ProyectoController extends BaseController {
   constructor({ proyectoService, colaboracionService }) {
@@ -15,7 +15,7 @@ export class ProyectoController extends BaseController {
       req.consulta;
     const filtros = { etiqueta, estado, habilidad, tipoColectivo, ubicacion, modalidad };
     const pagina = await this.proyectoService.listar({ ...paginacion, ...filtros });
-    this.responderPaginado(res, paginaPublica(pagina, proyectoPublico));
+    this.responderPaginado(res, pagina);
   };
 
   obtenerPorId = async (req, res) => {
@@ -56,6 +56,23 @@ export class ProyectoController extends BaseController {
   };
 
   listarColaboraciones = async (req, res) => {
-    res.status(200).json(await this.colaboracionService.listarPorProyecto(req.params.id));
+    this.responderPaginado(
+      res,
+      await this.colaboracionService.listarPaginaPorProyecto(req.params.id, {
+        ...this.aPaginacionDeDominio(req.consulta),
+        estado: req.consulta.estado,
+        privadas: true,
+      }),
+    );
+  };
+
+  listarParticipaciones = async (req, res) => {
+    this.responderPaginado(
+      res,
+      await this.colaboracionService.listarPaginaPorProyecto(
+        req.params.id,
+        this.aPaginacionDeDominio(req.consulta),
+      ),
+    );
   };
 }

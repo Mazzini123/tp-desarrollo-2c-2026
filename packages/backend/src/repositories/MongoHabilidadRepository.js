@@ -1,4 +1,5 @@
 import { HabilidadModel } from "../models/HabilidadModel.js";
+import { paginar } from "./paginar.js";
 
 export class MongoHabilidadRepository {
   async crear(datos) {
@@ -13,18 +14,16 @@ export class MongoHabilidadRepository {
     return HabilidadModel.findOne({ codigo });
   }
 
+  async buscarPorCodigos(codigos) {
+    return HabilidadModel.find({ codigo: { $in: codigos } });
+  }
+
   async listar() {
     return HabilidadModel.find().sort({ _id: 1 });
   }
 
-  async listarPaginado(numeroPagina, limitePorPagina) {
-    const salto = (numeroPagina - 1) * limitePorPagina;
-    const [items, total] = await Promise.all([
-      HabilidadModel.find().sort({ _id: 1 }).skip(salto).limit(limitePorPagina),
-      HabilidadModel.countDocuments(),
-    ]);
-
-    return { items, total };
+  async listarPaginado(pagina) {
+    return paginar(HabilidadModel, {}, pagina, { orden: { _id: 1 } });
   }
 
   async existeCodigo(codigo) {

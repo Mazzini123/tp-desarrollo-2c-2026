@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { validarIdsDeRuta } from "../middlewares/validarIds.js";
 import { validarBody, validarParams, validarQuery } from "../middlewares/validar.js";
 import {
   paginacionSchema,
@@ -16,13 +17,13 @@ import {
 } from "../schemas/medioDeContactoSchema.js";
 import { PERMISO } from "../security/autorizacion/enums/PERMISO.js";
 
-export function crearColaboradoresRouter(
-  colaboradorController,
-  notificacionController,
-  reclutamientoController,
-  autorizacion,
-) {
-  const router = Router();
+export function crearColaboradoresRouter(controllers, autorizacion) {
+  const {
+    colaborador: colaboradorController,
+    notificacion: notificacionController,
+    reclutamiento: reclutamientoController,
+  } = controllers;
+  const router = validarIdsDeRuta(Router());
   const { permiso, colaboradoraDe } = autorizacion;
   const editarPerfil = [permiso(PERMISO.COLABORADOR_PERFIL_EDITAR), colaboradoraDe()];
 
@@ -72,13 +73,12 @@ export function crearColaboradoresRouter(
     colaboradorController.quitarHabilidad,
   );
 
-  if (autorizacion.activa) {
-    router.get(
-      "/:id/medios-de-contacto",
-      editarPerfil,
-      colaboradorController.mediosDeContacto,
-    );
-  }
+  router.get(
+    "/:id/medios-de-contacto",
+    autorizacion.soloConAutenticacion,
+    editarPerfil,
+    colaboradorController.mediosDeContacto,
+  );
 
   router.post(
     "/:id/medios-de-contacto",

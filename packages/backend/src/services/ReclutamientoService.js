@@ -3,7 +3,9 @@ import { ConflictError } from "../errors/ConflictError.js";
 import { TIPO_NOTIFICACION } from "../domain/enums/TIPO_NOTIFICACION.js";
 import { ESTADO_BUSQUEDA } from "../domain/enums/ESTADO_BUSQUEDA.js";
 import { armarPaginado } from "../utils/paginacion.js";
+import { paginaDeResumenes } from "../dto/resumenDeProyecto.js";
 import { cumpleHabilidadesRequeridas, estadoDeBusqueda } from "./reglasDeBusqueda.js";
+import { yaSePostuloAlPerfil } from "./reglasDePostulacion.js";
 
 export class ReclutamientoService {
   constructor({
@@ -29,30 +31,29 @@ export class ReclutamientoService {
       proyectoId,
       perfilId,
     );
+    const paginado = { numeroPagina, limitePorPagina };
 
     const pagina = await this.colaboradorRepository.buscarPotenciales(
       {
         requeridas: perfil.codigosRequeridos(),
         opcionales: perfil.codigosOpcionales(),
-        excluirIds: proyecto.colaboraciones.map((c) => c.colaborador._id),
+        excluirIds: proyecto.colaboraciones
+          .filter((c) => String(c.perfil) === perfil.id && !c.estaRetirada())
+          .map((c) => c.colaborador._id),
       },
-      numeroPagina,
-      limitePorPagina,
+      paginado,
     );
 
-    return armarPaginado(pagina, numeroPagina, limitePorPagina);
+    return armarPaginado(pagina, paginado);
   }
 
   async buscarProyectos(colaboradorId, { numeroPagina = 1, limitePorPagina = 10 } = {}) {
     const colaborador = await this.colaboradorService.buscarPorId(colaboradorId);
 
-    const pagina = await this.proyectoRepository.buscarCompatibles(
-      colaborador,
-      numeroPagina,
-      limitePorPagina,
-    );
+    const paginado = { numeroPagina, limitePorPagina };
+    const pagina = await this.proyectoRepository.buscarCompatibles(colaborador, paginado);
 
-    return armarPaginado(pagina, numeroPagina, limitePorPagina);
+    return paginaDeResumenes(armarPaginado(pagina, paginado));
   }
 
   async invitar(proyectoId, perfilId, { colaboradorId, mensaje }) {
@@ -77,8 +78,8 @@ export class ReclutamientoService {
       );
     }
 
-    if (proyecto.yaColaboraron(colaborador)) {
-      throw new ConflictError("La persona ya se postulo a este proyecto");
+    if (yaSePostuloAlPerfil(proyecto, colaborador, perfil)) {
+      throw new ConflictError("La persona ya se postulo a este perfil");
     }
 
     if (await this.notificacionService.yaInvitada(colaborador.id, perfil.id)) {

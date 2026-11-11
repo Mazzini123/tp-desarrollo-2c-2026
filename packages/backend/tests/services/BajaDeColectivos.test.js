@@ -1,4 +1,9 @@
-import { armarServices, datosDePerfil, CODIGOS } from "../fixtures.js";
+import {
+  armarServices,
+  datosDePerfil,
+  CODIGOS,
+  proyectosDelColectivo,
+} from "../fixtures.js";
 import { ConflictError } from "../../src/errors/ConflictError.js";
 
 // Requerimiento adicional 23: eliminacion de colectivos.
@@ -44,9 +49,7 @@ describe("Baja de un colectivo", () => {
     expect(guardado.mediosDeContacto).toEqual([]);
     expect(guardado.redesSociales).toEqual([]);
     expect(guardado.nombre).toBe("Huerta");
-    expect(await services.proyectoService.listarPorColectivo(colectivo.id)).toHaveLength(
-      1,
-    );
+    expect(await proyectosDelColectivo(colectivo.id)).toHaveLength(1);
   });
 
   test("cierra los proyectos abiertos, con sus consecuencias", async () => {

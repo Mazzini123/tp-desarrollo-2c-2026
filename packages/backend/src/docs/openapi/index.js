@@ -1,6 +1,3 @@
-// Especificacion OpenAPI de la API: se sirve en /docs y /openapi.json.
-// Las rutas estan en rutas/ (un archivo por recurso) y los esquemas en esquemas/.
-
 import { rutasHealth } from "./rutas/health.js";
 import { rutasColectivos } from "./rutas/colectivos.js";
 import { rutasColaboradores } from "./rutas/colaboradores.js";
@@ -11,6 +8,8 @@ import { rutasCatalogos } from "./rutas/catalogos.js";
 import { rutasHabilidades } from "./rutas/habilidades.js";
 import { respuestas } from "./esquemas/respuestas.js";
 import { entradas } from "./esquemas/entradas.js";
+import { errores } from "./comunes.js";
+import { PARAMETROS_DE_ID } from "../../middlewares/validarIds.js";
 
 export const openapi = {
   openapi: "3.0.3",
@@ -36,21 +35,26 @@ export const openapi = {
       "JWT (emisor, audiencia y firma). Las lecturas publicas siguen abiertas. La cuenta",
       "puede crear un perfil de colaboradora nuevo despues de dar de baja el anterior.",
       "La API responde 401 sin sesion valida y 403 si falta autorizacion sobre el recurso.",
-      "El modo sin autenticacion se habilita expresamente en development o test.",
+      "El modo sin autenticacion se habilita expresamente en development o test; en ese",
+      "modo, las rutas que necesitan una cuenta responden 401.",
       "",
       "**Persistencia.** MongoDB. Colectivos, proyectos y colaboraciones en colecciones",
-      "propias; perfiles, logros y avances embebidos en el proyecto. Las respuestas siguen",
-      "anidando los proyectos en el colectivo y las colaboraciones en el proyecto. Los",
+      "propias; perfiles, logros y avances embebidos en el proyecto. Los listados usan resúmenes",
+      "sin historiales. Los detalles anidan una primera página con metadatos. Los",
       "colaboradores se referencian por id (populate) y de cada habilidad se guarda una",
       "copia con su codigo y titulo.",
-      "Todos los ids son ObjectId (24 caracteres hexadecimales).",
+      "Todos los ids son ObjectId (24 caracteres hexadecimales): un id con otro formato",
+      "responde 400 y uno bien formado que no existe, 404.",
+      "",
+      "**400 o 422.** 400 es un pedido mal formado (falta un campo, sobra uno, un tipo",
+      "no coincide). 422 es un pedido bien formado que incumple una regla de negocio.",
       "",
       "**Segunda entrega.** Se suman perfiles, postulaciones con estado, contribuciones",
       "anonimas, medios de contacto (que nunca se muestran), notificaciones internas",
       "replicadas por email/WhatsApp/SMS, busqueda de colaboradoras, valoraciones,",
       "estadisticas, timeline, etiquetas y redes sociales.",
       "",
-      "**Seguridad.** Todo texto que entra se limpia de HTML (req. adicional 11) y hay un",
+      "**Seguridad.** Los campos Markdown conservan código y autolinks; el HTML fuera del código se limpia. Hay un",
       "limite de solicitudes por IP (req. adicional 14): 300 cada 15 minutos en general y 30",
       "por minuto en busquedas y estadisticas.",
       "",
@@ -148,3 +152,17 @@ export const openapi = {
     },
   },
 };
+
+const erroresDeEntrada = { description: "El cuerpo JSON supera el límite de 100 KB." };
+for (const ruta of Object.values(openapi.paths)) {
+  for (const verbo of ["post", "put", "patch"])
+    if (ruta[verbo]?.requestBody) ruta[verbo].responses[413] = erroresDeEntrada;
+}
+
+const conIdEnLaRuta = (camino) =>
+  PARAMETROS_DE_ID.some((nombre) => camino.includes(`{${nombre}}`));
+for (const [camino, ruta] of Object.entries(openapi.paths)) {
+  if (!conIdEnLaRuta(camino)) continue;
+  for (const verbo of ["get", "post", "put", "patch", "delete"])
+    if (ruta[verbo]) ruta[verbo].responses[400] ??= errores[400];
+}

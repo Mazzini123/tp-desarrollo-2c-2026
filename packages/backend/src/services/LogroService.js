@@ -1,16 +1,21 @@
-import { ConflictError } from "../errors/ConflictError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
-import { buscarProyectoOFallar } from "./soporte/buscarOFallar.js";
+import { ConflictError } from "../errors/ConflictError.js";
+import {
+  buscarProyectoAbiertoOFallar,
+  buscarProyectoOFallar,
+} from "./soporte/buscarOFallar.js";
 
 export class LogroService {
   constructor({ proyectoRepository }) {
     this.proyectoRepository = proyectoRepository;
   }
 
-  async crearParaProyecto(proyectoId, datos) {
-    const proyecto = await this.buscarProyectoAbierto(proyectoId);
-    this.validarTituloLogroParaProyecto(datos.titulo, proyecto);
-
+  async crear(proyectoId, datos) {
+    const proyecto = await buscarProyectoAbiertoOFallar(
+      this.proyectoRepository,
+      proyectoId,
+    );
+    this.validarTituloUnico(proyecto, datos.titulo);
     const logro = proyecto.agregarLogro({
       titulo: datos.titulo,
       descripcion: datos.descripcion,
@@ -20,22 +25,23 @@ export class LogroService {
     return logro;
   }
 
-  async conseguirTodosDeProyecto(proyectoId) {
+  async listar(proyectoId) {
     return (await buscarProyectoOFallar(this.proyectoRepository, proyectoId)).logros;
   }
 
-  async conseguirPorIdParaProyecto(proyectoId, logroId) {
+  async buscarPorId(proyectoId, logroId) {
     const proyecto = await buscarProyectoOFallar(this.proyectoRepository, proyectoId);
 
-    return this.buscarLogroDeProyectoOrThrow(proyecto, logroId);
+    return this.buscarLogroOFallar(proyecto, logroId);
   }
 
-  async actualizarParaProyecto(proyectoId, logroId, { titulo, descripcion }) {
-    const proyecto = await this.buscarProyectoAbierto(proyectoId);
-    this.validarTituloLogroParaProyecto(titulo, proyecto, logroId);
-
-    const logro = this.buscarLogroDeProyectoOrThrow(proyecto, logroId);
-
+  async actualizar(proyectoId, logroId, { titulo, descripcion }) {
+    const proyecto = await buscarProyectoAbiertoOFallar(
+      this.proyectoRepository,
+      proyectoId,
+    );
+    const logro = this.buscarLogroOFallar(proyecto, logroId);
+    this.validarTituloUnico(proyecto, titulo, logroId);
     logro.titulo = titulo;
     logro.descripcion = descripcion;
 
@@ -43,28 +49,30 @@ export class LogroService {
     return logro;
   }
 
-  validarTituloLogroParaProyecto(tituloLogro, proyecto, logroId = null) {
-    if (
-      proyecto.logros.some(
-        (l) => l.titulo.toLowerCase() === tituloLogro.toLowerCase() && l.id !== logroId,
-      )
-    ) {
+  async eliminar(proyectoId, logroId) {
+    const proyecto = await buscarProyectoAbiertoOFallar(
+      this.proyectoRepository,
+      proyectoId,
+    );
+
+    const logro = this.buscarLogroOFallar(proyecto, logroId);
+    proyecto.quitarLogro(logro);
+
+    await this.proyectoRepository.guardar(proyecto);
+  }
+
+  validarTituloUnico(proyecto, titulo, logroId = null) {
+    const repetido = proyecto.logros.some(
+      (l) => l.titulo.toLowerCase() === titulo.toLowerCase() && l.id !== logroId,
+    );
+    if (repetido) {
       throw new ConflictError(
         `El proyecto con id "${proyecto.id}" ya contiene un logro con mismo titulo`,
       );
     }
   }
 
-  async eliminarParaProyecto(proyectoId, logroId) {
-    const proyecto = await this.buscarProyectoAbierto(proyectoId);
-
-    const logro = this.buscarLogroDeProyectoOrThrow(proyecto, logroId);
-    proyecto.logros = proyecto.logros.filter((l) => l.id !== logro.id);
-
-    await this.proyectoRepository.guardar(proyecto);
-  }
-
-  buscarLogroDeProyectoOrThrow(proyecto, logroId) {
+  buscarLogroOFallar(proyecto, logroId) {
     const logro = proyecto.logros.find((l) => l.id === logroId);
 
     if (!logro) {
@@ -74,15 +82,5 @@ export class LogroService {
     }
 
     return logro;
-  }
-
-  async buscarProyectoAbierto(proyectoId) {
-    const proyecto = await buscarProyectoOFallar(this.proyectoRepository, proyectoId);
-    if (!proyecto.estaAbierto()) {
-      throw new ConflictError(
-        `El proyecto con id "${proyectoId}" no se encuentra abierto`,
-      );
-    }
-    return proyecto;
   }
 }

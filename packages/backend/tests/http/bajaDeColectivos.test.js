@@ -33,18 +33,18 @@ describe("HTTP · baja de colectivos", () => {
     await api.post(`/colectivos/${colectivo.body.id}/baja`).set(encabezados).expect(409);
   });
 
-  test("el modo sin autenticacion no registra rutas reservadas al lider", async () => {
+  test("sin autenticacion, las rutas reservadas al lider responden 401", async () => {
     const { api } = await armarApp();
     const { body: colectivo } = await api
       .post("/colectivos")
       .send({ nombre: "F", descripcion: "d", tipoColectivo: "ONG" })
       .expect(201);
     const base = `/colectivos/${colectivo.id}`;
-    await api.post(`${base}/baja`).expect(404);
-    await api.post(`${base}/solicitudes-ingreso/${colectivo.id}/aceptacion`).expect(404);
-    await api.post(`${base}/solicitudes-ingreso/${colectivo.id}/rechazo`).expect(404);
-    await api.delete(`${base}/miembros/${colectivo.id}`).expect(404);
-    await api.post(`${base}/lider`).expect(404);
+    await api.post(`${base}/baja`).expect(401);
+    await api.post(`${base}/solicitudes-ingreso/${colectivo.id}/aceptacion`).expect(401);
+    await api.post(`${base}/solicitudes-ingreso/${colectivo.id}/rechazo`).expect(401);
+    await api.delete(`${base}/miembros/${colectivo.id}`).expect(401);
+    await api.post(`${base}/lider`).expect(401);
     expect((await api.get(base).expect(200)).body.fechaBaja).toBeNull();
   });
 });

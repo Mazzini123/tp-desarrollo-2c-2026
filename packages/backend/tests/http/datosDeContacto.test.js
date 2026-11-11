@@ -33,7 +33,7 @@ describe("HTTP · datos de contacto", () => {
     colaboradorId = ada.body.id;
   });
 
-  test("la ruta de contacto esta suspendida incluso con una colaboracion aceptada", async () => {
+  test("sin autenticacion, la ruta de contacto responde 401 incluso con una colaboracion aceptada", async () => {
     const postulacion = await api
       .post(`/proyectos/${proyectoId}/colaboraciones`)
       .send({ colaboradorId, perfilId })
@@ -45,6 +45,6 @@ describe("HTTP · datos de contacto", () => {
 
     await api
       .get(`/proyectos/${proyectoId}/colaboradores/${colaboradorId}/contacto`)
-      .expect(404);
+      .expect(401);
   });
 });

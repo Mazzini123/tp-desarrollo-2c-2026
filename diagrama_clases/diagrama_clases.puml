@@ -15,6 +15,9 @@ class Colectivo {
 
   +estaDadoDeBaja(): boolean
   +darDeBaja(fecha: Date): void
+  +tieneMedioDeContacto(medio: MedioDeContacto): boolean
+  +agregarMedioDeContacto(medio: MedioDeContacto): void
+  +quitarMedioDeContacto(medio: MedioDeContacto): void
 }
 
 enum TIPO_COLECTIVO {
@@ -28,7 +31,6 @@ class Ubicacion {
   -tipoUbicacion: TIPO_UBICACION
   -nombre: string
 
-  +esDeAlcanceNacional(): boolean
 }
 
 enum TIPO_UBICACION {
@@ -124,6 +126,7 @@ class Perfil {
   -modalidadColaboracion: MODALIDAD_COLABORACION
   -modoAceptacion: MODO_ACEPTACION
 
+  +tieneHabilidad(lista: Array<Habilidad>, habilidad: Habilidad): boolean
   +tieneHabilidadRequerida(habilidad: Habilidad): boolean
   +tieneHabilidadOpcional(habilidad: Habilidad): boolean
   +agregarHabilidadRequerida(habilidad: Habilidad): void
@@ -167,8 +170,6 @@ class Habilidad {
   -usuario: string
   -activo: boolean
 
-  +activar(): void
-  +desactivar(): void
   +equals(otra: Habilidad): boolean
 }
 
@@ -196,7 +197,6 @@ class Colaboracion {
   +estaPendiente(): boolean
   +estaAceptada(): boolean
   +estaFinalizada(): boolean
-  +estaDesvinculada(): boolean
   +estaRetirada(): boolean
   +esDe(colaborador: Colaborador): boolean
   +aceptar(fecha: Date): void
@@ -243,6 +243,8 @@ class Colaborador {
   -redesSociales: Array<RedSocial>
   -fechaBaja: Date
 
+  +estaDadaDeBaja(): boolean
+  +darDeBaja(fecha: Date): void
   +tienePronombre(pronombre: string): boolean
   +agregarPronombre(pronombre: string): void
   +quitarPronombre(pronombre: string): void

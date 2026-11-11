@@ -1,9 +1,5 @@
 import { ESTADO_BUSQUEDA } from "../domain/enums/ESTADO_BUSQUEDA.js";
 
-// Reglas de negocio de la busqueda de colaboradoras: cuando un perfil recibe
-// postulaciones y quien lo cumple. El dominio es anemico: las entidades solo
-// guardan los datos y las reglas viven aca, en la capa de services.
-
 export function perfilAceptaPostulaciones(perfil, ahora = new Date()) {
   const vencida =
     Boolean(perfil.fechaCierreBusqueda) && perfil.fechaCierreBusqueda <= ahora;
@@ -13,7 +9,10 @@ export function perfilAceptaPostulaciones(perfil, ahora = new Date()) {
 export function proyectoAceptaPostulaciones(proyecto, ahora = new Date()) {
   return (
     proyecto.estaAbierto() &&
-    proyecto.perfiles.some((perfil) => perfilAceptaPostulaciones(perfil, ahora))
+    !cierreVencido(proyecto, ahora) &&
+    proyecto.perfiles.some(
+      (perfil) => estadoDeBusqueda(perfil, proyecto, ahora) === ESTADO_BUSQUEDA.ABIERTA,
+    )
   );
 }
 
@@ -26,10 +25,26 @@ export function cierreVencido(proyecto, ahora) {
 }
 
 export function estadoDeBusqueda(perfil, proyecto, ahora = new Date()) {
-  if (!proyecto.estaAbierto()) {
+  return estadoDeBusquedaConCupo(
+    perfil,
+    {
+      proyectoAbierto: proyecto.estaAbierto(),
+      fechaCierre: proyecto.fechaCierre,
+      cupoCompleto: perfil.limiteAlcanzado(proyecto.cantidadAceptadas(perfil)),
+    },
+    ahora,
+  );
+}
+
+export function estadoDeBusquedaConCupo(
+  perfil,
+  { proyectoAbierto, fechaCierre, cupoCompleto },
+  ahora = new Date(),
+) {
+  if (!proyectoAbierto || (fechaCierre && fechaCierre <= ahora)) {
     return ESTADO_BUSQUEDA.CERRADA;
   }
-  if (perfil.limiteAlcanzado(proyecto.cantidadAceptadas(perfil))) {
+  if (cupoCompleto) {
     return ESTADO_BUSQUEDA.LIMITE_ALCANZADO;
   }
   return perfilAceptaPostulaciones(perfil, ahora)
@@ -37,7 +52,6 @@ export function estadoDeBusqueda(perfil, proyecto, ahora = new Date()) {
     : ESTADO_BUSQUEDA.CERRADA;
 }
 
-// Un perfil sin habilidades requeridas no matchea a nadie.
 export function cumpleHabilidadesRequeridas(perfil, colaborador) {
   return (
     perfil.habilidadesRequeridas.length > 0 &&

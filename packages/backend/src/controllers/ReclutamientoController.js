@@ -1,5 +1,4 @@
 import { BaseController } from "./BaseController.js";
-import { paginaPublica, proyectoPublico } from "../dto/vistasPublicas.js";
 
 export class ReclutamientoController extends BaseController {
   constructor({ reclutamientoService }) {
@@ -25,7 +24,7 @@ export class ReclutamientoController extends BaseController {
       req.params.id,
       paginacion,
     );
-    this.responderPaginado(res, paginaPublica(pagina, proyectoPublico));
+    this.responderPaginado(res, pagina);
   };
 
   invitar = async (req, res) => {

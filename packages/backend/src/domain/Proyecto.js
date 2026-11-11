@@ -11,9 +11,8 @@ export class Proyecto {
   }
 
   agregarLogro(datos) {
-    const logro = this.logros.create(datos);
-    this.logros.push(logro);
-    return logro;
+    this.logros.push(datos);
+    return this.logros.at(-1);
   }
 
   quitarLogro(logro) {
@@ -21,9 +20,8 @@ export class Proyecto {
   }
 
   agregarPerfil(datos) {
-    const perfil = this.perfiles.create(datos);
-    this.perfiles.push(perfil);
-    return perfil;
+    this.perfiles.push(datos);
+    return this.perfiles.at(-1);
   }
 
   quitarPerfil(perfil) {
@@ -54,9 +52,8 @@ export class Proyecto {
   }
 
   agregarAvance(datos) {
-    const avance = this.avances.create(datos);
-    this.avances.push(avance);
-    return avance;
+    this.avances.push(datos);
+    return this.avances.at(-1);
   }
 
   ultimoAvance() {

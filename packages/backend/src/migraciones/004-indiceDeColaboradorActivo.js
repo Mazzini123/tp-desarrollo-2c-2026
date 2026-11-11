@@ -22,7 +22,6 @@ export async function migrarIndiceDeColaboradorActivo() {
     throw new Error("El índice de contextos anterior tiene una definición inesperada");
   }
 
-  // Mongo conserva la unicidad de los activos durante todo el reemplazo.
   await ContextoUsuarioModel.createIndexes();
   try {
     await contextos.dropIndex(NOMBRE_ANTERIOR);

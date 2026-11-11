@@ -4,7 +4,7 @@ import { asegurarIndices } from "../../src/config/db.js";
 import { migrarIndiceDeColaboradorActivo } from "../../src/migraciones/004-indiceDeColaboradorActivo.js";
 import { IdentidadExternaModel } from "../../src/security/persistencia/IdentidadExternaModel.js";
 import { NotificacionModel } from "../../src/models/NotificacionModel.js";
-import { CODIGOS, datosDePerfil } from "../fixtures.js";
+import { CODIGOS, datosDePerfil, proyectosDelColectivo } from "../fixtures.js";
 import { ColectivoModel } from "../../src/models/ColectivoModel.js";
 import { ColaboradorModel } from "../../src/models/ColaboradorModel.js";
 import { ContextoUsuarioModel } from "../../src/security/persistencia/ContextoUsuarioModel.js";
@@ -492,7 +492,7 @@ describe("Integracion · contextos, transacciones e indices", () => {
     for (const resultado of resultados.slice(1)) {
       if (resultado.status === "rejected") expect(resultado.reason.status).toBe(409);
     }
-    const proyectos = await services.proyectoService.listarPorColectivo(colectivo.id);
+    const proyectos = await proyectosDelColectivo(colectivo.id);
     expect(proyectos.filter((p) => p.estaAbierto())).toHaveLength(0);
     expect(
       await SolicitudIngresoModel.countDocuments({

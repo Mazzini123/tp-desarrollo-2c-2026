@@ -16,6 +16,13 @@ import {
 
 const pasar = (_req, _res, next) => next();
 
+const sinAutenticacionHabilitada = () => {
+  throw new UnauthorizedError(
+    "Esta operacion necesita la autenticacion habilitada",
+    CODIGO_ERROR.NO_AUTENTICADO,
+  );
+};
+
 function exigirSesion(req) {
   if (!req.usuario) {
     throw new UnauthorizedError();
@@ -32,7 +39,7 @@ function exigirEntidad(req, entidadDelContexto, id) {
 
 export function autorizacionDesactivada() {
   return {
-    activa: false,
+    soloConAutenticacion: sinAutenticacionHabilitada,
     autenticar: (req, _res, next) => {
       req.autenticacion = null;
       req.usuario = null;
@@ -84,8 +91,7 @@ export function crearAutorizacion({
     if (!colectivoId) {
       return false;
     }
-    const proyecto = await proyectoService.buscarPorId(req.params.id);
-    return String(proyecto.colectivoId) === colectivoId;
+    return (await proyectoService.colectivoIdDe(req.params.id)) === colectivoId;
   };
 
   const esLaPersonaDeLaColaboracion = async (req) => {
@@ -93,9 +99,11 @@ export function crearAutorizacion({
     if (!colaboradorId) {
       return false;
     }
-    const proyecto = await proyectoService.buscarPorId(req.params.id);
-    const colaboracion = proyecto.buscarColaboracion(req.params.colaboracionId);
-    return Boolean(colaboracion?.esDe(colaboradorId));
+    const duena = await proyectoService.colaboradorIdDe(
+      req.params.id,
+      req.params.colaboracionId,
+    );
+    return duena === colaboradorId;
   };
 
   const prohibir = () => {
@@ -103,7 +111,7 @@ export function crearAutorizacion({
   };
 
   return {
-    activa: true,
+    soloConAutenticacion: pasar,
 
     autenticar: crearAutenticacion(autenticador),
 

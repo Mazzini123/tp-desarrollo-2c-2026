@@ -37,7 +37,7 @@ test("valida los dos grupos y los otros campos antes de aplicar cambios al perfi
   await api
     .put(ruta)
     .send({ ...cambios, codigosHabilidadesOpcionales: [CODIGOS.react] })
-    .expect(400);
+    .expect(422);
   await api
     .put(ruta)
     .send({ ...cambios, codigosHabilidadesOpcionales: ["no-existe"] })
@@ -45,7 +45,7 @@ test("valida los dos grupos y los otros campos antes de aplicar cambios al perfi
   await api
     .put(ruta)
     .send({ ...cambios, modoAceptacion: "TODO_SUMA", limiteColaboraciones: 1 })
-    .expect(400);
+    .expect(422);
 
   expect((await api.get(ruta).expect(200)).body).toEqual(original);
 });

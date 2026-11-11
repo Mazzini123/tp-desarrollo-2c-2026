@@ -1,4 +1,5 @@
 import { rateLimit } from "express-rate-limit";
+import { enteroDeEntorno } from "../config/entorno.js";
 
 const QUINCE_MINUTOS = 15 * 60 * 1000;
 const UN_MINUTO = 60 * 1000;
@@ -14,7 +15,7 @@ function crearLimitador({ ventanaMs, limite, mensaje }) {
     limit: limite,
     standardHeaders: "draft-8",
     legacyHeaders: false,
-    skip: (req) => req.path === "/health",
+    skip: (req) => ["/health", "/ready"].includes(req.path.replace(/\/$/, "")),
     handler: (_req, res) => res.status(429).json({ message: mensaje }),
   });
 }
@@ -39,10 +40,10 @@ export function crearLimitadores(limites = {}) {
 export function limitesDesdeEntorno(entorno = process.env) {
   const limites = {};
   if (entorno.LIMITE_SOLICITUDES_GENERAL) {
-    limites.general = Number(entorno.LIMITE_SOLICITUDES_GENERAL);
+    limites.general = enteroDeEntorno(entorno, "LIMITE_SOLICITUDES_GENERAL", 300);
   }
   if (entorno.LIMITE_SOLICITUDES_BUSQUEDAS) {
-    limites.busquedas = Number(entorno.LIMITE_SOLICITUDES_BUSQUEDAS);
+    limites.busquedas = enteroDeEntorno(entorno, "LIMITE_SOLICITUDES_BUSQUEDAS", 30);
   }
   return limites;
 }

@@ -37,7 +37,7 @@ export const rutasColaboradores = {
       description:
         "Todos los campos de identificacion son opcionales por separado, pero hace falta " +
         "**al menos uno de estos tres**: `nombreFantasia`, `cuentaGit`, o `nombre` y " +
-        "`apellido` juntos. Si no, la respuesta es 400. Los `pronombres` repetidos del " +
+        "`apellido` juntos. Si no, la respuesta es 422. Los `pronombres` repetidos del " +
         "payload se descartan en silencio. `mediosDeContacto` se registran pero **nunca " +
         "se muestran** en ninguna respuesta. `recibeMensajeriaInterna` (default true) " +
         "decide si se le pueden mandar notificaciones. Al crearla, se le avisa que " +
@@ -49,6 +49,7 @@ export const rutasColaboradores = {
       responses: {
         ...recurso("Colaborador", 201, "Colaborador creado."),
         400: errores[400],
+        422: errores[422],
         401: errores[401],
         403: errores[403],
         404: errores[404],
@@ -58,6 +59,8 @@ export const rutasColaboradores = {
     get: {
       tags: ["Colaboradores"],
       summary: "Listar colaboradores",
+      description:
+        "No incluye a las colaboradoras dadas de baja; su detalle por id sigue disponible.",
       parameters: paramsPaginacion,
       responses: listado("Colaborador"),
     },
@@ -119,10 +122,14 @@ export const rutasColaboradores = {
       tags: ["Colaboradores"],
       summary: "Agregar habilidad al colaborador",
       description:
-        "Idempotente. El codigo tiene que existir en el catalogo y estar activo, o la " +
-        "respuesta es 404.",
+        "Idempotente. El codigo tiene que existir en el catalogo (404) y estar activo (422).",
       requestBody: body("AgregarHabilidad"),
-      responses: { ...recurso("Colaborador"), 400: errores[400], 404: errores[404] },
+      responses: {
+        ...recurso("Colaborador"),
+        400: errores[400],
+        404: errores[404],
+        422: errores[422],
+      },
     },
   },
 

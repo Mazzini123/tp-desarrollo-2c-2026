@@ -1,3 +1,6 @@
+import { MongoAvisoRepository } from "./repositories/MongoAvisoRepository.js";
+import { ValoracionService } from "./services/ValoracionService.js";
+import { TimelineService } from "./services/TimelineService.js";
 import nodemailer from "nodemailer";
 import twilio from "twilio";
 
@@ -18,8 +21,8 @@ import { transaccionesMongo } from "./config/transacciones.js";
 import { CatalogoDeRoles } from "./security/autorizacion/CatalogoDeRoles.js";
 import { RegistroService } from "./security/application/RegistroService.js";
 import { ContextoService } from "./security/application/ContextoService.js";
-import { ModalidadService } from "./application/ModalidadService.js";
-import { MembresiaService } from "./application/MembresiaService.js";
+import { ModalidadService } from "./services/ModalidadService.js";
+import { MembresiaService } from "./services/MembresiaService.js";
 import { LiderazgoService } from "./security/application/LiderazgoService.js";
 import { CuentaController } from "./controllers/CuentaController.js";
 import { MembresiaController } from "./controllers/MembresiaController.js";
@@ -56,6 +59,7 @@ import { AvanceController } from "./controllers/AvanceController.js";
 
 export function crearRepositoriosMongo() {
   return {
+    avisoRepository: new MongoAvisoRepository(),
     habilidadRepository: new MongoHabilidadRepository(),
     colaboradorRepository: new MongoColaboradorRepository(),
     colectivoRepository: new MongoColectivoRepository(),
@@ -107,6 +111,7 @@ export function componerApp({
   avisarContextoImplicito,
 } = {}) {
   const {
+    avisoRepository,
     habilidadRepository,
     colaboradorRepository,
     colectivoRepository,
@@ -130,18 +135,21 @@ export function componerApp({
   });
 
   const perfilService = new PerfilService({
+    transacciones,
     proyectoRepository,
     habilidadService,
     notificacionService,
   });
 
   const avisoAutomaticoService = new AvisoAutomaticoService({
+    avisoRepository,
     colaboradorRepository,
     proyectoRepository,
     notificacionService,
   });
 
   const colaboradorService = new ColaboradorService({
+    transacciones,
     colaboradorRepository,
     habilidadService,
     avisoAutomaticoService,
@@ -155,6 +163,7 @@ export function componerApp({
   });
 
   const proyectoService = new ProyectoService({
+    colaboracionRepository,
     transacciones,
     proyectoRepository,
     colectivoService,
@@ -179,6 +188,19 @@ export function componerApp({
     proyectoService,
     colaboradorService,
     notificacionService,
+  });
+
+  const valoracionService = new ValoracionService({
+    colaboracionService,
+    colaboracionRepository,
+    proyectoRepository,
+    colectivoService,
+    colaboradorService,
+  });
+  const timelineService = new TimelineService({
+    colectivoService,
+    proyectoRepository,
+    colaboracionRepository,
   });
 
   const estadisticaService = new EstadisticaService({
@@ -244,6 +266,8 @@ export function componerApp({
     cuenta: new CuentaController({ registroService, contextoService, membresiaService }),
     membresia: new MembresiaController({ membresiaService, liderazgoService }),
     colectivo: new ColectivoController({
+      timelineService,
+      valoracionService,
       colectivoService,
       proyectoService,
       colaboracionService,
@@ -254,19 +278,22 @@ export function componerApp({
     perfil: new PerfilController({ perfilService }),
     habilidad: new HabilidadController({ habilidadService }),
     colaborador: new ColaboradorController({
+      valoracionService,
       colaboradorService,
       colaboracionService,
       modalidadService,
     }),
     notificacion: new NotificacionController({ notificacionService }),
     reclutamiento: new ReclutamientoController({ reclutamientoService }),
-    postulacion: new PostulacionController({ colaboracionService }),
+    postulacion: new PostulacionController({ colaboracionService, valoracionService }),
     estadistica: new EstadisticaController({ estadisticaService }),
     logro: new LogroController({ logroService }),
     avance: new AvanceController({ avanceService }),
   };
 
   const services = {
+    valoracionService,
+    timelineService,
     colectivoService,
     proyectoService,
     perfilService,

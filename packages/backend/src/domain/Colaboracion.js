@@ -41,10 +41,6 @@ export class Colaboracion {
     this.fechaFin = fecha;
   }
 
-  estaDesvinculada() {
-    return this.estado === COLABORACION_ESTADO.DESVINCULADA;
-  }
-
   desvincular(fecha) {
     this.estado = COLABORACION_ESTADO.DESVINCULADA;
     this.fechaFin = fecha;

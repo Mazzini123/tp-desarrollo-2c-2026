@@ -7,6 +7,7 @@ const aJSON = (documento) =>
 
 export function proyectoPublico(proyecto) {
   const json = aJSON(proyecto);
+  if (!Array.isArray(json.colaboraciones)) return json;
   return {
     ...json,
     colaboraciones: (json.colaboraciones ?? []).filter((c) => VISIBLES.has(c.estado)),
@@ -15,6 +16,7 @@ export function proyectoPublico(proyecto) {
 
 export function colectivoPublico(colectivo) {
   const json = aJSON(colectivo);
+  if (!Array.isArray(json.proyectos)) return json;
   return { ...json, proyectos: (json.proyectos ?? []).map(proyectoPublico) };
 }
 

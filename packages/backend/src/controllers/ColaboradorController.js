@@ -2,8 +2,14 @@ import { BaseController } from "./BaseController.js";
 import { colaboradorDelContexto } from "../security/http/contexto.js";
 
 export class ColaboradorController extends BaseController {
-  constructor({ colaboradorService, colaboracionService, modalidadService }) {
+  constructor({
+    colaboradorService,
+    colaboracionService,
+    modalidadService,
+    valoracionService,
+  }) {
     super();
+    this.valoracionService = valoracionService;
     this.colaboradorService = colaboradorService;
     this.modalidadService = modalidadService;
     this.colaboracionService = colaboracionService;
@@ -89,9 +95,7 @@ export class ColaboradorController extends BaseController {
   listarValoraciones = async (req, res) => {
     res
       .status(200)
-      .json(
-        await this.colaboracionService.listarValoracionesDeColaborador(req.params.id),
-      );
+      .json(await this.valoracionService.listarValoracionesDeColaborador(req.params.id));
   };
 
   listarColaboraciones = async (req, res) => {

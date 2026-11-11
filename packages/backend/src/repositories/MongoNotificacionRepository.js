@@ -1,10 +1,18 @@
+import { randomUUID } from "node:crypto";
 import { NotificacionModel } from "../models/NotificacionModel.js";
 import { esIdValido } from "./objectIds.js";
+import { paginar } from "./paginar.js";
 import { ESTADO_ENVIO } from "../domain/enums/ESTADO_ENVIO.js";
+import { TIPO_NOTIFICACION } from "../domain/enums/TIPO_NOTIFICACION.js";
 
 export class MongoNotificacionRepository {
   async crear(datos) {
-    return new NotificacionModel(datos).save();
+    if (!datos.clave) return new NotificacionModel(datos).save();
+    return NotificacionModel.findOneAndUpdate(
+      { clave: datos.clave },
+      { $setOnInsert: datos },
+      { upsert: true, returnDocument: "after", runValidators: true },
+    );
   }
 
   async guardar(notificacion) {
@@ -19,7 +27,7 @@ export class MongoNotificacionRepository {
     return Boolean(
       await NotificacionModel.exists({
         destinatarioId,
-        tipo: "INVITACION",
+        tipo: TIPO_NOTIFICACION.INVITACION,
         "referencias.perfilId": String(perfilId),
       }),
     );
@@ -29,30 +37,16 @@ export class MongoNotificacionRepository {
     return NotificacionModel.countDocuments({ destinatarioId, esLeida: { $ne: true } });
   }
 
-  async listarPorDestinatarioPaginado(
-    destinatarioId,
-    numeroPagina,
-    limitePorPagina,
-    { leida } = {},
-  ) {
+  async listarPorDestinatarioPaginado(destinatarioId, pagina, { leida } = {}) {
     const filtro = {
       destinatarioId,
       ...(leida === undefined ? {} : { esLeida: leida ? true : { $ne: true } }),
     };
-    const salto = (numeroPagina - 1) * limitePorPagina;
-
-    const [items, total] = await Promise.all([
-      NotificacionModel.find(filtro)
-        .sort({ fecha: -1, _id: 1 })
-        .skip(salto)
-        .limit(limitePorPagina),
-      NotificacionModel.countDocuments(filtro),
-    ]);
-
-    return { items, total };
+    return paginar(NotificacionModel, filtro, pagina, { orden: { fecha: -1, _id: 1 } });
   }
 
   async tomarEnvioPendiente(ahora, reservaHasta) {
+    const reservaId = randomUUID();
     const notificacion = await NotificacionModel.findOneAndUpdate(
       {
         envios: {
@@ -63,25 +57,34 @@ export class MongoNotificacionRepository {
           },
         },
       },
-      { $set: { "envios.$.enProcesoHasta": reservaHasta } },
+      {
+        $set: {
+          "envios.$.enProcesoHasta": reservaHasta,
+          "envios.$.reservaId": reservaId,
+        },
+      },
       { returnDocument: "after", sort: { fecha: 1, _id: 1 } },
     );
     if (!notificacion) return null;
     const envio = notificacion.envios.find(
-      (e) =>
-        e.estado === ESTADO_ENVIO.PENDIENTE &&
-        e.enProcesoHasta?.getTime() === reservaHasta.getTime(),
+      (e) => e.estado === ESTADO_ENVIO.PENDIENTE && e.reservaId === reservaId,
     );
     return { notificacion, envio };
   }
 
-  async actualizarEnvio(notificacionId, envioId, cambios) {
+  async actualizarEnvio(notificacionId, envioId, reservaId, cambios) {
     const set = Object.fromEntries(
       Object.entries(cambios).map(([campo, valor]) => [`envios.$.${campo}`, valor]),
     );
-    await NotificacionModel.updateOne(
-      { _id: notificacionId, "envios._id": envioId },
+    const resultado = await NotificacionModel.updateOne(
+      {
+        _id: notificacionId,
+        envios: {
+          $elemMatch: { _id: envioId, reservaId, estado: ESTADO_ENVIO.PENDIENTE },
+        },
+      },
       { $set: set },
     );
+    return resultado.matchedCount === 1;
   }
 }

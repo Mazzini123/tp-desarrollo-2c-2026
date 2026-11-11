@@ -8,7 +8,13 @@ const ObjectId = mongoose.Schema.Types.ObjectId;
 
 const valoracionSchema = new mongoose.Schema(
   {
-    puntaje: { type: Number, required: true, min: 1, max: 5 },
+    puntaje: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 5,
+      validate: Number.isSafeInteger,
+    },
     comentario: { type: String, default: null },
     fecha: { type: Date, default: Date.now },
   },
@@ -60,6 +66,7 @@ aplicarFormatoJSON(colaboracionSchema, {
 colaboracionSchema.index({ proyectoId: 1, fecha: 1 });
 colaboracionSchema.index({ colaborador: 1 });
 colaboracionSchema.index({ colectivoId: 1 });
+colaboracionSchema.index({ colectivoId: 1, estado: 1, fecha: -1, _id: -1 });
 
 export const ColaboracionModel = mongoose.model(
   "Colaboracion",

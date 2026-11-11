@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import { ColectivoModel } from "../models/ColectivoModel.js";
 import { ConcurrenciaError } from "../errors/ConcurrenciaError.js";
 import { esIdValido } from "./objectIds.js";
-import { salto } from "../utils/paginacion.js";
+import { paginar } from "./paginar.js";
 
 const ORDEN = { createdAt: 1, _id: 1 };
 
@@ -36,17 +36,9 @@ export class MongoColectivoRepository {
     return esIdValido(id) ? ColectivoModel.findById(id) : null;
   }
 
-  async listarPaginado(numeroPagina, limitePorPagina, { etiqueta } = {}) {
-    const filtro = etiqueta ? { etiquetas: etiqueta } : {};
-    const [items, total] = await Promise.all([
-      ColectivoModel.find(filtro)
-        .sort(ORDEN)
-        .skip(salto(numeroPagina, limitePorPagina))
-        .limit(limitePorPagina),
-      ColectivoModel.countDocuments(filtro),
-    ]);
-
-    return { items, total };
+  async listarPaginado(pagina, { etiqueta } = {}) {
+    const filtro = { fechaBaja: null, ...(etiqueta && { etiquetas: etiqueta }) };
+    return paginar(ColectivoModel, filtro, pagina, { orden: ORDEN });
   }
 
   async buscarResumen(id) {

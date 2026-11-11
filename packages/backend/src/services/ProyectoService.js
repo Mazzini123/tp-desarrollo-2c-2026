@@ -1,3 +1,8 @@
+import { detalleDeProyecto } from "../dto/detalleDeProyecto.js";
+import { paginaDeResumenes } from "../dto/resumenDeProyecto.js";
+import { PRIMERA_PAGINA } from "../dto/paginacion.js";
+import { NotFoundError } from "../errors/NotFoundError.js";
+import { notificarResoluciones } from "./soporte/notificarResoluciones.js";
 import { createHash } from "node:crypto";
 import { DomainError } from "../errors/DomainError.js";
 import { ConflictError } from "../errors/ConflictError.js";
@@ -5,11 +10,13 @@ import { DuplicadoError } from "../errors/DuplicadoError.js";
 import { buscarProyectoOFallar } from "./soporte/buscarOFallar.js";
 import { armarPaginado } from "../utils/paginacion.js";
 import { normalizarEtiquetas } from "../domain/etiquetas.js";
-import { cerrarProyecto, notificarResoluciones } from "./reglasDePostulacion.js";
+import { cerrarProyecto } from "./reglasDePostulacion.js";
+import { registro } from "../config/registro.js";
 
 export class ProyectoService {
   constructor({
     proyectoRepository,
+    colaboracionRepository,
     colectivoService,
     perfilService,
     notificacionService,
@@ -17,6 +24,7 @@ export class ProyectoService {
     transacciones,
   }) {
     this.transacciones = transacciones;
+    this.colaboracionRepository = colaboracionRepository;
     this.proyectoRepository = proyectoRepository;
     this.colectivoService = colectivoService;
     this.perfilService = perfilService;
@@ -43,14 +51,14 @@ export class ProyectoService {
         .digest("hex"),
     };
 
-    const resolverPublicacion = () =>
-      this.transacciones.ejecutar(async () => {
+    try {
+      return await this.transacciones.ejecutar(async () => {
         // La baja usa el mismo documento antes de buscar sus proyectos abiertos.
         const colectivo = await this.colectivoService.buscarPorId(colectivoId, {
           bloquear: true,
         });
         const existente = await this.buscarPublicacion(colectivo._id, publicacion);
-        if (existente) return { proyecto: existente, creado: false };
+        if (existente) return existente;
 
         this.validarFechaCierre(fechaCierre, ahora);
         if (colectivo.estaDadoDeBaja()) {
@@ -74,12 +82,9 @@ export class ProyectoService {
           proyecto.agregarPerfil(await this.perfilService.construirPerfil(datos));
         }
         await this.proyectoRepository.guardar(proyecto);
-        return { proyecto, creado: true };
+        await this.avisoAutomaticoService.avisarPorProyectoNuevo(proyecto);
+        return proyecto;
       });
-
-    let resultado;
-    try {
-      resultado = await resolverPublicacion();
     } catch (error) {
       if (publicacion && error instanceof DuplicadoError) {
         const ganador = await this.buscarPublicacion(colectivoId, publicacion);
@@ -87,52 +92,85 @@ export class ProyectoService {
       }
       throw error;
     }
-    const { proyecto, creado } = resultado;
-    if (!creado) return proyecto;
-
-    try {
-      await this.avisoAutomaticoService.avisarPorProyectoNuevo(proyecto);
-    } catch (error) {
-      console.error("No se pudieron enviar los avisos automaticos:", error.message);
-    }
-
-    return proyecto;
   }
 
   async listar({ numeroPagina = 1, limitePorPagina = 10, ...filtros } = {}) {
-    return armarPaginado(
-      await this.proyectoRepository.listarPaginado(
-        numeroPagina,
-        limitePorPagina,
-        filtros,
+    const pagina = { numeroPagina, limitePorPagina };
+    return paginaDeResumenes(
+      armarPaginado(
+        await this.proyectoRepository.listarPaginado(pagina, filtros),
+        pagina,
       ),
-      numeroPagina,
-      limitePorPagina,
     );
   }
 
-  async listarPorColectivo(colectivoId) {
+  async listarResumenesPorColectivo(
+    colectivoId,
+    { numeroPagina = 1, limitePorPagina = 10, incluirPendientes = false } = {},
+  ) {
     await this.colectivoService.buscarPorId(colectivoId);
-    return this.proyectoRepository.buscarPorColectivo(colectivoId);
+    const paginado = { numeroPagina, limitePorPagina };
+    const pagina = paginaDeResumenes(
+      armarPaginado(
+        await this.proyectoRepository.listarPorColectivoPaginado(colectivoId, paginado),
+        paginado,
+      ),
+    );
+    if (!incluirPendientes) return pagina;
+
+    const pendientes = await this.colaboracionRepository.contarPendientesPorProyecto(
+      pagina.items.map((proyecto) => proyecto.id),
+    );
+    for (const proyecto of pagina.items)
+      proyecto.postulacionesPendientes = pendientes.get(proyecto.id) ?? 0;
+    pagina.perfilesAbiertos =
+      await this.proyectoRepository.contarPerfilesAbiertos(colectivoId);
+    return pagina;
   }
 
   async verDetalle(proyectoId, colectivoIdDeQuienConsulta = null) {
-    const proyecto = await this.buscarPorId(proyectoId);
+    const proyecto = await this.proyectoRepository.buscarParaDetalle(proyectoId);
+    if (!proyecto) throw new NotFoundError("No existe ese proyecto");
     const esDueno = colectivoIdDeQuienConsulta === String(proyecto.colectivoId);
-
-    if (esDueno) {
-      return { proyecto, esDueno };
+    if (!esDueno) {
+      try {
+        const cantidad = await this.proyectoRepository.registrarVisualizacion(proyectoId);
+        if (cantidad !== undefined) proyecto.visualizaciones = cantidad;
+      } catch (error) {
+        registro.error("visualizacion_no_registrada", {
+          proyectoId,
+          error: error.message,
+        });
+      }
     }
-    try {
-      await this.proyectoRepository.registrarVisualizacion(proyectoId);
-    } catch (error) {
-      console.error("No se pudo registrar la visualizacion:", error.message);
-    }
-    return { proyecto: await this.buscarPorId(proyectoId), esDueno };
+    const pagina = await this.colaboracionRepository.listarDeProyecto(
+      proyectoId,
+      PRIMERA_PAGINA,
+      { privadas: esDueno },
+    );
+    const aceptadas =
+      await this.colaboracionRepository.contarAceptadasPorPerfil(proyectoId);
+    return { proyecto: detalleDeProyecto(proyecto, pagina, aceptadas, esDueno), esDueno };
   }
 
   async buscarPorId(proyectoId) {
     return buscarProyectoOFallar(this.proyectoRepository, proyectoId);
+  }
+
+  async colectivoIdDe(proyectoId) {
+    const colectivoId = await this.proyectoRepository.buscarColectivoId(proyectoId);
+    if (!colectivoId)
+      throw new NotFoundError(`No existe un proyecto con id "${proyectoId}"`);
+    return String(colectivoId);
+  }
+
+  async colaboradorIdDe(proyectoId, colaboracionId) {
+    await this.colectivoIdDe(proyectoId);
+    const colaboracion = await this.colaboracionRepository.buscarEnProyecto(
+      proyectoId,
+      colaboracionId,
+    );
+    return colaboracion ? String(colaboracion.colaborador) : null;
   }
 
   verificarAbierto(proyecto, accion) {
@@ -171,37 +209,41 @@ export class ProyectoService {
   }
 
   async finalizar(proyectoId, ahora = new Date()) {
-    const proyecto = await this.buscarPorId(proyectoId);
-    this.verificarAbierto(proyecto, "finalizar");
+    return this.transacciones.ejecutar(async () => {
+      const proyecto = await this.buscarPorId(proyectoId);
+      this.verificarAbierto(proyecto, "finalizar");
+      return this.guardarCierre(proyecto, ahora);
+    });
+  }
 
-    await this.cerrar(proyecto, ahora);
+  async cerrar(proyecto, ahora) {
+    return this.transacciones.ejecutar(async () => {
+      const actual = await this.buscarPorId(proyecto.id);
+      if (!actual.estaAbierto()) return actual;
+      return this.guardarCierre(actual, ahora);
+    });
+  }
+
+  async guardarCierre(proyecto, ahora) {
+    const cambios = cerrarProyecto(proyecto, ahora);
+    await this.proyectoRepository.guardar(proyecto);
+    await notificarResoluciones(this.notificacionService, proyecto, cambios);
     return proyecto;
   }
 
-  async cerrar(proyecto, ahora, opcionesDeNotificacion) {
-    const cambios = cerrarProyecto(proyecto, ahora);
-    await this.proyectoRepository.guardar(proyecto);
-    await notificarResoluciones(
-      this.notificacionService,
-      proyecto,
-      cambios,
-      opcionesDeNotificacion,
-    );
-  }
-
-  async cerrarVencidos(ahora = new Date()) {
+  async cerrarVencidos(ahora = new Date(), { debeDetenerse = () => false } = {}) {
     const vencidos = await this.proyectoRepository.buscarConCierreVencido(ahora);
     const cerrados = [];
 
     for (const proyecto of vencidos) {
+      if (debeDetenerse()) break;
       try {
-        await this.cerrar(proyecto, ahora);
-        cerrados.push(proyecto);
+        cerrados.push(await this.cerrar(proyecto, ahora));
       } catch (error) {
-        console.error(
-          `Cierre automatico: no se pudo cerrar el proyecto ${proyecto.id}:`,
-          error.message,
-        );
+        registro.error("cierre_automatico_fallido", {
+          proyectoId: proyecto.id,
+          error: error.message,
+        });
       }
     }
 

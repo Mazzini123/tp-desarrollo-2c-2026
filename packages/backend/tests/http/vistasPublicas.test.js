@@ -52,15 +52,20 @@ describe("HTTP · vistas publicas de proyectos y colectivos", () => {
     expect(soloAceptadas(detalle.body)).toEqual([aceptada.id]);
 
     const delColectivo = await api.get(`/colectivos/${colectivo.id}`).expect(200);
-    expect(soloAceptadas(delColectivo.body.proyectos[0])).toEqual([aceptada.id]);
+    expect(delColectivo.body.proyectos[0]).not.toHaveProperty("colaboraciones");
 
     const proyectosDelColectivo = await api
       .get(`/colectivos/${colectivo.id}/proyectos`)
       .expect(200);
-    expect(soloAceptadas(proyectosDelColectivo.body[0])).toEqual([aceptada.id]);
+    expect(proyectosDelColectivo.body.data[0]).not.toHaveProperty("colaboraciones");
 
     const listado = await api.get("/proyectos").expect(200);
-    expect(soloAceptadas(listado.body.data[0])).toEqual([aceptada.id]);
+    expect(listado.body.data[0]).not.toHaveProperty("colaboraciones");
+    const participaciones = await api
+      .get(`/proyectos/${proyecto.id}/participaciones?limit=1`)
+      .expect(200);
+    expect(participaciones.body.data.map((c) => c.id)).toEqual([aceptada.id]);
+    expect(participaciones.body.meta.total).toBe(1);
   });
 
   test("las postulaciones recibidas solo las ve el colectivo dueño", async () => {
@@ -103,5 +108,15 @@ describe("HTTP · vistas publicas de proyectos y colectivos", () => {
     await api.get(ruta).expect(401);
     await api.get(ruta).set(como("bea")).expect(403);
     await api.get(ruta).set(como("ana")).expect(200);
+
+    const pendientes = `/colectivos/${colectivo.id}/postulaciones`;
+    await api.get(pendientes).expect(401);
+    await api.get(pendientes).set(como("bea")).expect(403);
+    const pagina = await api
+      .get(`${pendientes}?page=1&limit=1`)
+      .set(como("ana"))
+      .expect(200);
+    expect(pagina.body.data).toEqual([]);
+    expect(pagina.body.meta).toMatchObject({ page: 1, per_page: 1, total: 0 });
   });
 });

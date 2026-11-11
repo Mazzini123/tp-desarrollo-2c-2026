@@ -3,6 +3,7 @@ import { AppError } from "../../errors/AppError.js";
 import { CODIGO_ERROR } from "../../errors/CODIGO_ERROR.js";
 import { objectIdSchema } from "../../schemas/comunesSchema.js";
 import { contextoRequerido } from "../application/ContextoService.js";
+import { registro } from "../../config/registro.js";
 
 const CONTEXTO = "X-Context-Id";
 
@@ -15,10 +16,11 @@ function encabezadoDeContexto(req) {
 }
 
 function avisarUsoImplicito(req) {
-  console.warn(
-    `[compatibilidad] ${req.method} ${req.originalUrl} sin ${CONTEXTO} ` +
-      `(usuario ${req.usuario.id}): se uso el unico contexto valido`,
-  );
+  registro.aviso("contexto_implicito", {
+    metodo: req.method,
+    ruta: req.originalUrl,
+    usuarioId: req.usuario.id,
+  });
 }
 
 export function crearAutorizacionContextual({

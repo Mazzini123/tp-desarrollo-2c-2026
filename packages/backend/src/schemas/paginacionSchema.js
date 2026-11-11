@@ -1,3 +1,4 @@
+import { COLABORACION_ESTADO } from "../domain/enums/COLABORACION_ESTADO.js";
 import { z } from "zod";
 
 export const paginacionSchema = z.object({
@@ -10,4 +11,8 @@ export const listadoDeNotificacionesSchema = paginacionSchema.extend({
     .enum(["true", "false"])
     .transform((valor) => valor === "true")
     .optional(),
+});
+
+export const listadoDeColaboracionesSchema = paginacionSchema.extend({
+  estado: z.enum(Object.values(COLABORACION_ESTADO)).optional(),
 });

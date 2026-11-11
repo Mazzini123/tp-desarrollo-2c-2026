@@ -17,30 +17,32 @@ export function crearCuentaRouter(cuentaController, autorizacion) {
   );
   router.get("/me", autorizacion.usuario(), cuentaController.yo);
 
-  if (autorizacion.activa) {
-    router.put(
-      "/usuario",
-      autorizacion.usuario(),
-      validarBody(nombreDeUsuarioSchema),
-      cuentaController.cambiarNombre,
-    );
-    router.put(
-      "/contexto-actual",
-      autorizacion.usuario(),
-      validarBody(seleccionarContextoSchema),
-      cuentaController.seleccionarContexto,
-    );
-    router.delete(
-      "/contexto-actual",
-      autorizacion.usuario(),
-      cuentaController.limpiarContexto,
-    );
-    router.get(
-      "/solicitudes-ingreso",
-      autorizacion.usuario(),
-      cuentaController.misSolicitudes,
-    );
-  }
+  router.put(
+    "/usuario",
+    autorizacion.soloConAutenticacion,
+    autorizacion.usuario(),
+    validarBody(nombreDeUsuarioSchema),
+    cuentaController.cambiarNombre,
+  );
+  router.put(
+    "/contexto-actual",
+    autorizacion.soloConAutenticacion,
+    autorizacion.usuario(),
+    validarBody(seleccionarContextoSchema),
+    cuentaController.seleccionarContexto,
+  );
+  router.delete(
+    "/contexto-actual",
+    autorizacion.soloConAutenticacion,
+    autorizacion.usuario(),
+    cuentaController.limpiarContexto,
+  );
+  router.get(
+    "/solicitudes-ingreso",
+    autorizacion.soloConAutenticacion,
+    autorizacion.usuario(),
+    cuentaController.misSolicitudes,
+  );
 
   return router;
 }

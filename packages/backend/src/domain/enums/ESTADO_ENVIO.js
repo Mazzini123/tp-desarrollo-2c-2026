@@ -1,5 +1,6 @@
 export const ESTADO_ENVIO = Object.freeze({
   PENDIENTE: "PENDIENTE",
   ENVIADO: "ENVIADO",
+  SIMULADO: "SIMULADO",
   FALLIDO: "FALLIDO",
 });

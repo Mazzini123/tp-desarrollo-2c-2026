@@ -71,17 +71,17 @@ test("un colectivo con todo su agregado vuelve completo", async () => {
     esPublica: false,
   });
   await s.colaboracionService.aceptar(proyecto.id, colaboracion.id);
-  await s.logroService.crearParaProyecto(proyecto.id, {
+  await s.logroService.crear(proyecto.id, {
     titulo: "Primer hito",
     descripcion: "Quedo online",
   });
-  await s.avanceService.registrarAvanceParaProyecto(proyecto.id, {
+  await s.avanceService.registrar(proyecto.id, {
     porcentajeConcrecion: 40,
     urlSistema: "https://fundacion.org",
     urlRepositorio: "https://github.com/fundacion/sitio",
   });
   await s.colaboracionService.finalizar(proyecto.id, colaboracion.id);
-  await s.colaboracionService.valorar(proyecto.id, colaboracion.id, {
+  await s.valoracionService.valorar(proyecto.id, colaboracion.id, {
     autor: "COLECTIVO",
     puntaje: 5,
     comentario: "Excelente",
@@ -186,6 +186,7 @@ test("las notificaciones quedan guardadas para su destinataria", async () => {
     mensaje: "Te esperamos",
   });
 
+  await s.avisoAutomaticoService.procesarPendientes(new Date(), { tope: 100 });
   const guardadas = await NotificacionModel.find({ destinatarioId: ada.id });
   // El aviso automatico al darla de alta y la invitacion.
   expect(guardadas.map((n) => n.tipo)).toEqual(

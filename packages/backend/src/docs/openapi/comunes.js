@@ -1,5 +1,3 @@
-// Piezas reutilizadas por las rutas y los esquemas de la especificacion OpenAPI.
-
 export const OBJECT_ID = {
   type: "string",
   pattern: "^[a-f0-9]{24}$",
@@ -38,6 +36,10 @@ export const META_PAGINACION = {
     per_page: { type: "integer", example: 10 },
     total: { type: "integer", example: 12 },
     total_pages: { type: "integer", example: 2 },
+    perfiles_abiertos: {
+      type: "integer",
+      description: "Total global, solo en proyectos del colectivo dueño.",
+    },
     unread: {
       type: "integer",
       description: "Solo en la bandeja de mensajes: total de no leidas.",
@@ -49,13 +51,21 @@ export const errores = {
   400: {
     description:
       "Falla de forma: falto un campo obligatorio, sobro uno (los schemas son strict), " +
-      "un tipo no coincide, o una regla de dominio rechazo el valor.",
+      "un tipo no coincide, o un id (de la ruta o del body) no es un ObjectId.",
     content: {
       "application/json": { schema: { $ref: "#/components/schemas/Problema" } },
     },
   },
   404: {
     description: "No existe el recurso referenciado por el id o el codigo de la ruta.",
+    content: {
+      "application/json": { schema: { $ref: "#/components/schemas/Problema" } },
+    },
+  },
+  422: {
+    description:
+      "El pedido esta bien formado pero incumple una regla de negocio (por ejemplo, " +
+      "postularse sin las habilidades requeridas o borrar el ultimo perfil de un proyecto).",
     content: {
       "application/json": { schema: { $ref: "#/components/schemas/Problema" } },
     },
@@ -234,3 +244,8 @@ export function body(nombreSchema) {
     },
   };
 }
+
+errores[413] = {
+  description: "El cuerpo JSON supera 100 KB.",
+  content: { "application/json": { schema: { $ref: "#/components/schemas/Problema" } } },
+};

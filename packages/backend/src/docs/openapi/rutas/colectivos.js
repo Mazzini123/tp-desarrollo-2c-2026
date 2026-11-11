@@ -20,7 +20,7 @@ export const rutasColectivos = {
       description:
         "`nombre`, `descripcion` y `tipoColectivo` son obligatorios. `ubicacion` es " +
         "opcional pero condicionada: si `tipoUbicacion` es PROVINCIA, `nombre` tiene que " +
-        "ser una de las 23 provincias argentinas; si es LOCALIDAD, `nombre` es obligatorio. " +
+        "ser una de las 23 provincias argentinas; si es LOCALIDAD, `nombre` es obligatorio (422 si no). " +
         "Opcionales: `redesSociales` (req. 27, solo URLs http/https), `etiquetas` (req. 34, " +
         "se normalizan) y `mediosDeContacto`. Con autenticacion activa se requiere un " +
         "usuario registrado con nombre propio. Se crea su contexto LIDER y se selecciona.",
@@ -28,6 +28,7 @@ export const rutasColectivos = {
       responses: {
         ...recurso("Colectivo", 201, "Colectivo creado."),
         400: errores[400],
+        422: errores[422],
         401: errores[401],
         403: errores[403],
         409: errores[409],
@@ -36,8 +37,10 @@ export const rutasColectivos = {
     get: {
       tags: ["Colectivos"],
       summary: "Listar colectivos",
+      description:
+        "No incluye a los colectivos dados de baja; su detalle por id sigue disponible.",
       parameters: [...paramsPaginacion, paramEtiqueta],
-      responses: listado("Colectivo"),
+      responses: listado("ResumenColectivo"),
     },
   },
 
@@ -60,6 +63,7 @@ export const rutasColectivos = {
       responses: {
         ...recurso("Colectivo"),
         400: errores[400],
+        422: errores[422],
         404: errores[404],
         409: errores[409],
       },
@@ -73,9 +77,9 @@ export const rutasColectivos = {
       summary: "Crear proyecto del colectivo",
       description:
         "Necesita al menos un perfil, y cada perfil al menos una habilidad requerida (los " +
-        "codigos tienen que existir y estar activos, o 404). Cada perfil define su busqueda, " +
+        "codigos tienen que existir (404) y estar activos (422)). Cada perfil define su busqueda, " +
         "su limite de colaboraciones y su modo de aceptacion (ver CrearPerfil). " +
-        "`fechaCierre` (req. 10) tiene que ser futura. Al crearlo, " +
+        "`fechaCierre` (req. 10) tiene que ser futura (422). Al crearlo, " +
         "se avisa a las personas compatibles (req. 9). Un colectivo dado de baja no puede " +
         "publicar proyectos (409). Repetir la clave con el mismo cuerpo devuelve el proyecto " +
         "existente sin volver a enviar avisos. Con otros datos responde 409.",
@@ -91,6 +95,7 @@ export const rutasColectivos = {
       responses: {
         ...recurso("Proyecto", 201, "Proyecto creado o recuperado por su clave."),
         400: errores[400],
+        422: errores[422],
         404: errores[404],
         409: errores[409],
       },
@@ -98,19 +103,24 @@ export const rutasColectivos = {
     get: {
       tags: ["Proyectos"],
       summary: "Listar proyectos del colectivo",
-      description: "Sin paginar: devuelve el array completo de proyectos del colectivo.",
+      description:
+        "Resúmenes sin historial. El contexto dueño recibe postulacionesPendientes por proyecto y meta.perfiles_abiertos global.",
+      parameters: paramsPaginacion,
+      responses: { ...listado("ResumenProyecto"), 404: errores[404] },
+    },
+  },
+  "/colectivos/{id}/postulaciones": {
+    get: {
+      tags: ["Postulaciones"],
+      summary: "Postulaciones pendientes de todo el colectivo",
+      description:
+        "Página independiente de la lista de proyectos. Solo el colectivo dueño con POSTULACION_RESOLVER; conserva anonimato.",
+      security: [{ bearerAuth: [], contexto: [] }],
+      parameters: [paramId, ...paramsPaginacion],
       responses: {
-        200: {
-          description: "Proyectos del colectivo.",
-          content: {
-            "application/json": {
-              schema: {
-                type: "array",
-                items: { $ref: "#/components/schemas/Proyecto" },
-              },
-            },
-          },
-        },
+        ...listado("PostulacionPendiente"),
+        401: errores[401],
+        403: errores[403],
         404: errores[404],
       },
     },

@@ -38,12 +38,6 @@ export function buscarProvincia(nombre) {
   return PROVINCIAS.find((provincia) => sinAcentos(provincia) === buscada) ?? null;
 }
 
-export class Ubicacion {
-  esDeAlcanceNacional() {
-    return this.tipoUbicacion === TIPO_UBICACION.ARGENTINA;
-  }
-}
-
 export function nombreDeUbicacion(tipoUbicacion, nombre) {
   return tipoUbicacion === TIPO_UBICACION.PROVINCIA ||
     tipoUbicacion === TIPO_UBICACION.LOCALIDAD

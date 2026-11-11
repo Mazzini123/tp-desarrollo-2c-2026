@@ -30,31 +30,34 @@ packages/
 
 El backend sigue una arquitectura de capas:
 
-| Capa | Responsabilidad |
-|---|---|
-| `src/domain` | Las entidades, con un dominio anémico: solo datos y operaciones estructurales (agregar/quitar, buscar por id, predicados y cambios de estado, conteos). Incluye los enums propios del negocio |
-| `src/services` | Casos de uso y **toda la lógica de negocio**, incluidas las reglas puras de `reglasDePostulacion.js` y `reglasDeBusqueda.js`. En `soporte/`, helpers compartidos entre services |
-| `src/repositories` | Repositorios de negocio en MongoDB |
-| `src/models` | Esquemas de los documentos de negocio y `loadClass` de las clases de dominio |
-| `src/security` | Proveedores, identidad interna, contextos, roles, permisos, middlewares M1–M3 y su persistencia |
-| `src/application` | Orquestación de las altas, bajas y membresías entre seguridad y negocio |
-| `src/controllers` | Traducción HTTP ↔ servicios |
-| `src/routes` | Definición de endpoints y middlewares por ruta |
-| `src/middlewares` | Validación, sanitización, límite de solicitudes, 404 y manejo de errores |
-| `src/canales` | Adaptadores de salida hacia servicios externos: email (nodemailer), WhatsApp y SMS |
-| `src/jobs` | Tareas periódicas: el cierre automático de proyectos |
-| `src/schemas` | Schemas de Zod: la forma de lo que entra por HTTP |
-| `src/docs/openapi` | Especificación OpenAPI (Swagger), partida por recurso |
-| `src/composicion.js` | Raíz de composición: el único lugar que elige implementaciones |
+| Capa                 | Responsabilidad                                                                                                                                                                                                  |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/domain`         | Las entidades, con un dominio anémico: solo datos y operaciones estructurales (agregar/quitar, buscar por id, predicados y cambios de estado, conteos). Incluye los enums propios del negocio                    |
+| `src/services`       | Reglas de negocio, casos de uso, transacciones y coordinación. Incluye altas, bajas y membresías con `ModalidadService` y `MembresiaService`; módulos de reglas compartidas y funciones auxiliares en `soporte/` |
+| `src/repositories`   | Repositorios de negocio en MongoDB                                                                                                                                                                               |
+| `src/models`         | Esquemas de los documentos de negocio y `loadClass` de las clases de dominio                                                                                                                                     |
+| `src/security`       | Proveedores, identidad interna, contextos, roles, permisos, middlewares M1–M3 y su persistencia                                                                                                                  |
+| `src/controllers`    | Traducción HTTP ↔ servicios                                                                                                                                                                                      |
+| `src/routes`         | Definición de endpoints y middlewares por ruta                                                                                                                                                                   |
+| `src/middlewares`    | Validación, sanitización, límite de solicitudes, 404 y manejo de errores                                                                                                                                         |
+| `src/canales`        | Adaptadores de salida hacia servicios externos: email (nodemailer), WhatsApp y SMS                                                                                                                               |
+| `src/jobs`           | Cierre de proyectos, generación durable de avisos y entrega de notificaciones                                                                                                                                    |
+| `src/config`         | Configuración de entorno, conexión a MongoDB, transacciones y apagado de la API                                                                                                                                  |
+| `src/schemas`        | Schemas de Zod: la forma de lo que entra por HTTP                                                                                                                                                                |
+| `src/docs/openapi`   | Especificación OpenAPI (Swagger), partida por recurso                                                                                                                                                            |
+| `src/composicion.js` | Raíz de composición: el único lugar que elige implementaciones                                                                                                                                                   |
 
 **Dominio anémico.** Siguiendo el lineamiento de la cátedra, las entidades no
 tienen lógica de negocio: solo operaciones estructurales simples que no cambian
 nunca (agregar o quitar un perfil, buscar una colaboración, contar las aceptadas,
 pasar una colaboración a ACEPTADA con su fecha). Las reglas —cuándo un perfil
 recibe postulaciones, quién cumple un perfil, quién ve los datos de contacto, qué
-pasa al dar de baja un colectivo— están en los services. La única excepción es
-el campo `estadoBusqueda` del JSON de cada perfil: lo arma un virtual de
-Mongoose, pero llamando a `estadoDeBusqueda` de `services/reglasDeBusqueda.js`.
+pasa al dar de baja un colectivo— están en `src/services`. Las reglas compartidas
+se agrupan en `reglasDeBusqueda.js` y `reglasDePostulacion.js`, que trabajan en
+memoria. Los servicios coordinan su aplicación, la persistencia y las transacciones.
+Los virtuales y los DTOs reutilizan esos módulos de reglas. `services/soporte`
+contiene funciones auxiliares compartidas, como buscar un recurso o informar que
+no existe y generar las notificaciones de una resolución.
 
 La regla es que las dependencias apuntan siempre hacia adentro: los controllers
 conocen a los services, los services a los modelos y a los repositories, y el
@@ -69,7 +72,7 @@ Ningún controller ni service importa del contenedor: las dependencias entran
 
 ### Persistencia (MongoDB)
 
-Mongoose es un **ODM** (*Object Document Mapper*): mapea objetos a documentos
+Mongoose es un **ODM** (_Object Document Mapper_): mapea objetos a documentos
 (no a tablas, como un ORM).
 
 **Una sola abstracción por entidad.** Cada schema de `src/models` carga su
@@ -88,14 +91,14 @@ tienen constructor (Mongoose no lo llama): los valores por defecto están en el
 schema. Las entidades se crean con el modelo (`new ColaboradorModel({...})`) o
 desde su repositorio (`colectivoRepository.crear(datos)`, `proyectoRepository.nuevo(datos)`).
 
-| Colección | Qué guarda | Relaciones |
-|---|---|---|
-| `habilidads` | El catálogo | `codigo` único (`desarrollo_node`), aparte del `_id` |
-| `colaboradors` | Colaboradores | Copia `{codigo, titulo}` de sus habilidades |
-| `colectivos` | El colectivo | — |
-| `proyectos` | El proyecto **con sus perfiles, logros y avances embebidos** | `colectivoId` por referencia, más una copia de nombre, tipo y ubicación del colectivo; copia de habilidades en perfiles |
-| `colaboraciones` | Postulaciones y colaboraciones | `proyectoId`, `colectivoId` y `colaborador` por referencia (ObjectId) |
-| `notificaciones` | Los mensajes internos de cada persona | `destinatarioId` por referencia (ObjectId) |
+| Colección        | Qué guarda                                                   | Relaciones                                                                                                              |
+| ---------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| `habilidads`     | El catálogo                                                  | `codigo` único (`desarrollo_node`), aparte del `_id`                                                                    |
+| `colaboradors`   | Colaboradores                                                | Copia `{codigo, titulo}` de sus habilidades                                                                             |
+| `colectivos`     | El colectivo                                                 | —                                                                                                                       |
+| `proyectos`      | El proyecto **con sus perfiles, logros y avances embebidos** | `colectivoId` por referencia, más una copia de nombre, tipo y ubicación del colectivo; copia de habilidades en perfiles |
+| `colaboraciones` | Postulaciones y colaboraciones                               | `proyectoId`, `colectivoId` y `colaborador` por referencia (ObjectId)                                                   |
+| `notificaciones` | Los mensajes internos de cada persona                        | `destinatarioId` por referencia (ObjectId)                                                                              |
 
 (Los nombres en inglés "mal pluralizados" los pone Mongoose solo.)
 
@@ -112,12 +115,11 @@ Decisiones:
   embebidos en el proyecto: se leen siempre con él.
 - **El proyecto lleva una copia de su colectivo** (nombre, tipo, ubicación):
   es lo que muestra y por lo que se filtra. `ColectivoService.actualizar` la
-  actualiza en todos sus proyectos cuando el colectivo cambia.
-- **`MongoProyectoRepository` arma el proyecto con sus colaboraciones**: al
-  leer las trae en una sola consulta (con `populate` del colaborador) y al
-  guardar persiste el proyecto y las colaboraciones que cambiaron. Servicios y
-  dominio siguen viendo `proyecto.colaboraciones`, y la API devuelve el mismo
-  JSON que antes.
+  actualiza en todos sus proyectos dentro de la misma transacción cuando el colectivo cambia.
+- **Comandos y lecturas tienen contratos distintos.** Para modificar, el repositorio
+  reconstruye el agregado completo con sus colaboraciones. Los listados devuelven
+  resúmenes con proyecciones y el detalle solo la primera página del historial.
+  Nunca se guarda una proyección parcial. Ver [el contrato de repositorios](packages/backend/CONTRATO-REPOSITORIOS.md).
 - **Habilidades desnormalizadas.** Perfiles y personas guardan una copia
   `{codigo, titulo}` de cada habilidad. El catálogo es precargado y una
   habilidad no cambia de título, así que no hace falta ir a buscarla cada vez
@@ -143,7 +145,8 @@ Decisiones:
 - **Envíos externos por job.** Una notificación se guarda con sus envíos
   (email, WhatsApp, SMS) en estado `PENDIENTE`; `jobs/enviosPendientes.js` los
   manda fuera del pedido HTTP, con límite de tiempo, reintentos con espera
-  creciente y estado final `ENVIADO` o `FALLIDO`.
+  creciente y estado final `ENVIADO`, `SIMULADO` o `FALLIDO`. Las reservas tienen
+  un token único y solo su dueño puede confirmar el resultado.
 
 ## Segunda entrega: qué hace la API
 
@@ -152,35 +155,35 @@ mapa, con el requerimiento del enunciado que resuelve cada cosa.
 
 ### Requerimientos mínimos
 
-| Funcionalidad | Rutas |
-|---|---|
-| Perfiles (CRUD) | `/proyectos/:id/perfiles...` |
-| Logros (CRUD) | `/proyectos/:id/logros` y `/proyectos/:id/logros/:logroId` |
-| Avances: porcentaje de concreción y enlaces, con historial | `POST /proyectos/:id/avances` (solo se agregan), `GET /proyectos/:id/avances` |
-| Medios de contacto: se registran pero **nunca se muestran** | `POST /colaboradores/:id/medios-de-contacto`, `DELETE .../medios-de-contacto/:tipo/:valor` |
-| Contribuciones anónimas | `esPublica: false` en `POST /proyectos/:id/colaboraciones` |
-| Búsqueda de colaboradoras según un perfil | `GET /proyectos/:id/perfiles/:perfilId/colaboradoras-potenciales` |
-| Contactarlas (mensaje interno) | `POST /proyectos/:id/perfiles/:perfilId/invitaciones` |
-| Búsqueda de proyectos según las habilidades de la colaboradora | `GET /colaboradores/:id/proyectos-potenciales` |
-| Notificaciones internas, replicadas por email/WhatsApp/SMS | `GET /colaboradores/:id/notificaciones`, `POST .../notificaciones/:notificacionId/lectura` |
+| Funcionalidad                                                  | Rutas                                                                                      |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Perfiles (CRUD)                                                | `/proyectos/:id/perfiles...`                                                               |
+| Logros (CRUD)                                                  | `/proyectos/:id/logros` y `/proyectos/:id/logros/:logroId`                                 |
+| Avances: porcentaje de concreción y enlaces, con historial     | `POST /proyectos/:id/avances` (solo se agregan), `GET /proyectos/:id/avances`              |
+| Medios de contacto: se registran pero **nunca se muestran**    | `POST /colaboradores/:id/medios-de-contacto`, `DELETE .../medios-de-contacto/:tipo/:valor` |
+| Contribuciones anónimas                                        | `esPublica: false` en `POST /proyectos/:id/colaboraciones`                                 |
+| Búsqueda de colaboradoras según un perfil                      | `GET /proyectos/:id/perfiles/:perfilId/colaboradoras-potenciales`                          |
+| Contactarlas (mensaje interno)                                 | `POST /proyectos/:id/perfiles/:perfilId/invitaciones`                                      |
+| Búsqueda de proyectos según las habilidades de la colaboradora | `GET /colaboradores/:id/proyectos-potenciales`                                             |
+| Notificaciones internas, replicadas por email/WhatsApp/SMS     | `GET /colaboradores/:id/notificaciones`, `POST .../notificaciones/:notificacionId/lectura` |
 
 ### Requerimientos adicionales
 
-| # | Requerimiento | Cómo |
-|---|---|---|
-| 8 | Aceptación y rechazo automático de postulaciones | `modoAceptacion` y `limiteColaboraciones` en cada perfil; `POST .../colaboraciones/:colaboracionId/aceptacion` y `/rechazo` |
-| 9 | Notificaciones automáticas | Al crear un proyecto se avisa a las personas compatibles; al crear una persona, se le avisa qué proyectos le sirven |
-| 10 | Cierre automático de proyectos | `fechaCierre` en el proyecto; `src/jobs/cierreAutomatico.js` revisa cada minuto |
-| 11 | Sanitización | `src/middlewares/sanitizar.js`: saca todo el HTML de los textos que entran |
-| 14 | Límite de solicitudes | `src/middlewares/limiteDeTasa.js`: 300 cada 15 min por IP; 30 por minuto en búsquedas y estadísticas |
-| 16, 30 | Estadísticas globales / API pública | `GET /estadisticas`, con el Aggregation Framework |
-| 17 | Estadísticas por organización | `GET /colectivos/:id/estadisticas`; `GET /proyectos/:id` suma visualizaciones |
-| 19 | Línea de tiempo | `GET /colectivos/:id/timeline`: alta, proyectos, logros, avances, colaboraciones cerradas y baja |
-| 23 | Eliminación de colectivos | `POST /colectivos/:id/baja` |
-| 27 | Redes sociales | `redesSociales` en colectivos y colaboradores |
-| 34 | Etiquetas | `etiquetas` en colectivos y proyectos; filtro `?etiqueta=` en los listados |
-| 38 | Markdown (backend) | Las descripciones lo guardan intacto; el renderizado es del [frontend](https://github.com/Mazzini123/codigo-a-voluntad-front) |
-| 39 | Valoraciones mutuas | `POST .../colaboraciones/:colaboracionId/finalizacion` y `/valoraciones`; `GET /colaboradores/:id/valoraciones`, `GET /colectivos/:id/valoraciones` |
+| #      | Requerimiento                                    | Cómo                                                                                                                                                                       |
+| ------ | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 8      | Aceptación y rechazo automático de postulaciones | `modoAceptacion` y `limiteColaboraciones` en cada perfil; `POST .../colaboraciones/:colaboracionId/aceptacion` y `/rechazo`                                                |
+| 9      | Notificaciones automáticas                       | Al crear un proyecto se avisa a las personas compatibles; al crear una persona, se le avisa qué proyectos le sirven                                                        |
+| 10     | Cierre automático de proyectos                   | `fechaCierre` en el proyecto; `src/jobs/cierreAutomatico.js` revisa cada minuto                                                                                            |
+| 11     | Sanitización                                     | Quita los elementos HTML de los textos y conserva el texto con ángulos que no es HTML (`Array<string>`, `x<y`); en campos Markdown conserva código y autolinks             |
+| 14     | Límite de solicitudes                            | `src/middlewares/limiteDeTasa.js`: 300 cada 15 min por IP; 30 por minuto en búsquedas y estadísticas                                                                       |
+| 16, 30 | Estadísticas globales / API pública              | `GET /estadisticas`, con el Aggregation Framework                                                                                                                          |
+| 17     | Estadísticas por organización                    | `GET /colectivos/:id/estadisticas`; `GET /proyectos/:id` suma visualizaciones                                                                                              |
+| 19     | Línea de tiempo                                  | `GET /colectivos/:id/timeline`: alta, proyectos, logros, avances, colaboraciones cerradas y baja                                                                           |
+| 23     | Eliminación de colectivos                        | `POST /colectivos/:id/baja`                                                                                                                                                |
+| 27     | Redes sociales                                   | `redesSociales` en colectivos y colaboradores                                                                                                                              |
+| 34     | Etiquetas                                        | `etiquetas` en colectivos y proyectos; filtro `?etiqueta=` en los listados                                                                                                 |
+| 38     | Markdown (backend)                               | Las descripciones conservan la sintaxis Markdown y limpian HTML externo al código; el renderizado es del [frontend](https://github.com/Mazzini123/codigo-a-voluntad-front) |
+| 39     | Valoraciones mutuas                              | `POST .../colaboraciones/:colaboracionId/finalizacion` y `/valoraciones`; `GET /colaboradores/:id/valoraciones`, `GET /colectivos/:id/valoraciones`                        |
 
 Los adicionales 13, 18, 21, 29 y 35 quedan para la tercera entrega: todos
 necesitan saber quién está usando la plataforma (un equipo administrativo, o la
@@ -199,11 +202,11 @@ aceptadas (`limiteColaboraciones`, opcional) y su propio modo de aceptación.
                 └──────────▶ RECHAZADA
 ```
 
-| Modo | Límite | Qué pasa |
-|---|---|---|
-| `REVISION_MANUAL` (por defecto) | opcional | Nada automático: el colectivo acepta o rechaza. Alcanzado el límite, no se puede aceptar a nadie más |
-| `TODO_SUMA` | no se permite | Se acepta en el momento |
-| `HASTA_LLENAR_VACANTES` | obligatorio | Espera hasta juntar tantas como el límite; ahí se aceptan todas, se cierra la búsqueda del perfil y se rechazan las demás |
+| Modo                            | Límite        | Qué pasa                                                                                                                  |
+| ------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `REVISION_MANUAL` (por defecto) | opcional      | Nada automático: el colectivo acepta o rechaza. Alcanzado el límite, no se puede aceptar a nadie más                      |
+| `TODO_SUMA`                     | no se permite | Se acepta en el momento                                                                                                   |
+| `HASTA_LLENAR_VACANTES`         | obligatorio   | Espera hasta juntar tantas como el límite; ahí se aceptan todas, se cierra la búsqueda del perfil y se rechazan las demás |
 
 Los datos de contacto de la persona quedan a disposición del colectivo recién
 cuando la postulación es aceptada.
@@ -211,7 +214,8 @@ cuando la postulación es aceptada.
 **Desanotar:** `POST .../colaboraciones/:colaboracionId/desvinculacion` pasa una
 colaboración aceptada a `DESVINCULADA`. La usan tanto el colectivo como la
 persona, y es permanente: queda en el historial y no se puede volver a postular
-al mismo proyecto.
+al mismo perfil. Otros perfiles se evalúan de forma independiente; una postulación
+retirada permite volver a postularse.
 
 Cerrar un proyecto (a mano, por fecha o porque el colectivo se dio de baja)
 siempre tiene las mismas consecuencias: se rechazan las postulaciones pendientes
@@ -219,28 +223,30 @@ y terminan las colaboraciones en curso.
 
 ### Variables de entorno
 
-| Variable | Obligatoria | Qué hace |
-|---|---|---|
-| `MONGO_URI` | sí | Conexión a MongoDB |
-| `SERVER_PORT` | no (8000) | Puerto de la API |
-| `LOGTO_ENDPOINT` | para autenticar | Endpoint del tenant de Logto. La API valida los JWT (emisor `<endpoint>/oidc`, JWKS del tenant) |
-| `LOGTO_API_RESOURCE` | para autenticar | Identificador del API resource de Logto: es la audiencia que tiene que traer el token. Es el mismo valor que `VITE_LOGTO_API_RESOURCE` en el front |
-| `LOGTO_ALGORITMOS` | no (`ES384`) | Algoritmos de firma aceptados, separados por coma. Los que publica `<endpoint>/oidc/jwks` |
-| `AUTH_PROVEEDORES` | no | JSON con varios proveedores (reemplaza a las `LOGTO_*`). Ver `.env.example` |
-| `AUTH_DESACTIVADA` | no (`false`) | Permite iniciar sin proveedor únicamente con `NODE_ENV=development` o `NODE_ENV=test`. Con `NODE_ENV=production`, `true` impide el arranque |
-| `COMPAT_CONTEXTO_IMPLICITO` | no | Transitorio. `true` acepta pedidos sin `X-Context-Id` si el usuario tiene un único contexto válido y es el actual. Apagar cuando el front mande el encabezado |
-| `CORS_ORIGENES` | no | Orígenes del front, separados por coma. Sin esto se acepta cualquiera |
-| `SMTP_URL` | no | Servidor SMTP para mandar las notificaciones por email. Sin esto se simulan (quedan en el log) |
-| `SMTP_REMITENTE` | no | El "De:" de esos emails |
-| `LIMITE_SOLICITUDES_GENERAL` | no (300) | Solicitudes por IP cada 15 minutos |
-| `LIMITE_SOLICITUDES_BUSQUEDAS` | no (30) | Solicitudes por IP por minuto en búsquedas y estadísticas |
-| `CIERRE_AUTOMATICO_INTERVALO_MS` | no (60000) | Cada cuánto se buscan proyectos con la fecha de cierre vencida |
-| `ENVIOS_INTERVALO_MS` | no (15000) | Cada cuánto se mandan los emails, WhatsApp y SMS pendientes de las notificaciones |
+| Variable                         | Obligatoria     | Qué hace                                                                                                                                                      |
+| -------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MONGO_URI`                      | sí              | Conexión a MongoDB                                                                                                                                            |
+| `SERVER_PORT`                    | no (8000)       | Puerto de la API                                                                                                                                              |
+| `LOGTO_ENDPOINT`                 | para autenticar | Endpoint del tenant de Logto. La API valida los JWT (emisor `<endpoint>/oidc`, JWKS del tenant)                                                               |
+| `LOGTO_API_RESOURCE`             | para autenticar | Identificador del API resource de Logto: es la audiencia que tiene que traer el token. Es el mismo valor que `VITE_LOGTO_API_RESOURCE` en el front            |
+| `LOGTO_ALGORITMOS`               | no (`ES384`)    | Algoritmos de firma aceptados, separados por coma. Los que publica `<endpoint>/oidc/jwks`                                                                     |
+| `AUTH_PROVEEDORES`               | no              | JSON con varios proveedores (reemplaza a las `LOGTO_*`). Ver `.env.example`                                                                                   |
+| `AUTH_DESACTIVADA`               | no (`false`)    | Permite iniciar sin proveedor únicamente con `NODE_ENV=development` o `NODE_ENV=test`. Con `NODE_ENV=production`, `true` impide el arranque                   |
+| `COMPAT_CONTEXTO_IMPLICITO`      | no              | Transitorio. `true` acepta pedidos sin `X-Context-Id` si el usuario tiene un único contexto válido y es el actual. Apagar cuando el front mande el encabezado |
+| `CORS_ORIGENES`                  | no              | Orígenes del front, separados por coma. Sin esto se acepta cualquiera                                                                                         |
+| `SMTP_URL`                       | no              | Servidor SMTP para mandar las notificaciones por email. Sin esto se simulan (quedan en el log)                                                                |
+| `SMTP_REMITENTE`                 | no              | El "De:" de esos emails                                                                                                                                       |
+| `LIMITE_SOLICITUDES_GENERAL`     | no (300)        | Solicitudes por IP cada 15 minutos                                                                                                                            |
+| `LIMITE_SOLICITUDES_BUSQUEDAS`   | no (30)         | Solicitudes por IP por minuto en búsquedas y estadísticas                                                                                                     |
+| `CIERRE_AUTOMATICO_INTERVALO_MS` | no (60000)      | Cada cuánto se buscan proyectos con la fecha de cierre vencida                                                                                                |
+| `ENVIOS_INTERVALO_MS`            | no (15000)      | Frecuencia de generación de avisos y entrega de envíos pendientes                                                                                             |
+| `APAGADO_PLAZO_MS`               | no (25000)      | Plazo máximo para terminar HTTP y jobs antes de cerrar MongoDB                                                                                                |
+| `TRUST_PROXY`                    | no (false)      | IP o redes CIDR explícitas de proxies confiables, separadas por coma                                                                                          |
 
-WhatsApp y SMS se simulan siempre: requieren un proveedor pago y el enunciado
-pide privilegiar herramientas económicas. Enchufar uno real es escribir otra
-clase con un método `enviar()` en `src/canales/` y cambiar una línea en
-`composicion.js`.
+WhatsApp usa Twilio cuando están definidos `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`
+y `TWILIO_WHATSAPP_REMITENTE`; en otro caso se simula. Email usa `SMTP_URL` si
+está configurado; SMS se simula. Un envío simulado termina en `SIMULADO` y
+`exito: false`: no acredita entrega a un proveedor real.
 
 ### Manejo de errores
 
@@ -251,13 +257,14 @@ corresponde y hay un solo lugar que la traduce a HTTP:
 service / dominio          middlewares/manejadorErrores.js        respuesta
 ─────────────────────      ───────────────────────────────        ─────────
 throw ZodError        ──▶  (validación de forma)             ──▶  400 + issues
-throw DomainError     ──▶  err.status                        ──▶  400
+id de la ruta que no es ObjectId (middlewares/validarIds.js) ──▶  400
 throw BadRequestError ──▶  err.status                        ──▶  400
 throw NotFoundError   ──▶  err.status                        ──▶  404
 throw ConflictError   ──▶  err.status                        ──▶  409
+throw DomainError     ──▶  err.status (regla de negocio)     ──▶  422
 Mongoose ValidationError / CastError                         ──▶  400
 Mongoose VersionError (otro pedido guardó antes)             ──▶  409
-cualquier otra cosa   ──▶  console.error + genérico          ──▶  500
+cualquier otra cosa   ──▶  registro.error + genérico         ──▶  500
 ```
 
 El manejador se registra último en `app.js` y declara cuatro parámetros: así es
@@ -265,15 +272,23 @@ como Express reconoce un error handler y le entrega el error. Express 5 también
 captura las promesas rechazadas, así que esto va a seguir funcionando cuando los
 repositorios sean `async` contra MongoDB.
 
+### Registro
+
+Todo lo que escribe la API pasa por `src/config/registro.js`: una línea JSON por
+evento, con `fecha`, `nivel` (`info`, `aviso` o `error`), `evento` y sus datos.
+Cada pedido HTTP se registra al terminar (`pedido_http`, con `requestId`, método,
+ruta, estado y milisegundos), salvo `/health` y `/ready`, y salvo en los tests.
+Las rutas inexistentes pasan por el mismo manejador de errores que el resto.
+
 ### Forma de las respuestas
 
 El resultado de la operación lo dice el código HTTP, no un campo del body.
 
-| Caso | Body |
-|---|---|
-| Un recurso | el objeto directo, sin envoltorio |
+| Caso                | Body                                                            |
+| ------------------- | --------------------------------------------------------------- |
+| Un recurso          | el objeto directo, sin envoltorio                               |
 | Un listado paginado | `{ data: [...], meta: { page, per_page, total, total_pages } }` |
-| Un error | `{ message }`, más `issues` si es de validación |
+| Un error            | `{ message }`, más `issues` si es de validación                 |
 
 > **Cambio respecto de la primera entrega.** Las respuestas ya no traen el campo
 > `status`, y `PATCH /proyectos/:id` fue reemplazado por
@@ -307,19 +322,19 @@ Logto registra, autentica y emite el access token. Al iniciar o restaurar la ses
 
 La compatibilidad transitoria `COMPAT_CONTEXTO_IMPLICITO=true` acepta la ausencia del header solo cuando hay exactamente un contexto válido y coincide con el persistido. La respuesta indica `Deprecation: true`. La opción está desactivada por defecto y se limita a la resolución del contexto.
 
-| Endpoint | Para qué |
-|---|---|
-| `POST /auth/registro` | Alta o recuperación idempotente del usuario del token. Se llama antes de consultar la cuenta |
-| `PUT /auth/usuario` | Completar o cambiar el nombre (dato propio de la app) |
-| `GET /auth/me` | Consulta de solo lectura del usuario, nombre, contexto actual y contextos con sus permisos. Conserva el `id` legado del token y `rol` y `perfilId` del contexto actual. El ID interno está en `usuario.id` |
-| `PUT` / `DELETE /auth/contexto-actual` | Elegir el contexto / dejarlo en `null` al cerrar sesión |
-| `POST /colectivos/:id/solicitudes-ingreso` y `.../cancelacion` | Pedir el ingreso / cancelarlo |
-| `GET /colectivos/:id/solicitudes-ingreso` | Bandeja consultable por miembros y líder |
-| `POST .../aceptacion`, `POST .../rechazo` | Resolución de solicitudes por el líder |
-| `GET /colectivos/:id/miembros`, `DELETE /colectivos/:id/miembros/:contextoId` | Miembros / quitar uno |
-| `POST /colectivos/:id/abandono`, `POST /colectivos/:id/lider` | Irse / pasar el liderazgo |
-| `POST /colectivos/:id/baja` | Baja lógica del colectivo del contexto actual del líder. Disponible con autenticación activa |
-| `POST /colaboradores/:id/baja` | Baja lógica del perfil de colaboradora |
+| Endpoint                                                                      | Para qué                                                                                                                                                                                                   |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /auth/registro`                                                         | Alta o recuperación idempotente del usuario del token. Se llama antes de consultar la cuenta                                                                                                               |
+| `PUT /auth/usuario`                                                           | Completar o cambiar el nombre (dato propio de la app)                                                                                                                                                      |
+| `GET /auth/me`                                                                | Consulta de solo lectura del usuario, nombre, contexto actual y contextos con sus permisos. Conserva el `id` legado del token y `rol` y `perfilId` del contexto actual. El ID interno está en `usuario.id` |
+| `PUT` / `DELETE /auth/contexto-actual`                                        | Elegir el contexto / dejarlo en `null` al cerrar sesión                                                                                                                                                    |
+| `POST /colectivos/:id/solicitudes-ingreso` y `.../cancelacion`                | Pedir el ingreso / cancelarlo                                                                                                                                                                              |
+| `GET /colectivos/:id/solicitudes-ingreso`                                     | Bandeja consultable por miembros y líder                                                                                                                                                                   |
+| `POST .../aceptacion`, `POST .../rechazo`                                     | Resolución de solicitudes por el líder                                                                                                                                                                     |
+| `GET /colectivos/:id/miembros`, `DELETE /colectivos/:id/miembros/:contextoId` | Miembros / quitar uno                                                                                                                                                                                      |
+| `POST /colectivos/:id/abandono`, `POST /colectivos/:id/lider`                 | Irse / pasar el liderazgo                                                                                                                                                                                  |
+| `POST /colectivos/:id/baja`                                                   | Baja lógica del colectivo del contexto actual del líder. Disponible con autenticación activa                                                                                                               |
+| `POST /colaboradores/:id/baja`                                                | Baja lógica del perfil de colaboradora                                                                                                                                                                     |
 
 **Proveedores y arranque**
 
@@ -352,15 +367,15 @@ docker compose logs -f api       # ver los logs de la api (Ctrl+C para salir)
 
 Verificación: `curl http://localhost:8000/health`
 
-| Comando | Qué hace |
-|---|---|
-| `docker compose up -d --build` | Levanta todo. **Usar `--build` después de cada cambio de código** |
-| `docker compose ps` | Estado de los contenedores |
-| `docker compose logs -f api` | Logs de la api en vivo |
-| `docker compose restart api` | Reinicia solo la api |
-| `docker compose down` | Baja los contenedores. **Los datos se conservan** |
-| `docker compose down -v` | Baja todo **y borra la base** (el volumen `mongo-data`) |
-| `docker exec -it cav-mongo mongosh codigo-a-voluntad` | Consola de Mongo |
+| Comando                                               | Qué hace                                                          |
+| ----------------------------------------------------- | ----------------------------------------------------------------- |
+| `docker compose up -d --build`                        | Levanta todo. **Usar `--build` después de cada cambio de código** |
+| `docker compose ps`                                   | Estado de los contenedores                                        |
+| `docker compose logs -f api`                          | Logs de la api en vivo                                            |
+| `docker compose restart api`                          | Reinicia solo la api                                              |
+| `docker compose down`                                 | Baja los contenedores. **Los datos se conservan**                 |
+| `docker compose down -v`                              | Baja todo **y borra la base** (el volumen `mongo-data`)           |
+| `docker exec -it cav-mongo mongosh codigo-a-voluntad` | Consola de Mongo                                                  |
 
 > **Ojo con el `--build`.** El `Dockerfile` copia el código **adentro de la
 > imagen** al construirla. Si editás un archivo y hacés solo `docker compose up`
@@ -389,14 +404,14 @@ asegura los catálogos de roles y permisos, instala el validador de
 
 ## Scripts
 
-| Comando | Qué hace |
-|---|---|
-| `npm run dev:backend` | Backend con recarga automática (`node --watch`) |
-| `npm run start:backend` | Backend sin recarga (es el que corre dentro del contenedor) |
-| `npm test` | Todos los tests (Jest, contra un MongoDB que levanta solo) |
-| `npm run test:integracion` | Solo los de `tests/integracion` |
-| `npm run lint` | ESLint sobre todo el repo |
-| `npm run format` | Prettier sobre todo el repo |
+| Comando                    | Qué hace                                                    |
+| -------------------------- | ----------------------------------------------------------- |
+| `npm run dev:backend`      | Backend con recarga automática (`node --watch`)             |
+| `npm run start:backend`    | Backend sin recarga (es el que corre dentro del contenedor) |
+| `npm test`                 | Todos los tests (Jest, contra un MongoDB que levanta solo)  |
+| `npm run test:integracion` | Solo los de `tests/integracion`                             |
+| `npm run lint`             | ESLint sobre todo el repo                                   |
+| `npm run format`           | Prettier sobre todo el repo                                 |
 
 ## Tests
 
@@ -410,13 +425,13 @@ de MongoDB (queda en caché).
 Para usar un Mongo ya levantado (por ejemplo el de `docker compose up -d mongo`):
 `MONGO_URI_TEST=mongodb://127.0.0.1:27017/?replicaSet=rs0 npm test`.
 
-| Carpeta | Qué prueba |
-|---|---|
-| `tests/domain` | Entidades |
-| `tests/services` | Casos de uso, sobre los repositorios de Mongo |
-| `tests/http` | Rutas y middlewares de la app Express entera, con supertest |
-| `tests/middlewares`, `tests/models` | Sanitización y formato JSON |
-| `tests/integracion` | Lo propio de la base: índices, transacciones, concurrencia, agregaciones y migraciones |
+| Carpeta                             | Qué prueba                                                                             |
+| ----------------------------------- | -------------------------------------------------------------------------------------- |
+| `tests/domain`                      | Entidades                                                                              |
+| `tests/services`                    | Casos de uso, sobre los repositorios de Mongo                                          |
+| `tests/http`                        | Rutas y middlewares de la app Express entera, con supertest                            |
+| `tests/middlewares`, `tests/models` | Sanitización y formato JSON                                                            |
+| `tests/integracion`                 | Lo propio de la base: índices, transacciones, concurrencia, agregaciones y migraciones |
 
 ```bash
 npm test                                     # todo
@@ -424,14 +439,14 @@ npm run test:integracion                     # solo tests/integracion
 npm test --workspace=backend -- --watch      # en watch
 ```
 
-| Archivo de integración | Qué prueba |
-|---|---|
-| `persistencia.test.js` | Cada entidad vuelve de la base con **todos** sus campos (Mongoose descarta en silencio lo que no está en el schema) |
-| `busquedas.test.js` | Las búsquedas de colaboradoras y proyectos potenciales, contra las reglas de `reglasDeBusqueda.js` |
-| `estadisticas.test.js` | Los pipelines de estadísticas |
-| `concurrencia.test.js` | Concurrencia optimista por proyecto: dos aceptaciones simultáneas no superan el cupo; editar un proyecto no choca con postularse a otro |
-| `migracionProyectos.test.js` | Migraciones 002 (proyectos y colaboraciones a sus colecciones) y 003 (envíos con estado) |
-| `api.test.js` | La app Express entera contra Mongo (test de integración de controladores) |
+| Archivo de integración            | Qué prueba                                                                                                                                            |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `persistencia.test.js`            | Cada entidad vuelve de la base con **todos** sus campos (Mongoose descarta en silencio lo que no está en el schema)                                   |
+| `busquedas.test.js`               | Las búsquedas de colaboradoras y proyectos potenciales, contra las reglas de `reglasDeBusqueda.js`                                                    |
+| `estadisticas.test.js`            | Los pipelines de estadísticas                                                                                                                         |
+| `concurrencia.test.js`            | Concurrencia optimista por proyecto: dos aceptaciones simultáneas no superan el cupo; editar un proyecto no choca con postularse a otro               |
+| `migracionProyectos.test.js`      | Migraciones 002 (proyectos y colaboraciones a sus colecciones) y 003 (envíos con estado)                                                              |
+| `api.test.js`                     | La app Express entera contra Mongo (test de integración de controladores)                                                                             |
 | `contextosYTransacciones.test.js` | Rollback de un alta que falla, índices únicos de contextos, validador `$jsonSchema`, transferencia de liderazgo concurrente y la migración de cuentas |
 
 ## Despliegue
@@ -451,22 +466,22 @@ reservarla desde la consola. Para verificar la actual, desde la VM:
 
 ### Conectarse a la VM
 
-| Dato | Valor |
-|---|---|
-| Instancia | `instance-20260907-2051` (Oracle Cloud, región São Paulo) |
-| IP pública | `147.15.102.156` |
-| Usuario | `ubuntu` (el que traen las imágenes Ubuntu de Oracle) |
-| Proyecto | `~/tp-desarrollo-2c-2026`, en la rama `main` |
+| Dato             | Valor                                                     |
+| ---------------- | --------------------------------------------------------- |
+| Instancia        | `instance-20260907-2051` (Oracle Cloud, región São Paulo) |
+| IP pública       | `147.15.102.156`                                          |
+| Usuario          | `ubuntu` (el que traen las imágenes Ubuntu de Oracle)     |
+| Proyecto         | `~/tp-desarrollo-2c-2026`, en la rama `main`              |
 | Cuenta de Oracle | La de Lucio (creador de la instancia y de la consola web) |
 
 Se entra por SSH con un **archivo de clave privada**, no con contraseña. La VM
 acepta las claves públicas que estén en `~/.ssh/authorized_keys`, una por
 línea. Cada integrante tiene la suya:
 
-| Clave (comentario al final de la línea) | De quién |
-|---|---|
-| `ssh-key-2026-09-07` | Lucio: la generó Oracle al crear la instancia |
-| `mate-tp-dds` | Mateo |
+| Clave (comentario al final de la línea) | De quién                                      |
+| --------------------------------------- | --------------------------------------------- |
+| `ssh-key-2026-09-07`                    | Lucio: la generó Oracle al crear la instancia |
+| `mate-tp-dds`                           | Mateo                                         |
 
 ```powershell
 # Con la clave por defecto (~/.ssh/id_ed25519), SSH la encuentra solo:
@@ -509,11 +524,11 @@ Host cav-vm
 
 **Problemas comunes.**
 
-| Mensaje | Causa | Solución |
-|---|---|---|
-| `Permission denied (publickey)` | Esa clave no está en `authorized_keys`, o el usuario no es `ubuntu` | Revisar el usuario; que alguien con acceso agregue la clave pública |
-| `UNPROTECTED PRIVATE KEY FILE` | Windows le dio permisos de más al archivo de clave | `icacls "<archivo>" /inheritance:r` y `icacls "<archivo>" /grant:r "$($env:USERNAME):(R)"` |
-| `Connection timed out` | La VM está apagada o cambió la IP | Consola de Oracle → Compute → Instances |
+| Mensaje                         | Causa                                                               | Solución                                                                                   |
+| ------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `Permission denied (publickey)` | Esa clave no está en `authorized_keys`, o el usuario no es `ubuntu` | Revisar el usuario; que alguien con acceso agregue la clave pública                        |
+| `UNPROTECTED PRIVATE KEY FILE`  | Windows le dio permisos de más al archivo de clave                  | `icacls "<archivo>" /inheritance:r` y `icacls "<archivo>" /grant:r "$($env:USERNAME):(R)"` |
+| `Connection timed out`          | La VM está apagada o cambió la IP                                   | Consola de Oracle → Compute → Instances                                                    |
 
 > Si se pierden **todas** las claves privadas no hay forma de entrar por SSH:
 > habría que recrear la instancia cargando claves nuevas. Por eso cada
@@ -591,12 +606,12 @@ Para que un puerto de un contenedor llegue a internet hacen falta tres cosas:
 contenedor ──"ports" del compose──▶ VM ──firewall de la VM──▶ Security List de Oracle ──▶ internet
 ```
 
-| Pieza | Dónde | Qué hace |
-|---|---|---|
-| `EXPOSE 8000` | `Dockerfile` | Nada en la red: documenta en qué puerto escucha la app |
-| `ports: "8000:8000"` | compose | Enlaza `puerto_de_la_VM:puerto_del_contenedor` (podría ser `"9000:8000"`) |
-| Firewall de Ubuntu | la VM | Filtro de la máquina. Ojo: los puertos que publica Docker se lo saltean |
-| Security List | consola de Oracle → VCN | El firewall de la nube: sin una regla de entrada para el puerto, no llega nada |
+| Pieza                | Dónde                   | Qué hace                                                                       |
+| -------------------- | ----------------------- | ------------------------------------------------------------------------------ |
+| `EXPOSE 8000`        | `Dockerfile`            | Nada en la red: documenta en qué puerto escucha la app                         |
+| `ports: "8000:8000"` | compose                 | Enlaza `puerto_de_la_VM:puerto_del_contenedor` (podría ser `"9000:8000"`)      |
+| Firewall de Ubuntu   | la VM                   | Filtro de la máquina. Ojo: los puertos que publica Docker se lo saltean        |
+| Security List        | consola de Oracle → VCN | El firewall de la nube: sin una regla de entrada para el puerto, no llega nada |
 
 El 8000 de la API está abierto en la Security List (por eso se llega desde el
 navegador). Para exponer Mongo habría que publicar el 27017 **y** abrirlo en
@@ -607,11 +622,11 @@ nada escuchando.
 
 Son dos límites distintos, y cada uno limita a un proceso:
 
-| Configuración | Limita a | Qué es |
-|---|---|---|
-| `--wiredTigerCacheSizeGB 0.25` | Mongo | La caché de su motor de almacenamiento. El proceso entero usa algo más |
-| `NODE_OPTIONS=--max-old-space-size=256` | La API | El heap de V8, en MB. Node usa más que eso en total (~350-400 MB) |
-| `mem_limit` | Cada contenedor | Techo duro (cgroups de Linux): si se pasa, el kernel mata el proceso y Docker lo reinicia |
+| Configuración                           | Limita a        | Qué es                                                                                    |
+| --------------------------------------- | --------------- | ----------------------------------------------------------------------------------------- |
+| `--wiredTigerCacheSizeGB 0.25`          | Mongo           | La caché de su motor de almacenamiento. El proceso entero usa algo más                    |
+| `NODE_OPTIONS=--max-old-space-size=256` | La API          | El heap de V8, en MB. Node usa más que eso en total (~350-400 MB)                         |
+| `mem_limit`                             | Cada contenedor | Techo duro (cgroups de Linux): si se pasa, el kernel mata el proceso y Docker lo reinicia |
 
 El consumo real se mira con `docker stats --no-stream`.
 
@@ -632,11 +647,11 @@ configuración queda en el volumen y sobrevive a reinicios.
 
 Volver atrás es sacar `--replSet` y `--keyFile` del `command`: los datos no cambian.
 
-| Situación | Qué hacer |
-|---|---|
+| Situación                                     | Qué hacer                                                                                                        |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | Compass o `mongosh` desde la PC por túnel SSH | Agregar `directConnection=true` a la URI: el nodo se anuncia como `mongo:27017`, que fuera de Docker no resuelve |
-| Se perdió el `keyFile` | Generar otro y reiniciar Mongo |
-| Se renombró el servicio `mongo` | `rs.reconfig` con el host nuevo |
+| Se perdió el `keyFile`                        | Generar otro y reiniciar Mongo                                                                                   |
+| Se renombró el servicio `mongo`               | `rs.reconfig` con el host nuevo                                                                                  |
 
 El oplog ocupa 512 MB fijos (`--oplogSize`). Conviene volver a medir con
 `docker stats` contra el límite de memoria del contenedor.
@@ -658,12 +673,12 @@ docker image prune -f        # borra las imágenes viejas (el disco es chico)
 
 ### Operación
 
-| Comando | Qué hace |
-|---|---|
-| `docker compose -f docker-compose.prod.yml ps` | Estado |
-| `docker compose -f docker-compose.prod.yml logs -f api` | Logs de la api |
-| `docker compose -f docker-compose.prod.yml restart api` | Reiniciar la api |
-| `docker stats --no-stream` | Consumo de memoria de cada contenedor |
+| Comando                                                                                              | Qué hace                              |
+| ---------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| `docker compose -f docker-compose.prod.yml ps`                                                       | Estado                                |
+| `docker compose -f docker-compose.prod.yml logs -f api`                                              | Logs de la api                        |
+| `docker compose -f docker-compose.prod.yml restart api`                                              | Reiniciar la api                      |
+| `docker stats --no-stream`                                                                           | Consumo de memoria de cada contenedor |
 | `docker exec -it cav-mongo mongosh -u <usuario> -p --authenticationDatabase admin codigo-a-voluntad` | Consola de Mongo (pide la contraseña) |
 
 ### Dónde están los datos y cómo hacer backup
@@ -724,3 +739,18 @@ Reglas del equipo:
 - Facundo Teran
 - Matias Trejo
 - Tiago Beltran
+
+## Revisión integral de noviembre de 2026
+
+Ver [cambios, contratos HTTP y operación](packages/backend/REVISION-IMPLEMENTADA.md) y
+[contrato de repositorios](packages/backend/CONTRATO-REPOSITORIOS.md). Los listados usan
+resúmenes y los historiales se consultan por páginas. La rama correspondiente del
+frontend incorpora navegación, conteos globales y carga de páginas adicionales.
+
+## Estilo de código
+
+El equipo usa el mismo formato en backend y frontend. Las reglas, la configuración
+del editor y los comandos de verificación están en [ESTILO.md](ESTILO.md).
+
+La [guía de simplificación](packages/backend/SIMPLIFICACION.md) explica las decisiones
+para el TP: apagado directo, un único generador de avisos y respuestas de lectura explícitas.
