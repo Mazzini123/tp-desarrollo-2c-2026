@@ -192,6 +192,69 @@ describe("HTTP · registro e identidad", () => {
 });
 
 describe("HTTP · contexto en cada pedido", () => {
+  test.each([false, true])(
+    "M3 usa el contexto persistido aunque cambie despues de M2 (compat=%s)",
+    async (compat) => {
+      const { api, services, token, como, crearColectivo, contextos } = await armar({
+        compat,
+      });
+      const a = await crearColectivo("ana");
+      const contextoA = contextos.get("ana");
+      const resolver = services.contextoService.resolverEnPedido;
+      services.contextoService.resolverEnPedido = async function (usuario, ...args) {
+        expect(String(usuario.contextoActualId)).toBe(contextoA);
+        await this.limpiarActual({ _id: usuario._id });
+        return resolver.call(this, usuario, ...args);
+      };
+      try {
+        const respuesta = await api
+          .put(`/colectivos/${a.id}`)
+          .set(compat ? token("ana") : como("ana", contextoA))
+          .send({ nombre: "No debe cambiar" })
+          .expect(compat ? 400 : 409);
+        expect(codigo(respuesta)).toBe(
+          compat ? "CONTEXTO_REQUERIDO" : "CONTEXTO_NO_ACTUAL",
+        );
+        expect((await ColectivoModel.findById(a.id)).nombre).toBe(a.nombre);
+      } finally {
+        services.contextoService.resolverEnPedido = resolver;
+      }
+    },
+  );
+
+  test("un pedido ordinario admitido conserva el colectivo de M3 al cambiar el actual", async () => {
+    const { api, services, como, crearColectivo, elegir, contextos } = await armar();
+    const a = await crearColectivo("ana", "A");
+    const contextoA = contextos.get("ana");
+    const b = await crearColectivo("ana", "B");
+    const contextoB = contextos.get("ana");
+    await elegir("ana", contextoA);
+    const resolver = services.contextoService.resolverEnPedido;
+    services.contextoService.resolverEnPedido = async function (...args) {
+      const admitido = await resolver.apply(this, args);
+      await this.usuarioRepository.fijarContextoActual(args[0]._id, contextoB);
+      return admitido;
+    };
+    try {
+      await api
+        .put(`/colectivos/${a.id}`)
+        .set(como("ana", contextoA))
+        .send({ nombre: "A actualizado" })
+        .expect(200);
+      // Ser lider de B no habilita a usar A para modificar B, aun al cambiar el actual.
+      await elegir("ana", contextoA);
+      await api
+        .put(`/colectivos/${b.id}`)
+        .set(como("ana", contextoA))
+        .send({ nombre: "No debe cambiar" })
+        .expect(403);
+      expect((await ColectivoModel.findById(a.id)).nombre).toBe("A actualizado");
+      expect((await ColectivoModel.findById(b.id)).nombre).toBe("B");
+    } finally {
+      services.contextoService.resolverEnPedido = resolver;
+    }
+  });
+
   test("se rechaza sin contexto, con uno ajeno, desactualizado o inactivo", async () => {
     const { api, token, como, crearColectivo, yo, elegir, contextos } = await armar();
     const a = await crearColectivo("ana", "A");

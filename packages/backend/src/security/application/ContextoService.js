@@ -1,5 +1,4 @@
 import { TIPO_CONTEXTO } from "../autorizacion/enums/TIPO_CONTEXTO.js";
-import { ROL_CUENTA } from "../http/ROL_CUENTA.js";
 import { BadRequestError } from "../../errors/BadRequestError.js";
 import { ConflictError } from "../../errors/ConflictError.js";
 import { ForbiddenError } from "../../errors/ForbiddenError.js";
@@ -101,13 +100,11 @@ export class ContextoService {
     return descripcion;
   }
 
-  async cuentaDe(usuario, sub) {
+  async cuentaDe(usuario) {
     const validos = await this.validosDe(usuario._id);
     const actual = validos.find((c) => mismoId(c._id, usuario.contextoActualId)) ?? null;
 
     return {
-      id: sub,
-      ...rolYPerfilDe(actual),
       usuario: {
         id: usuario.id,
         nombre: usuario.nombre,
@@ -169,29 +166,21 @@ export class ContextoService {
   }
 
   async resolverEnPedido(usuario, contextoId, { compat = false } = {}) {
+    const vigente = await this.usuarioRepository.buscarPorId(usuario._id);
     if (contextoId === undefined) {
       if (!compat) throw contextoRequerido();
       const validos = await this.validosDe(usuario._id);
-      if (validos.length !== 1 || !mismoId(validos[0]._id, usuario.contextoActualId)) {
+      if (validos.length !== 1 || !mismoId(validos[0]._id, vigente?.contextoActualId)) {
         throw contextoRequerido();
       }
       return { contexto: validos[0], implicito: true };
     }
 
     const contexto = await this.contextoPropio(usuario, contextoId);
-    if (!mismoId(usuario.contextoActualId, contexto._id)) {
+    if (!mismoId(vigente?.contextoActualId, contexto._id)) {
       throw contextoNoActual();
     }
     await this.exigirValido(contexto);
     return { contexto, implicito: false };
   }
-}
-
-function rolYPerfilDe(contexto) {
-  if (!contexto) {
-    return { rol: null, perfilId: null };
-  }
-  return contexto.tipo === TIPO_CONTEXTO.COLECTIVO
-    ? { rol: ROL_CUENTA.COLECTIVO, perfilId: String(contexto.colectivoId) }
-    : { rol: ROL_CUENTA.COLABORADORA, perfilId: String(contexto.colaboradorId) };
 }

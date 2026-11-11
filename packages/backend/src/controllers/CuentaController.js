@@ -1,5 +1,6 @@
 import { BaseController } from "./BaseController.js";
 import { UnauthorizedError } from "../errors/UnauthorizedError.js";
+import { cuentaDto } from "../security/http/cuentaDto.js";
 
 const sinAutenticacion = () =>
   new UnauthorizedError("La autenticacion no esta habilitada o falta la sesion");
@@ -19,9 +20,8 @@ export class CuentaController extends BaseController {
 
   yo = async (req, res) => {
     if (!req.usuario) throw sinAutenticacion();
-    res
-      .status(200)
-      .json(await this.contextoService.cuentaDe(req.usuario, req.autenticacion.sub));
+    const cuenta = await this.contextoService.cuentaDe(req.usuario);
+    res.status(200).json(cuentaDto(cuenta, req.autenticacion.sub));
   };
 
   cambiarNombre = async (req, res) => {
