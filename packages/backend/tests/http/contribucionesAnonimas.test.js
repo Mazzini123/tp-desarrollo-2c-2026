@@ -34,8 +34,8 @@ describe("HTTP · contribuciones anonimas", () => {
     expect(alta.body.colaborador).toBeNull();
 
     const listado = await api.get(`/proyectos/${proyectoId}/colaboraciones`).expect(200);
-    expect(listado.body).toHaveLength(1);
-    expect(listado.body[0]).toMatchObject({ esPublica: false, colaborador: null });
+    expect(listado.body.data).toHaveLength(1);
+    expect(listado.body.data[0]).toMatchObject({ esPublica: false, colaborador: null });
 
     const proyecto = await api.get(`/proyectos/${proyectoId}`).expect(200);
     expect(JSON.stringify(proyecto.body)).not.toContain(colaboradorId);

@@ -39,32 +39,11 @@ export class Perfil {
     return this.habilidadesOpcionales.map((h) => h.codigo);
   }
 
-  cumpleHabilidadesRequeridas(colaborador) {
-    return (
-      this.habilidadesRequeridas.length > 0 &&
-      this.habilidadesRequeridas.every((habilidad) =>
-        colaborador.tieneHabilidad(habilidad),
-      )
-    );
-  }
-
-  cumpleAlgunaHabilidadOpcional(colaborador) {
-    return this.habilidadesOpcionales.some((habilidad) =>
-      colaborador.tieneHabilidad(habilidad),
-    );
-  }
-
   tieneLimite() {
     return this.limiteColaboraciones !== null && this.limiteColaboraciones !== undefined;
   }
 
   limiteAlcanzado(cantidadAceptadas) {
     return this.tieneLimite() && cantidadAceptadas >= this.limiteColaboraciones;
-  }
-
-  aceptaPostulaciones(ahora = new Date()) {
-    const vencida =
-      Boolean(this.fechaCierreBusqueda) && this.fechaCierreBusqueda <= ahora;
-    return this.busquedaAbierta && !vencida;
   }
 }

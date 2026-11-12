@@ -1,3 +1,5 @@
+import { mismoMedioDeContacto } from "./MedioDeContacto.js";
+
 export class Colectivo {
   estaDadoDeBaja() {
     return this.fechaBaja !== null && this.fechaBaja !== undefined;
@@ -5,17 +7,21 @@ export class Colectivo {
 
   darDeBaja(fecha) {
     this.fechaBaja = fecha;
-    this.mediosDeContacto = [];
-    this.redesSociales = [];
   }
 
-  agregarProyecto(datos) {
-    const proyecto = this.proyectos.create(datos);
-    this.proyectos.push(proyecto);
-    return proyecto;
+  tieneMedioDeContacto(medio) {
+    return this.mediosDeContacto.some((existente) =>
+      mismoMedioDeContacto(existente, medio),
+    );
   }
 
-  buscarProyecto(proyectoId) {
-    return this.proyectos.find((p) => p.id === String(proyectoId)) ?? null;
+  agregarMedioDeContacto(medio) {
+    this.mediosDeContacto.push(medio);
+  }
+
+  quitarMedioDeContacto(medio) {
+    this.mediosDeContacto = this.mediosDeContacto.filter(
+      (existente) => !mismoMedioDeContacto(existente, medio),
+    );
   }
 }

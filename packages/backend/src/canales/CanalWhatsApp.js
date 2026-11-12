@@ -6,8 +6,8 @@ export class CanalWhatsApp {
 
   async enviar({ destino, contenido }) {
     // Aseguramos que el destino tenga el prefijo 'whatsapp:' requerido por Twilio
-    const destinoFormateado = destino.startsWith('whatsapp:') 
-      ? destino 
+    const destinoFormateado = destino.startsWith("whatsapp:")
+      ? destino
       : `whatsapp:${destino}`;
 
     await this.cliente.messages.create({

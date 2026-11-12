@@ -1,12 +1,5 @@
 import { rateLimit } from "express-rate-limit";
-
-// Requerimiento adicional 14: "Proteger las busquedas y APIs publicas contra
-// scraping o abuso mediante limites de solicitudes por IP/usuario".
-//
-// Todavia no hay usuarios (llegan con la autenticacion, en la tercera
-// entrega), asi que el limite es por IP. El contador vive en la memoria del
-// proceso: alcanza porque la API corre en un solo contenedor. Con varias
-// replicas habria que compartirlo (por ejemplo en Redis).
+import { enteroDeEntorno } from "../config/entorno.js";
 
 const QUINCE_MINUTOS = 15 * 60 * 1000;
 const UN_MINUTO = 60 * 1000;
@@ -22,7 +15,7 @@ function crearLimitador({ ventanaMs, limite, mensaje }) {
     limit: limite,
     standardHeaders: "draft-8",
     legacyHeaders: false,
-    skip: (req) => req.path === "/health",
+    skip: (req) => ["/health", "/ready"].includes(req.path.replace(/\/$/, "")),
     handler: (_req, res) => res.status(429).json({ message: mensaje }),
   });
 }
@@ -44,14 +37,13 @@ export function crearLimitadores(limites = {}) {
   };
 }
 
-// Permite ajustar los limites sin tocar codigo (por ejemplo, en la VM).
 export function limitesDesdeEntorno(entorno = process.env) {
   const limites = {};
   if (entorno.LIMITE_SOLICITUDES_GENERAL) {
-    limites.general = Number(entorno.LIMITE_SOLICITUDES_GENERAL);
+    limites.general = enteroDeEntorno(entorno, "LIMITE_SOLICITUDES_GENERAL", 300);
   }
   if (entorno.LIMITE_SOLICITUDES_BUSQUEDAS) {
-    limites.busquedas = Number(entorno.LIMITE_SOLICITUDES_BUSQUEDAS);
+    limites.busquedas = enteroDeEntorno(entorno, "LIMITE_SOLICITUDES_BUSQUEDAS", 30);
   }
   return limites;
 }

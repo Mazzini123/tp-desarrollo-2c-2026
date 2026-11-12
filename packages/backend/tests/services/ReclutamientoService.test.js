@@ -223,6 +223,7 @@ describe("ReclutamientoService · invitar", () => {
       mediosDeContacto: [{ tipo: "EMAIL", valor: "ada@mail.com" }],
     });
 
+    await services.avisoAutomaticoService.procesarPendientes(new Date(), { tope: 100 });
     const notificacion = await invitar(ada.id);
 
     expect(notificacion.tipo).toBe("INVITACION");
@@ -231,7 +232,8 @@ describe("ReclutamientoService · invitar", () => {
       perfilId: perfil.id,
     });
     expect(notificacion.contenido).toContain("Nos encantaria contar con vos");
-    // El aviso automatico del alta (req. 9) y la invitacion.
+    // El aviso automatico del alta (req. 9) y la invitacion, que manda el job.
+    await services.notificacionService.procesarEnviosPendientes();
     expect(services.canales.EMAIL.enviados.map((m) => m.asunto)).toEqual([
       expect.stringContaining("coinciden con tus habilidades"),
       expect.stringContaining("te invita"),
@@ -262,5 +264,30 @@ describe("ReclutamientoService · invitar", () => {
     });
     await services.proyectoService.finalizar(proyecto.id);
     await expect(invitar(ada.id)).rejects.toThrow(ConflictError);
+  });
+
+  test("a un perfil con la busqueda cerrada no se invita, aunque otro siga abierto", async () => {
+    const colectivo = await crearColectivoDePrueba(services.colectivoService);
+    const conDosPerfiles = await services.proyectoService.crear({
+      colectivoId: colectivo.id,
+      titulo: "Con dos perfiles",
+      descripcion: "...",
+      perfiles: [datosDePerfil(), datosDePerfil()],
+    });
+    const [cerrado, abierto] = conDosPerfiles.perfiles;
+    await services.perfilService.actualizar(conDosPerfiles.id, cerrado.id, {
+      busquedaAbierta: false,
+    });
+    const ada = await services.colaboradorService.crear({
+      cuentaGit: "ada",
+      codigosHabilidades: [CODIGOS.node],
+    });
+    const invitarA = (perfilId) =>
+      services.reclutamientoService.invitar(conDosPerfiles.id, perfilId, {
+        colaboradorId: ada.id,
+      });
+
+    await expect(invitarA(cerrado.id)).rejects.toThrow(ConflictError);
+    await expect(invitarA(abierto.id)).resolves.toMatchObject({ tipo: "INVITACION" });
   });
 });

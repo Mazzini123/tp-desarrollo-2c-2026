@@ -7,7 +7,21 @@ export function validarBody(schema) {
 
 export function validarQuery(schema) {
   return (req, _res, next) => {
-    req.paginacion = schema.parse(req.query);
+    req.consulta = schema.parse(req.query);
+    next();
+  };
+}
+
+export function validarParams(schema) {
+  return (req, _res, next) => {
+    req.parametros = schema.parse(req.params);
+    next();
+  };
+}
+
+export function validarHeaders(schema) {
+  return (req, _res, next) => {
+    req.encabezados = schema.parse(req.headers);
     next();
   };
 }

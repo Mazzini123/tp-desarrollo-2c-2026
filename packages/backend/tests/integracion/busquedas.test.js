@@ -1,11 +1,15 @@
-import { CODIGOS, datosDePerfil } from "../fixtures.js";
+import { CODIGOS, datosDePerfil, proyectosDelColectivo } from "../fixtures.js";
 import { armarServicesConMongo, usarBaseDeTest } from "./baseDeTest.js";
+import {
+  cumpleHabilidadesRequeridas,
+  perfilAceptaPostulaciones,
+} from "../../src/services/reglasDeBusqueda.js";
 
 /**
  * Las busquedas las resuelve Mongo con el Aggregation Framework. La regla de
- * negocio esta escrita dos veces: en los metodos de dominio (que validan una
+ * negocio esta escrita dos veces: en services/reglasDeBusqueda.js (que valida una
  * postulacion) y en el pipeline (que busca). Estos tests corren el pipeline
- * contra una base real y chequean que coincida con los metodos de dominio.
+ * contra una base real y chequean que coincida con esas reglas.
  */
 usarBaseDeTest();
 
@@ -143,6 +147,7 @@ describe("proyectos potenciales segun las habilidades de una persona", () => {
     await s.colaboracionService.aceptar(i.id, enI.id);
 
     const persona = await crearPersona("persona", nodo);
+    await s.avisoAutomaticoService.procesarPendientes(new Date(), { tope: 100 });
     const bandeja = await s.notificacionService.listar(persona.id);
     expect(bandeja.items[0].asunto).toBe(
       "Hay 3 proyecto(s) que coinciden con tus habilidades",
@@ -162,7 +167,7 @@ describe("proyectos potenciales segun las habilidades de una persona", () => {
     expect(pagina.total).toBe(2);
 
     const titulosEncontrados = new Set(pagina.items.map((p) => p.titulo));
-    const todos = (await s.colectivoService.buscarPorId(colectivo.id)).proyectos;
+    const todos = await proyectosDelColectivo(colectivo.id);
     const ahora = new Date();
     for (const proyecto of todos) {
       const segunDominio =
@@ -170,9 +175,9 @@ describe("proyectos potenciales segun las habilidades de una persona", () => {
         !proyecto.yaColaboraron(persona) &&
         proyecto.perfiles.some(
           (perfil) =>
-            perfil.aceptaPostulaciones(ahora) &&
+            perfilAceptaPostulaciones(perfil, ahora) &&
             !perfil.limiteAlcanzado(proyecto.cantidadAceptadas(perfil)) &&
-            perfil.cumpleHabilidadesRequeridas(persona),
+            cumpleHabilidadesRequeridas(perfil, persona),
         );
       expect([proyecto.titulo, titulosEncontrados.has(proyecto.titulo)]).toEqual([
         proyecto.titulo,

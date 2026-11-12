@@ -1,17 +1,16 @@
 import { z } from "zod";
 import { crearPerfilSchema } from "./perfilSchema.js";
 import { tieneAlgunCampoDefinido } from "../utils/validaciones.js";
-import { etiquetasSchema } from "./comunesSchema.js";
-
-const fechaCierreSchema = z
-  .union([z.iso.datetime({ offset: true }), z.iso.date()])
-  .transform((texto) => new Date(texto))
-  .nullable();
+import {
+  objectIdSchema,
+  etiquetasSchema,
+  fechaDeCierreSchema as fechaCierreSchema,
+} from "./comunesSchema.js";
 
 export const crearProyectoSchema = z
   .object({
-    titulo: z.string().trim().min(1),
-    descripcion: z.string().trim().min(1),
+    titulo: z.string().trim().min(1).max(100),
+    descripcion: z.string().trim().min(1).max(5000),
     perfiles: z.array(crearPerfilSchema).min(1),
     etiquetas: etiquetasSchema.default([]),
     fechaCierre: fechaCierreSchema.optional(),
@@ -20,8 +19,8 @@ export const crearProyectoSchema = z
 
 export const actualizarProyectoSchema = z
   .object({
-    titulo: z.string().trim().min(1).optional(),
-    descripcion: z.string().trim().min(1).optional(),
+    titulo: z.string().trim().min(1).max(100).optional(),
+    descripcion: z.string().trim().min(1).max(5000).optional(),
     etiquetas: etiquetasSchema.optional(),
     fechaCierre: fechaCierreSchema.optional(),
   })
@@ -32,8 +31,12 @@ export const actualizarProyectoSchema = z
 
 export const anotarColaboradorSchema = z
   .object({
-    colaboradorId: z.string().trim().min(1),
-    perfilId: z.string().trim().min(1),
+    colaboradorId: objectIdSchema,
+    perfilId: objectIdSchema,
     esPublica: z.boolean().default(true),
   })
   .strict();
+
+export const publicacionHeadersSchema = z.looseObject({
+  "idempotency-key": z.uuid().toLowerCase().optional(),
+});

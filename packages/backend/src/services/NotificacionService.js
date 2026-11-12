@@ -1,88 +1,159 @@
-import { NotificacionModel } from "../models/NotificacionModel.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
+import { ESTADO_ENVIO } from "../domain/enums/ESTADO_ENVIO.js";
 import { armarPaginado } from "../utils/paginacion.js";
+import { conLimiteDeTiempo } from "../utils/tiempo.js";
+import { registro } from "../config/registro.js";
+
+const UN_MINUTO = 60_000;
+
+export const POLITICA_DE_ENVIOS = Object.freeze({
+  maximoDeIntentos: 5,
+  esperaInicialMs: UN_MINUTO,
+  limiteDeTiempoMs: 10_000,
+  reservaMs: 5 * UN_MINUTO,
+});
 
 export class NotificacionService {
-  // Usa el repositorio de colaboradores y no ColaboradorService: el alta de
-  // un colaborador dispara avisos (req. adicional 9), asi que
-  // ColaboradorService depende de este service y no al reves.
-  constructor({ notificacionRepository, colaboradorRepository, canales }) {
+  constructor({
+    notificacionRepository,
+    colaboradorRepository,
+    canales,
+    politica = POLITICA_DE_ENVIOS,
+  }) {
     this.notificacionRepository = notificacionRepository;
     this.colaboradorRepository = colaboradorRepository;
-    // Un canal por tipo de medio de contacto: { EMAIL, WHATSAPP, SMS }.
     this.canales = canales;
+    this.politica = politica;
   }
 
-  // Devuelve null si la persona no acepta mensajeria interna: en ese caso no
-  // se le escribe, ni adentro de la plataforma ni afuera.
-  async notificar(colaborador, { tipo, asunto, contenido, referencias = {} }) {
+  async notificar(colaborador, { tipo, asunto, contenido, referencias = {}, clave }) {
     if (!colaborador.recibeMensajeriaInterna) {
       return null;
     }
 
-    const notificacion = new NotificacionModel({
+    const envios = colaborador.mediosDeContacto
+      .filter((medio) => this.canales[medio.tipo])
+      .map((medio) => ({ canal: medio.tipo, destino: medio.valor }));
+
+    return this.notificacionRepository.crear({
+      clave,
       destinatarioId: colaborador.id,
       tipo,
       asunto,
       contenido,
       referencias,
+      envios,
     });
-
-    notificacion.envios = await this.replicar(colaborador, notificacion);
-    await this.notificacionRepository.guardar(notificacion);
-
-    return notificacion;
   }
 
-  // "Las notificaciones internas deberian poder ser replicadas a traves de los
-  // medios de contacto registrados" — enunciado, segunda entrega.
-  //
-  // allSettled y no all: si falla el SMS igual tiene que salir el email, y un
-  // proveedor caido no puede hacer fallar la operacion que genero el aviso.
-  async replicar(colaborador, notificacion) {
-    const medios = colaborador.mediosDeContacto.filter((medio) => this.canales[medio.tipo]);
+  async procesarEnviosPendientes(
+    ahora = new Date(),
+    { tope = 50, debeDetenerse = () => false } = {},
+  ) {
+    const resumen = { enviados: 0, reintentos: 0, fallidos: 0 };
+    const inicio = Date.now();
+    const instante = () => new Date(ahora.getTime() + Date.now() - inicio);
 
-    const resultados = await Promise.allSettled(
-      medios.map((medio) =>
-        this.canales[medio.tipo].enviar({
-          destino: medio.valor,
+    for (let i = 0; i < tope && !debeDetenerse(); i++) {
+      const momento = instante();
+      const reservaHasta = new Date(momento.getTime() + this.politica.reservaMs);
+      const tomado = await this.notificacionRepository.tomarEnvioPendiente(
+        momento,
+        reservaHasta,
+      );
+      if (!tomado) break;
+      const estado = await this.enviar(tomado, instante);
+      if (estado) resumen[estado] += 1;
+    }
+
+    return resumen;
+  }
+
+  async enviar({ notificacion, envio }, instante) {
+    const intentos = envio.intentos + 1;
+    try {
+      const canal = this.canales[envio.canal];
+      if (!canal) throw new Error(`No hay un canal configurado para ${envio.canal}`);
+      const resultado = await conLimiteDeTiempo(
+        canal.enviar({
+          destino: envio.destino,
           asunto: notificacion.asunto,
           contenido: notificacion.contenido,
         }),
-      ),
-    );
-
-    return resultados.map((resultado, i) => {
-      if (resultado.status === "rejected") {
-        console.error(`No se pudo replicar por ${medios[i].tipo}:`, resultado.reason?.message);
-      }
-      return { canal: medios[i].tipo, exito: resultado.status === "fulfilled" };
-    });
+        this.politica.limiteDeTiempoMs,
+        `El envio por ${envio.canal}`,
+      );
+      const confirmado = await this.notificacionRepository.actualizarEnvio(
+        notificacion._id,
+        envio._id,
+        envio.reservaId,
+        {
+          estado: resultado?.simulado ? ESTADO_ENVIO.SIMULADO : ESTADO_ENVIO.ENVIADO,
+          intentos,
+          fechaEnvio: instante(),
+          enProcesoHasta: null,
+          reservaId: null,
+          ultimoError: null,
+        },
+      );
+      return confirmado ? "enviados" : null;
+    } catch (error) {
+      const agotado = intentos >= this.politica.maximoDeIntentos;
+      const espera = this.politica.esperaInicialMs * 2 ** (intentos - 1);
+      registro.error("envio_fallido", {
+        notificacionId: notificacion.id,
+        envioId: envio.id,
+        canal: envio.canal,
+        intentos,
+        error: error.message,
+      });
+      const confirmado = await this.notificacionRepository.actualizarEnvio(
+        notificacion._id,
+        envio._id,
+        envio.reservaId,
+        {
+          estado: agotado ? ESTADO_ENVIO.FALLIDO : ESTADO_ENVIO.PENDIENTE,
+          intentos,
+          proximoIntento: new Date(instante().getTime() + espera),
+          enProcesoHasta: null,
+          reservaId: null,
+          ultimoError: error.message,
+        },
+      );
+      return confirmado ? (agotado ? "fallidos" : "reintentos") : null;
+    }
   }
 
-  async listar(colaboradorId, { numeroPagina = 1, limitePorPagina = 10 } = {}) {
+  async listar(colaboradorId, { numeroPagina = 1, limitePorPagina = 10, leida } = {}) {
     if (!(await this.colaboradorRepository.buscarPorId(colaboradorId))) {
       throw new NotFoundError(`No existe un colaborador con id "${colaboradorId}"`);
     }
 
-    return armarPaginado(
+    const paginado = { numeroPagina, limitePorPagina };
+    const pagina = armarPaginado(
       await this.notificacionRepository.listarPorDestinatarioPaginado(
         colaboradorId,
-        numeroPagina,
-        limitePorPagina,
+        paginado,
+        { leida },
       ),
-      numeroPagina,
-      limitePorPagina,
+      paginado,
     );
+    const noLeidas = await this.notificacionRepository.contarNoLeidas(colaboradorId);
+
+    return { ...pagina, noLeidas };
+  }
+
+  async yaInvitada(colaboradorId, perfilId) {
+    return this.notificacionRepository.existeInvitacion(colaboradorId, perfilId);
   }
 
   async marcarComoLeida(colaboradorId, notificacionId) {
     const notificacion = await this.notificacionRepository.buscarPorId(notificacionId);
 
-    // Una notificacion ajena responde igual que una inexistente: no se confirma
-    // que exista algo que no es tuyo.
     if (!notificacion || !notificacion.esPara(colaboradorId)) {
-      throw new NotFoundError(`No existe la notificacion "${notificacionId}" para ese colaborador`);
+      throw new NotFoundError(
+        `No existe la notificacion "${notificacionId}" para ese colaborador`,
+      );
     }
 
     notificacion.marcarComoLeida();

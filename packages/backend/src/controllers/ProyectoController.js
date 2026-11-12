@@ -1,4 +1,6 @@
 import { BaseController } from "./BaseController.js";
+import { colectivoDelContexto } from "../security/http/contexto.js";
+import { proyectoPublico } from "../dto/vistasPublicas.js";
 
 export class ProyectoController extends BaseController {
   constructor({ proyectoService, colaboracionService }) {
@@ -8,16 +10,20 @@ export class ProyectoController extends BaseController {
   }
 
   listar = async (req, res) => {
-    const paginacion = this.aPaginacionDeDominio(req.paginacion);
-    const { etiqueta } = req.paginacion;
-    this.responderPaginado(
-      res,
-      await this.proyectoService.listar({ ...paginacion, etiqueta }),
-    );
+    const paginacion = this.aPaginacionDeDominio(req.consulta);
+    const { etiqueta, estado, habilidad, tipoColectivo, ubicacion, modalidad } =
+      req.consulta;
+    const filtros = { etiqueta, estado, habilidad, tipoColectivo, ubicacion, modalidad };
+    const pagina = await this.proyectoService.listar({ ...paginacion, ...filtros });
+    this.responderPaginado(res, pagina);
   };
 
   obtenerPorId = async (req, res) => {
-    res.status(200).json(await this.proyectoService.verDetalle(req.params.id));
+    const { proyecto, esDueno } = await this.proyectoService.verDetalle(
+      req.params.id,
+      colectivoDelContexto(req.contexto),
+    );
+    res.status(200).json(esDueno ? proyecto : proyectoPublico(proyecto));
   };
 
   actualizar = async (req, res) => {
@@ -50,6 +56,23 @@ export class ProyectoController extends BaseController {
   };
 
   listarColaboraciones = async (req, res) => {
-    res.status(200).json(await this.colaboracionService.listarPorProyecto(req.params.id));
+    this.responderPaginado(
+      res,
+      await this.colaboracionService.listarPaginaPorProyecto(req.params.id, {
+        ...this.aPaginacionDeDominio(req.consulta),
+        estado: req.consulta.estado,
+        privadas: true,
+      }),
+    );
+  };
+
+  listarParticipaciones = async (req, res) => {
+    this.responderPaginado(
+      res,
+      await this.colaboracionService.listarPaginaPorProyecto(
+        req.params.id,
+        this.aPaginacionDeDominio(req.consulta),
+      ),
+    );
   };
 }

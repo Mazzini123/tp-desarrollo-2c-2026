@@ -4,35 +4,55 @@ services:
     container_name: cav-mongo
     restart: unless-stopped
     ports:
-      # 127.0.0.1: solo se puede conectar desde esta misma maquina (Compass,
-      # mongosh, los tests de integracion). Este Mongo no tiene usuario ni
-      # contraseña: si alguien levantara este compose en un servidor, no queda
-      # escuchando para toda la red.
+      # Mongo no tiene autenticación; el puerto se publica solo en localhost.
       - "127.0.0.1:27017:27017"
+    # Replica set de un nodo para habilitar transacciones.
+    command: ["--replSet", "rs0", "--bind_ip_all"]
     volumes:
-      # Volumen con nombre: Docker lo guarda en su propia carpeta
-      # (/var/lib/docker/volumes/...), no en la del proyecto. Sobrevive a
-      # "docker compose down"; "down -v" lo borra.
+      # Conserva la base entre reinicios; "down -v" borra el volumen.
       - mongo-data:/data/db
+    healthcheck:
+      # Inicializa el replica set y espera a que el nodo sea PRIMARY.
+      test:
+        [
+          "CMD",
+          "mongosh",
+          "--quiet",
+          "--eval",
+          "try { quit(rs.status().myState === 1 ? 0 : 1) } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'mongo:27017' }] }); quit(1) }",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
 
   api:
+    # Margen para el apagado ordenado de la API (25 s por defecto).
+    stop_grace_period: 30s
     build: .
     container_name: cav-api
     restart: unless-stopped
     ports:
-      # Puerto 8000 de la maquina -> puerto 8000 del contenedor.
       - "8000:8000"
     environment:
+      NODE_ENV: development
       SERVER_PORT: 8000
-      # "mongo" es el nombre del servicio: dentro de la red interna de
-      # compose, cada servicio se encuentra por su nombre.
-      MONGO_URI: mongodb://mongo:27017/codigo-a-voluntad
+      MONGO_URI: mongodb://mongo:27017/codigo-a-voluntad?replicaSet=rs0
 
-      # Twilio
+      # Desarrollo: AUTH_DESACTIVADA=true permite trabajar sin autenticación.
+      LOGTO_ENDPOINT: ${LOGTO_ENDPOINT:-}
+      LOGTO_API_RESOURCE: ${LOGTO_API_RESOURCE:-}
+      LOGTO_ALGORITMOS: ${LOGTO_ALGORITMOS:-ES384}
+      AUTH_PROVEEDORES:
+      AUTH_DESACTIVADA: ${AUTH_DESACTIVADA:-true}
+      COMPAT_CONTEXTO_IMPLICITO: ${COMPAT_CONTEXTO_IMPLICITO:-false}
+      CORS_ORIGENES: ${CORS_ORIGENES:-}
+
       TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
       TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy
 
 volumes:
   mongo-data:

@@ -1,17 +1,32 @@
+import { MongoAvisoRepository } from "./repositories/MongoAvisoRepository.js";
+import { ValoracionService } from "./services/ValoracionService.js";
+import { TimelineService } from "./services/TimelineService.js";
 import nodemailer from "nodemailer";
 import twilio from "twilio";
 
-import { InMemoryColectivoRepository } from "./repositories/InMemoryColectivoRepository.js";
-import { InMemoryHabilidadRepository } from "./repositories/InMemoryHabilidadRepository.js";
 import { MongoHabilidadRepository } from "./repositories/MongoHabilidadRepository.js";
 import { MongoColaboradorRepository } from "./repositories/MongoColaboradorRepository.js";
 import { MongoColectivoRepository } from "./repositories/MongoColectivoRepository.js";
+import { MongoProyectoRepository } from "./repositories/MongoProyectoRepository.js";
+import { MongoColaboracionRepository } from "./repositories/MongoColaboracionRepository.js";
 import { MongoNotificacionRepository } from "./repositories/MongoNotificacionRepository.js";
-import { InMemoryNotificacionRepository } from "./repositories/InMemoryNotificacionRepository.js";
-import { InMemoryColaboradorRepository } from "./repositories/InMemoryColaboradorRepository.js";
 import { MongoEstadisticaRepository } from "./repositories/MongoEstadisticaRepository.js";
-import { InMemoryEstadisticaRepository } from "./repositories/InMemoryEstadisticaRepository.js";
 
+import { MongoUsuarioRepository } from "./security/persistencia/MongoUsuarioRepository.js";
+import { MongoIdentidadExternaRepository } from "./security/persistencia/MongoIdentidadExternaRepository.js";
+import { MongoContextoUsuarioRepository } from "./security/persistencia/MongoContextoUsuarioRepository.js";
+import { MongoSolicitudIngresoRepository } from "./security/persistencia/MongoSolicitudIngresoRepository.js";
+import { transaccionesMongo } from "./config/transacciones.js";
+
+import { CatalogoDeRoles } from "./security/autorizacion/CatalogoDeRoles.js";
+import { RegistroService } from "./security/application/RegistroService.js";
+import { ContextoService } from "./security/application/ContextoService.js";
+import { ModalidadService } from "./services/ModalidadService.js";
+import { MembresiaService } from "./services/MembresiaService.js";
+import { LiderazgoService } from "./security/application/LiderazgoService.js";
+import { CuentaController } from "./controllers/CuentaController.js";
+import { MembresiaController } from "./controllers/MembresiaController.js";
+import { crearAutorizacion } from "./middlewares/autorizacion.js";
 import { CanalEmail } from "./canales/CanalEmail.js";
 import { CanalWhatsApp } from "./canales/CanalWhatsApp.js";
 import { CanalSimulado } from "./canales/CanalSimulado.js";
@@ -44,27 +59,19 @@ import { AvanceController } from "./controllers/AvanceController.js";
 
 export function crearRepositoriosMongo() {
   return {
+    avisoRepository: new MongoAvisoRepository(),
     habilidadRepository: new MongoHabilidadRepository(),
     colaboradorRepository: new MongoColaboradorRepository(),
     colectivoRepository: new MongoColectivoRepository(),
+    proyectoRepository: new MongoProyectoRepository(),
+    colaboracionRepository: new MongoColaboracionRepository(),
     notificacionRepository: new MongoNotificacionRepository(),
     estadisticaRepository: new MongoEstadisticaRepository(),
-  };
-}
-
-export function crearRepositoriosEnMemoria() {
-  const colaboradorRepository = new InMemoryColaboradorRepository();
-  const colectivoRepository = new InMemoryColectivoRepository();
-
-  return {
-    habilidadRepository: new InMemoryHabilidadRepository(),
-    colaboradorRepository,
-    colectivoRepository,
-    notificacionRepository: new InMemoryNotificacionRepository(),
-    estadisticaRepository: new InMemoryEstadisticaRepository({
-      colectivoRepository,
-      colaboradorRepository,
-    }),
+    usuarioRepository: new MongoUsuarioRepository(),
+    identidadExternaRepository: new MongoIdentidadExternaRepository(),
+    contextoUsuarioRepository: new MongoContextoUsuarioRepository(),
+    solicitudIngresoRepository: new MongoSolicitudIngresoRepository(),
+    transacciones: transaccionesMongo,
   };
 }
 
@@ -98,13 +105,25 @@ export function crearCanalesEnMemoria() {
 export function componerApp({
   repositorios = crearRepositoriosMongo(),
   canales = crearCanales(),
+  autenticador = null,
+  catalogoDeRoles = new CatalogoDeRoles(),
+  compatContextoImplicito = false,
+  avisarContextoImplicito,
 } = {}) {
   const {
+    avisoRepository,
     habilidadRepository,
     colaboradorRepository,
     colectivoRepository,
+    proyectoRepository,
+    colaboracionRepository,
     notificacionRepository,
     estadisticaRepository,
+    usuarioRepository,
+    identidadExternaRepository,
+    contextoUsuarioRepository,
+    solicitudIngresoRepository,
+    transacciones,
   } = repositorios;
 
   const habilidadService = new HabilidadService({ habilidadRepository });
@@ -116,30 +135,37 @@ export function componerApp({
   });
 
   const perfilService = new PerfilService({
-    colectivoRepository,
+    transacciones,
+    proyectoRepository,
     habilidadService,
     notificacionService,
   });
 
   const avisoAutomaticoService = new AvisoAutomaticoService({
+    avisoRepository,
     colaboradorRepository,
-    colectivoRepository,
+    proyectoRepository,
     notificacionService,
   });
 
   const colaboradorService = new ColaboradorService({
+    transacciones,
     colaboradorRepository,
     habilidadService,
     avisoAutomaticoService,
   });
 
   const colectivoService = new ColectivoService({
+    transacciones,
     colectivoRepository,
+    proyectoRepository,
     notificacionService,
   });
 
   const proyectoService = new ProyectoService({
-    colectivoRepository,
+    colaboracionRepository,
+    transacciones,
+    proyectoRepository,
     colectivoService,
     perfilService,
     notificacionService,
@@ -148,18 +174,33 @@ export function componerApp({
 
   const reclutamientoService = new ReclutamientoService({
     colaboradorRepository,
-    colectivoRepository,
+    proyectoRepository,
     colaboradorService,
     perfilService,
     notificacionService,
   });
 
   const colaboracionService = new ColaboracionService({
-    colectivoRepository,
+    transacciones,
+    proyectoRepository,
+    colaboracionRepository,
     colectivoService,
     proyectoService,
     colaboradorService,
     notificacionService,
+  });
+
+  const valoracionService = new ValoracionService({
+    colaboracionService,
+    colaboracionRepository,
+    proyectoRepository,
+    colectivoService,
+    colaboradorService,
+  });
+  const timelineService = new TimelineService({
+    colectivoService,
+    proyectoRepository,
+    colaboracionRepository,
   });
 
   const estadisticaService = new EstadisticaService({
@@ -167,29 +208,92 @@ export function componerApp({
     colectivoService,
   });
 
-  const logroService = new LogroService({ colectivoRepository });
+  const logroService = new LogroService({ proyectoRepository });
 
-  const avanceService = new AvanceService({ colectivoRepository });
+  const avanceService = new AvanceService({ proyectoRepository });
+
+  const registroService = new RegistroService({
+    transacciones,
+    identidadExternaRepository,
+    usuarioRepository,
+  });
+
+  const contextoService = new ContextoService({
+    transacciones,
+    contextoUsuarioRepository,
+    usuarioRepository,
+    colectivoRepository,
+    colaboradorRepository,
+    catalogoDeRoles,
+  });
+
+  const modalidadService = new ModalidadService({
+    transacciones,
+    contextoService,
+    contextoUsuarioRepository,
+    usuarioRepository,
+    colectivoService,
+    colaboradorService,
+    colaboracionService,
+  });
+
+  const membresiaService = new MembresiaService({
+    transacciones,
+    contextoService,
+    contextoUsuarioRepository,
+    solicitudIngresoRepository,
+    usuarioRepository,
+    colectivoService,
+  });
+
+  const liderazgoService = new LiderazgoService({
+    transacciones,
+    contextoService,
+    contextoUsuarioRepository,
+  });
+
+  const autorizacion = crearAutorizacion({
+    autenticador,
+    registroService,
+    contextoService,
+    catalogoDeRoles,
+    proyectoService,
+    compatContextoImplicito,
+    avisarContextoImplicito,
+  });
 
   const controllers = {
+    cuenta: new CuentaController({ registroService, contextoService, membresiaService }),
+    membresia: new MembresiaController({ membresiaService, liderazgoService }),
     colectivo: new ColectivoController({
+      timelineService,
+      valoracionService,
       colectivoService,
       proyectoService,
       colaboracionService,
+      modalidadService,
+      membresiaService,
     }),
     proyecto: new ProyectoController({ proyectoService, colaboracionService }),
     perfil: new PerfilController({ perfilService }),
     habilidad: new HabilidadController({ habilidadService }),
-    colaborador: new ColaboradorController({ colaboradorService, colaboracionService }),
+    colaborador: new ColaboradorController({
+      valoracionService,
+      colaboradorService,
+      colaboracionService,
+      modalidadService,
+    }),
     notificacion: new NotificacionController({ notificacionService }),
     reclutamiento: new ReclutamientoController({ reclutamientoService }),
-    postulacion: new PostulacionController({ colaboracionService }),
+    postulacion: new PostulacionController({ colaboracionService, valoracionService }),
     estadistica: new EstadisticaController({ estadisticaService }),
     logro: new LogroController({ logroService }),
     avance: new AvanceController({ avanceService }),
   };
 
   const services = {
+    valoracionService,
+    timelineService,
     colectivoService,
     proyectoService,
     perfilService,
@@ -202,7 +306,12 @@ export function componerApp({
     estadisticaService,
     logroService,
     avanceService,
+    registroService,
+    contextoService,
+    modalidadService,
+    membresiaService,
+    liderazgoService,
   };
 
-  return { controllers, services };
+  return { controllers, services, autorizacion };
 }

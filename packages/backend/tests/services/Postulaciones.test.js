@@ -45,6 +45,12 @@ describe("Postulaciones", () => {
     });
   }
 
+  // Lo que quedo guardado en la base (el objeto que devolvio el servicio no
+  // se entera de lo que cambio despues).
+  const releer = (proyecto) => services.proyectoService.buscarPorId(proyecto.id);
+  const estadoDe = async (proyecto, colaboracion) =>
+    (await releer(proyecto)).buscarColaboracion(colaboracion.id).estado;
+
   const actualizarPerfil = (proyecto, datos) =>
     services.perfilService.actualizar(proyecto.id, proyecto.perfiles[0].id, datos);
 
@@ -79,7 +85,7 @@ describe("Postulaciones", () => {
 
       const segunda = await postular(proyecto);
       expect(segunda.estado).toBe("ACEPTADA");
-      expect(primera.estado).toBe("ACEPTADA");
+      expect(await estadoDe(proyecto, primera)).toBe("ACEPTADA");
     });
 
     test("al alcanzar el limite se cierra la busqueda del perfil", async () => {
@@ -89,7 +95,7 @@ describe("Postulaciones", () => {
       });
       await postular(proyecto);
 
-      expect(proyecto.perfiles[0].busquedaAbierta).toBe(false);
+      expect((await releer(proyecto)).perfiles[0].busquedaAbierta).toBe(false);
       await expect(postular(proyecto)).rejects.toThrow(ConflictError);
     });
 
@@ -149,8 +155,8 @@ describe("Postulaciones", () => {
 
       await services.colaboracionService.aceptar(proyecto.id, a.id);
 
-      expect(a.estado).toBe("ACEPTADA");
-      expect(b.estado).toBe("PENDIENTE");
+      expect(await estadoDe(proyecto, a)).toBe("ACEPTADA");
+      expect(await estadoDe(proyecto, b)).toBe("PENDIENTE");
       await expect(
         services.colaboracionService.aceptar(proyecto.id, b.id),
       ).rejects.toThrow(ConflictError);
@@ -235,7 +241,7 @@ describe("Postulaciones", () => {
 
       await actualizarPerfil(proyecto, { modoAceptacion: "TODO_SUMA" });
 
-      expect(a.estado).toBe("ACEPTADA");
+      expect(await estadoDe(proyecto, a)).toBe("ACEPTADA");
     });
 
     test("el limite no puede quedar por debajo de las ya aceptadas", async () => {

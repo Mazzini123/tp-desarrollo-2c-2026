@@ -1,9 +1,10 @@
 import { BaseController } from "./BaseController.js";
+import { colaboradorDelContexto } from "../security/http/contexto.js";
 
-// Acciones sobre una colaboracion ya creada (una postulacion).
 export class PostulacionController extends BaseController {
-  constructor({ colaboracionService }) {
+  constructor({ colaboracionService, valoracionService }) {
     super();
+    this.valoracionService = valoracionService;
     this.colaboracionService = colaboracionService;
   }
 
@@ -24,13 +25,22 @@ export class PostulacionController extends BaseController {
   };
 
   desvincular = async (req, res) => {
+    res.status(200).json(
+      await this.colaboracionService.desvincular(
+        req.params.id,
+        req.params.colaboracionId,
+        {
+          porLaColaboradora: Boolean(colaboradorDelContexto(req.contexto)),
+        },
+      ),
+    );
+  };
+
+  retirar = async (req, res) => {
     res
       .status(200)
       .json(
-        await this.colaboracionService.desvincular(
-          req.params.id,
-          req.params.colaboracionId,
-        ),
+        await this.colaboracionService.retirar(req.params.id, req.params.colaboracionId),
       );
   };
 
@@ -49,7 +59,7 @@ export class PostulacionController extends BaseController {
     res
       .status(201)
       .json(
-        await this.colaboracionService.valorar(
+        await this.valoracionService.valorar(
           req.params.id,
           req.params.colaboracionId,
           req.body,

@@ -7,16 +7,17 @@ class Colectivo {
   -descripcion: string
   -tipoColectivo: TIPO_COLECTIVO
   -ubicacion: Ubicacion
-  -proyectos: Array<Proyecto>
   -redesSociales: Array<RedSocial>
   -etiquetas: Array<string>
   -mediosDeContacto: Array<MedioDeContacto>
   -fechaAlta: Date
   -fechaBaja: Date
 
-  +agregarProyecto(proyecto: Proyecto): void
   +estaDadoDeBaja(): boolean
   +darDeBaja(fecha: Date): void
+  +tieneMedioDeContacto(medio: MedioDeContacto): boolean
+  +agregarMedioDeContacto(medio: MedioDeContacto): void
+  +quitarMedioDeContacto(medio: MedioDeContacto): void
 }
 
 enum TIPO_COLECTIVO {
@@ -30,7 +31,6 @@ class Ubicacion {
   -tipoUbicacion: TIPO_UBICACION
   -nombre: string
 
-  +esDeAlcanceNacional(): boolean
 }
 
 enum TIPO_UBICACION {
@@ -46,7 +46,6 @@ class RedSocial {
 }
 
 Colectivo --> TIPO_COLECTIVO
-Colectivo --> "*" Proyecto
 Colectivo --> "0..1" Ubicacion
 Colectivo --> "*" RedSocial
 Colectivo --> "*" MedioDeContacto
@@ -55,6 +54,7 @@ Ubicacion --> TIPO_UBICACION
 ' ───────────────────────── Proyecto, logros y avances ─────────────────────────
 
 class Proyecto {
+  -colectivo: Colectivo
   -titulo: string
   -descripcion: string
   -estado: PROYECTO_ESTADO
@@ -73,21 +73,18 @@ class Proyecto {
 
   +estaAbierto(): boolean
   +finalizarProyecto(fecha: Date): void
-  +cierreVencido(ahora: Date): boolean
-  +cumpleAlgunPerfil(colaborador: Colaborador): boolean
   +agregarPerfil(perfil: Perfil): void
   +quitarPerfil(perfil: Perfil): void
+  +buscarPerfil(perfilId: string): Perfil
   +yaColaboraron(colaborador: Colaborador): boolean
   +agregarColaboracion(colaboracion: Colaboracion): void
-  +quitarColaboracion(colaboracion: Colaboracion): void
   +buscarColaboracion(colaboracionId: string): Colaboracion
   +colaboracionesPendientes(): Array<Colaboracion>
   +cantidadAceptadas(perfil: Perfil): number
-  +aceptaPostulaciones(): boolean
   +agregarLogro(logro: Logro): void
   +quitarLogro(logro: Logro): void
   +agregarAvance(avance: Avance): void
-  +puedeVerContactoDe(colaborador: Colaborador): boolean
+  +ultimoAvance(): Avance
 }
 
 enum PROYECTO_ESTADO {
@@ -108,6 +105,7 @@ class Avance {
   -fecha: Date
 }
 
+Proyecto --> "1" Colectivo
 Proyecto --> PROYECTO_ESTADO
 Proyecto --> "1..*" Perfil
 Proyecto --> "*" Colaboracion
@@ -117,6 +115,7 @@ Proyecto --> "*" Avance
 ' ───────────────────────── Perfil y Compromiso ─────────────────────────
 
 class Perfil {
+  -titulo: string
   -busquedaAbierta: boolean
   -descripcion: string
   -fechaCierreBusqueda: Date
@@ -127,15 +126,15 @@ class Perfil {
   -modalidadColaboracion: MODALIDAD_COLABORACION
   -modoAceptacion: MODO_ACEPTACION
 
-  +aceptaPostulaciones(ahora: Date): boolean
+  +tieneHabilidad(lista: Array<Habilidad>, habilidad: Habilidad): boolean
   +tieneHabilidadRequerida(habilidad: Habilidad): boolean
   +tieneHabilidadOpcional(habilidad: Habilidad): boolean
   +agregarHabilidadRequerida(habilidad: Habilidad): void
   +quitarHabilidadRequerida(habilidad: Habilidad): void
   +agregarHabilidadOpcional(habilidad: Habilidad): void
   +quitarHabilidadOpcional(habilidad: Habilidad): void
-  +cumpleHabilidadesRequeridas(colaborador: Colaborador): boolean
-  +cumpleAlgunaHabilidadOpcional(colaborador: Colaborador): boolean
+  +codigosRequeridos(): Array<string>
+  +codigosOpcionales(): Array<string>
   +tieneLimite(): boolean
   +limiteAlcanzado(cantidadAceptadas: number): boolean
 }
@@ -171,8 +170,6 @@ class Habilidad {
   -usuario: string
   -activo: boolean
 
-  +activar(): void
-  +desactivar(): void
   +equals(otra: Habilidad): boolean
 }
 
@@ -186,6 +183,7 @@ Compromiso --> PERIODO_COMPROMISO
 ' ───────────────────────── Colaboración y valoraciones ─────────────────────────
 
 class Colaboracion {
+  -proyecto: Proyecto
   -colaborador: Colaborador
   -perfil: Perfil
   -esPublica: boolean
@@ -199,12 +197,13 @@ class Colaboracion {
   +estaPendiente(): boolean
   +estaAceptada(): boolean
   +estaFinalizada(): boolean
-  +estaDesvinculada(): boolean
+  +estaRetirada(): boolean
+  +esDe(colaborador: Colaborador): boolean
   +aceptar(fecha: Date): void
   +rechazar(fecha: Date): void
   +finalizar(fecha: Date): void
   +desvincular(fecha: Date): void
-  +toJSON(): object
+  +retirar(fecha: Date): void
 }
 
 enum COLABORACION_ESTADO {
@@ -213,6 +212,7 @@ enum COLABORACION_ESTADO {
   RECHAZADA
   FINALIZADA
   DESVINCULADA
+  RETIRADA
 }
 
 class Valoracion {
@@ -221,6 +221,7 @@ class Valoracion {
   -fecha: Date
 }
 
+Colaboracion --> Proyecto
 Colaboracion --> Colaborador
 Colaboracion --> Perfil
 Colaboracion --> COLABORACION_ESTADO
@@ -240,7 +241,10 @@ class Colaborador {
   -recibeMensajeriaInterna: boolean
   -mediosDeContacto: Array<MedioDeContacto>
   -redesSociales: Array<RedSocial>
+  -fechaBaja: Date
 
+  +estaDadaDeBaja(): boolean
+  +darDeBaja(fecha: Date): void
   +tienePronombre(pronombre: string): boolean
   +agregarPronombre(pronombre: string): void
   +quitarPronombre(pronombre: string): void
@@ -252,7 +256,6 @@ class Colaborador {
   +agregarMedioDeContacto(medio: MedioDeContacto): void
   +quitarMedioDeContacto(medio: MedioDeContacto): void
   +nombreParaMostrar(): string
-  +toJSON(): object
 }
 
 class MedioDeContacto {
@@ -276,16 +279,16 @@ MedioDeContacto --> TIPOS_MEDIOS_CONTACTO
 ' ───────────────────────── Notificaciones ─────────────────────────
 
 class NotificacionInterna {
-  -destinatario: Usuario
+  -destinatario: Colaborador
   -tipo: TIPO_NOTIFICACION
   -asunto: string
   -contenido: string
   -referencias: object
   -fecha: Date
   -esLeida: boolean
-  -envios: Array<{canal, exito}>
 
   +marcarComoLeida(): void
+  +esPara(colaboradorId: string): boolean
 }
 
 enum TIPO_NOTIFICACION {
@@ -294,34 +297,10 @@ enum TIPO_NOTIFICACION {
   POSTULACION_ACEPTADA
   POSTULACION_RECHAZADA
   COLABORACION_FINALIZADA
-  NUEVA_POSTULACION
   DESVINCULACION
 }
 
 NotificacionInterna --> TIPO_NOTIFICACION
-NotificacionInterna --> Usuario
-
-' ───────────────────────── Usuarios ─────────────────────────
-
-class Usuario {
-  -email: string
-  -passwordHash: string
-  -rol: ROL
-  -colectivo: Colectivo
-  -colaborador: Colaborador
-  -fechaAlta: Date
-
-  +esColectivo(): boolean
-  +esColaborador(): boolean
-}
-
-enum ROL {
-  COLECTIVO
-  COLABORADOR
-}
-
-Usuario --> ROL
-Usuario --> "0..1" Colectivo
-Usuario --> "0..1" Colaborador
+NotificacionInterna --> Colaborador
 
 @enduml

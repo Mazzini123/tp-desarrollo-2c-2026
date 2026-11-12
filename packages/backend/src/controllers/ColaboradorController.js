@@ -1,19 +1,35 @@
 import { BaseController } from "./BaseController.js";
-import { medioDeContactoSchema } from "../schemas/medioDeContactoSchema.js";
+import { colaboradorDelContexto } from "../security/http/contexto.js";
 
 export class ColaboradorController extends BaseController {
-  constructor({ colaboradorService, colaboracionService }) {
+  constructor({
+    colaboradorService,
+    colaboracionService,
+    modalidadService,
+    valoracionService,
+  }) {
     super();
+    this.valoracionService = valoracionService;
     this.colaboradorService = colaboradorService;
+    this.modalidadService = modalidadService;
     this.colaboracionService = colaboracionService;
   }
 
   crear = async (req, res) => {
-    res.status(201).json(await this.colaboradorService.crear(req.body));
+    const colaborador = req.usuario
+      ? await this.modalidadService.crearPerfilColaborador(req.usuario, req.body)
+      : await this.colaboradorService.crear(req.body);
+    res.status(201).json(colaborador);
+  };
+
+  darDeBaja = async (req, res) => {
+    res
+      .status(200)
+      .json(await this.modalidadService.darDeBajaPerfilColaborador(req.params.id));
   };
 
   listar = async (req, res) => {
-    const paginacion = this.aPaginacionDeDominio(req.paginacion);
+    const paginacion = this.aPaginacionDeDominio(req.consulta);
     this.responderPaginado(res, await this.colaboradorService.listar(paginacion));
   };
 
@@ -59,6 +75,10 @@ export class ColaboradorController extends BaseController {
     res.status(200).json(colaborador);
   };
 
+  mediosDeContacto = async (req, res) => {
+    res.status(200).json(await this.colaboradorService.mediosDeContacto(req.params.id));
+  };
+
   agregarMedioDeContacto = async (req, res) => {
     res
       .status(201)
@@ -68,25 +88,22 @@ export class ColaboradorController extends BaseController {
   };
 
   quitarMedioDeContacto = async (req, res) => {
-    const medio = medioDeContactoSchema.parse({
-      tipo: req.params.tipo,
-      valor: req.params.valor,
-    });
-    await this.colaboradorService.quitarMedioDeContacto(req.params.id, medio);
+    await this.colaboradorService.quitarMedioDeContacto(req.params.id, req.parametros);
     res.status(204).send();
   };
 
   listarValoraciones = async (req, res) => {
     res
       .status(200)
-      .json(
-        await this.colaboracionService.listarValoracionesDeColaborador(req.params.id),
-      );
+      .json(await this.valoracionService.listarValoracionesDeColaborador(req.params.id));
   };
 
   listarColaboraciones = async (req, res) => {
-    res
-      .status(200)
-      .json(await this.colaboracionService.listarPorColaborador(req.params.id));
+    const esLaDuena = colaboradorDelContexto(req.contexto) === req.params.id;
+    res.status(200).json(
+      await this.colaboracionService.listarPorColaborador(req.params.id, {
+        incluirAnonimas: esLaDuena,
+      }),
+    );
   };
 }

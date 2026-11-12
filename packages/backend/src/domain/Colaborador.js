@@ -1,6 +1,14 @@
 import { mismoMedioDeContacto } from "./MedioDeContacto.js";
 
 export class Colaborador {
+  estaDadaDeBaja() {
+    return this.fechaBaja !== null && this.fechaBaja !== undefined;
+  }
+
+  darDeBaja(fecha) {
+    this.fechaBaja = fecha;
+  }
+
   tienePronombre(pronombre) {
     return this.pronombres.includes(pronombre);
   }

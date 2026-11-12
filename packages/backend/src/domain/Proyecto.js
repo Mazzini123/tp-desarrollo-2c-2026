@@ -10,20 +10,9 @@ export class Proyecto {
     this.fechaFinalizacion = fecha;
   }
 
-  cierreVencido(ahora) {
-    return this.estaAbierto() && Boolean(this.fechaCierre) && this.fechaCierre <= ahora;
-  }
-
-  cumpleAlgunPerfil(colaborador) {
-    return this.perfiles.some((perfil) =>
-      perfil.cumpleHabilidadesRequeridas(colaborador),
-    );
-  }
-
   agregarLogro(datos) {
-    const logro = this.logros.create(datos);
-    this.logros.push(logro);
-    return logro;
+    this.logros.push(datos);
+    return this.logros.at(-1);
   }
 
   quitarLogro(logro) {
@@ -31,9 +20,8 @@ export class Proyecto {
   }
 
   agregarPerfil(datos) {
-    const perfil = this.perfiles.create(datos);
-    this.perfiles.push(perfil);
-    return perfil;
+    this.perfiles.push(datos);
+    return this.perfiles.at(-1);
   }
 
   quitarPerfil(perfil) {
@@ -48,8 +36,7 @@ export class Proyecto {
     return this.colaboraciones.some((c) => c.esDe(colaborador));
   }
 
-  agregarColaboracion(datos) {
-    const colaboracion = this.colaboraciones.create(datos);
+  agregarColaboracion(colaboracion) {
     this.colaboraciones.push(colaboracion);
     return colaboracion;
   }
@@ -65,9 +52,8 @@ export class Proyecto {
   }
 
   agregarAvance(datos) {
-    const avance = this.avances.create(datos);
-    this.avances.push(avance);
-    return avance;
+    this.avances.push(datos);
+    return this.avances.at(-1);
   }
 
   ultimoAvance() {
@@ -78,13 +64,5 @@ export class Proyecto {
     return this.colaboraciones.filter(
       (c) => c.estaAceptada() && String(c.perfil) === String(perfil.id),
     ).length;
-  }
-
-  aceptaPostulaciones(ahora = new Date()) {
-    return this.estaAbierto() && this.perfiles.some((p) => p.aceptaPostulaciones(ahora));
-  }
-
-  puedeVerContactoDe(colaborador) {
-    return this.colaboraciones.some((c) => c.esDe(colaborador) && c.estaAceptada());
   }
 }

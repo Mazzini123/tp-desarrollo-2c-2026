@@ -32,8 +32,13 @@ export class Colaboracion {
     return idComoTexto(this.colaborador) === idComoTexto(colaboradorOId);
   }
 
-  estaDesvinculada() {
-    return this.estado === COLABORACION_ESTADO.DESVINCULADA;
+  estaRetirada() {
+    return this.estado === COLABORACION_ESTADO.RETIRADA;
+  }
+
+  retirar(fecha) {
+    this.estado = COLABORACION_ESTADO.RETIRADA;
+    this.fechaFin = fecha;
   }
 
   desvincular(fecha) {

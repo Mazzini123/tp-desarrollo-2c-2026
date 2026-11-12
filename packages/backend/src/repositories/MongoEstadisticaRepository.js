@@ -1,5 +1,8 @@
 import { ColectivoModel } from "../models/ColectivoModel.js";
 import { ColaboradorModel } from "../models/ColaboradorModel.js";
+import { ProyectoModel } from "../models/ProyectoModel.js";
+import { ColaboracionModel } from "../models/ColaboracionModel.js";
+import { aObjectId } from "./objectIds.js";
 import * as pipelines from "./pipelinesDeEstadisticas.js";
 
 const TOPE_DE_HABILIDADES = 5;
@@ -12,10 +15,10 @@ export class MongoEstadisticaRepository {
     const [colectivos, proyectos, colaboraciones, colaboradores, requeridas, ofrecidas] =
       await Promise.all([
         ColectivoModel.aggregate(pipelines.colectivosPorEstado()),
-        ColectivoModel.aggregate(pipelines.proyectosPorEstado()),
-        ColectivoModel.aggregate(pipelines.colaboracionesPorEstado()),
+        ProyectoModel.aggregate(pipelines.proyectosPorEstado()),
+        ColaboracionModel.aggregate(pipelines.colaboracionesPorEstado()),
         ColaboradorModel.aggregate(pipelines.contar()),
-        ColectivoModel.aggregate(pipelines.habilidadesMasRequeridas(TOPE_DE_HABILIDADES)),
+        ProyectoModel.aggregate(pipelines.habilidadesMasRequeridas(TOPE_DE_HABILIDADES)),
         ColaboradorModel.aggregate(
           pipelines.habilidadesMasOfrecidas(TOPE_DE_HABILIDADES),
         ),
@@ -35,13 +38,22 @@ export class MongoEstadisticaRepository {
   }
 
   async deColectivo(colectivoId) {
-    const [resultado] = await ColectivoModel.aggregate(
-      pipelines.estadisticasDeColectivo(colectivoId),
-    );
+    const [[resultado], porEstado] = await Promise.all([
+      ProyectoModel.aggregate(pipelines.estadisticasDeColectivo(colectivoId)),
+      ColaboracionModel.aggregate(
+        pipelines.colaboracionesPorEstado({ colectivoId: aObjectId(colectivoId) }),
+      ),
+    ]);
+
+    const colaboracionesPorEstado = {};
+    for (const { _id, cantidad } of porEstado) {
+      colaboracionesPorEstado[_id.estado] =
+        (colaboracionesPorEstado[_id.estado] ?? 0) + cantidad;
+    }
 
     return {
       totales: resultado?.totales[0] ?? null,
-      colaboracionesPorEstado: aMapa(resultado?.colaboracionesPorEstado ?? []),
+      colaboracionesPorEstado,
       porProyecto: resultado?.porProyecto ?? [],
     };
   }

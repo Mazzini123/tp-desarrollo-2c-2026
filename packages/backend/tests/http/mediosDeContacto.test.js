@@ -1,5 +1,42 @@
 import { armarApp } from "./app.js";
 
+test("los contactos de un colectivo se guardan en el alta y se conservan al editar datos publicos", async () => {
+  const { api, services } = await armarApp();
+  const contacto = { tipo: "EMAIL", valor: "f@mail.com" };
+  const alta = await api
+    .post("/colectivos")
+    .send({
+      nombre: "Fundacion",
+      descripcion: "Descripcion original",
+      tipoColectivo: "ONG",
+      mediosDeContacto: [contacto],
+    })
+    .expect(201);
+  const ruta = `/colectivos/${alta.body.id}`;
+  const detalle = await api.get(ruta).expect(200);
+  const listado = await api.get("/colectivos").expect(200);
+  const edicion = await api
+    .put(ruta)
+    .send({ descripcion: "Descripcion actualizada" })
+    .expect(200);
+
+  expect(alta.body).not.toHaveProperty("mediosDeContacto");
+  expect(detalle.body).not.toHaveProperty("mediosDeContacto");
+  expect(listado.body.data[0]).not.toHaveProperty("mediosDeContacto");
+  expect(edicion.body).toMatchObject({ descripcion: "Descripcion actualizada" });
+  expect(edicion.body).not.toHaveProperty("mediosDeContacto");
+
+  await api
+    .put(ruta)
+    .send({ descripcion: "Otro cambio", mediosDeContacto: [] })
+    .expect(400);
+  const guardado = await services.colectivoService.buscarPorId(alta.body.id);
+  expect(guardado.descripcion).toBe("Descripcion actualizada");
+  expect(guardado.mediosDeContacto.map(({ tipo, valor }) => ({ tipo, valor }))).toEqual([
+    contacto,
+  ]);
+});
+
 describe("HTTP · medios de contacto", () => {
   let api;
   let colaboradorId;

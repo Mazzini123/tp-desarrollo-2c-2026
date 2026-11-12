@@ -1,5 +1,5 @@
-import { ColectivoModel } from "../../src/models/ColectivoModel.js";
-import { ColaboradorModel } from "../../src/models/ColaboradorModel.js";
+import mongoose from "mongoose";
+import { ProyectoModel } from "../../src/models/ProyectoModel.js";
 import { HabilidadModel } from "../../src/models/HabilidadModel.js";
 import { PROYECTO_ESTADO } from "../../src/domain/enums/PROYECTO_ESTADO.js";
 
@@ -16,26 +16,17 @@ function perfilQueRequiere(...habilidades) {
   };
 }
 
-// Un proyecto no existe fuera de su colectivo: se crea adentro de uno. No
-// hace falta una base: new ColectivoModel() arma el documento en memoria.
+// Un proyecto pertenece a un colectivo (guarda su id y una copia de sus
+// datos). No hace falta una base: new ProyectoModel() arma el documento.
 function proyectoAbierto(...perfiles) {
-  const colectivo = new ColectivoModel({
-    nombre: "Fundacion Ejemplo",
-    descripcion: "Colectivo de prueba",
-    tipoColectivo: "FUNDACION",
-  });
-  const proyecto = colectivo.agregarProyecto({
+  const proyecto = new ProyectoModel({
+    colectivoId: new mongoose.Types.ObjectId(),
+    datosDelColectivo: { nombre: "Fundacion Ejemplo", tipoColectivo: "FUNDACION" },
     titulo: "Sitio institucional",
     descripcion: "Proyecto de prueba",
   });
   perfiles.forEach((p) => proyecto.agregarPerfil(p));
   return proyecto;
-}
-
-function colaboradorCon(...habilidades) {
-  const colaborador = new ColaboradorModel({ cuentaGit: "octocat" });
-  habilidades.forEach((h) => colaborador.agregarHabilidad(h));
-  return colaborador;
 }
 
 describe("Proyecto · ciclo de vida", () => {
@@ -54,21 +45,6 @@ describe("Proyecto · ciclo de vida", () => {
 });
 
 describe("Proyecto · perfiles", () => {
-  test("cumple si el colaborador tiene TODAS las requeridas de algun perfil", () => {
-    const proyecto = proyectoAbierto(perfilQueRequiere(node, react));
-    expect(proyecto.cumpleAlgunPerfil(colaboradorCon(node, react))).toBe(true);
-  });
-
-  test("no cumple si le falta una requerida de cada perfil", () => {
-    const proyecto = proyectoAbierto(perfilQueRequiere(node, react));
-    expect(proyecto.cumpleAlgunPerfil(colaboradorCon(react))).toBe(false);
-  });
-
-  test("alcanza con cumplir uno solo de los perfiles", () => {
-    const proyecto = proyectoAbierto(perfilQueRequiere(node), perfilQueRequiere(react));
-    expect(proyecto.cumpleAlgunPerfil(colaboradorCon(react))).toBe(true);
-  });
-
   test("quitarPerfil lo saca por id", () => {
     const proyecto = proyectoAbierto(perfilQueRequiere(node), perfilQueRequiere(react));
     const [primero, segundo] = proyecto.perfiles;

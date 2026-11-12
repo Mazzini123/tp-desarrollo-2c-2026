@@ -1,76 +1,101 @@
-import { ColaboradorModel } from "../models/ColaboradorModel.js";
 import { construirRedesSociales } from "../domain/RedSocial.js";
-import { esTipoMedioContactoValido } from "../domain/enums/TIPOS_MEDIOS_CONTACTO.js";
+import { sinMediosRepetidos } from "../domain/MedioDeContacto.js";
 import { DomainError } from "../errors/DomainError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
 import { ConflictError } from "../errors/ConflictError.js";
 import { armarPaginado } from "../utils/paginacion.js";
+import { CODIGO_ERROR } from "../errors/CODIGO_ERROR.js";
 
 export class ColaboradorService {
-  constructor({ colaboradorRepository, habilidadService, avisoAutomaticoService }) {
+  constructor({
+    colaboradorRepository,
+    habilidadService,
+    avisoAutomaticoService,
+    transacciones,
+  }) {
+    this.transacciones = transacciones;
     this.colaboradorRepository = colaboradorRepository;
     this.habilidadService = habilidadService;
     this.avisoAutomaticoService = avisoAutomaticoService;
   }
 
-  async crear({
-    nombreFantasia,
-    nombre,
-    apellido,
-    cuentaGit,
-    pronombres,
-    presentacion,
-    codigosHabilidades,
-    recibeMensajeriaInterna = true,
-    mediosDeContacto = [],
-    redesSociales = [],
-  }) {
-    this.validarIdentificacion({ nombreFantasia, nombre, apellido, cuentaGit });
-
-    const colaborador = new ColaboradorModel({
+  async crear(
+    {
       nombreFantasia,
       nombre,
       apellido,
       cuentaGit,
+      pronombres,
       presentacion,
-      recibeMensajeriaInterna,
-    });
+      codigosHabilidades,
+      recibeMensajeriaInterna = true,
+      mediosDeContacto = [],
+      redesSociales = [],
+    },
+    { avisar = true } = {},
+  ) {
+    return this.transacciones.ejecutar(async () => {
+      this.validarIdentificacion({ nombreFantasia, nombre, apellido, cuentaGit });
 
-    colaborador.redesSociales = construirRedesSociales(redesSociales);
+      const habilidades =
+        codigosHabilidades && codigosHabilidades.length > 0
+          ? await this.habilidadService.resolverPorCodigos([
+              ...new Set(codigosHabilidades),
+            ])
+          : [];
 
-    mediosDeContacto.forEach((datos) => {
-      const medio = this.construirMedioDeContacto(datos);
-      // En el alta un repetido se ignora, igual que los pronombres del payload.
-      if (!colaborador.tieneMedioDeContacto(medio)) {
-        colaborador.agregarMedioDeContacto(medio);
+      const colaborador = await this.colaboradorRepository.crear({
+        nombreFantasia,
+        nombre,
+        apellido,
+        cuentaGit,
+        presentacion,
+        recibeMensajeriaInterna,
+        pronombres: [...new Set(pronombres ?? [])],
+        mediosDeContacto: sinMediosRepetidos(mediosDeContacto),
+        redesSociales: construirRedesSociales(redesSociales),
+        habilidades: habilidades.map(({ codigo, titulo }) => ({ codigo, titulo })),
+      });
+      if (avisar) {
+        await this.avisarAlta(colaborador);
       }
+      return colaborador;
     });
+  }
 
-    if (pronombres) {
-      colaborador.reemplazarPronombres(pronombres);
+  async avisarAlta(colaborador) {
+    return this.avisoAutomaticoService.avisarPorColaboradorNuevo(colaborador);
+  }
+
+  exigirActiva(colaborador) {
+    if (colaborador.estaDadaDeBaja()) {
+      throw new ConflictError(
+        "El perfil de colaboradora esta dado de baja",
+        CODIGO_ERROR.COLABORADORA_DADA_DE_BAJA,
+      );
     }
+  }
 
-    if (codigosHabilidades && codigosHabilidades.length > 0) {
-      // await ANTES del forEach: resolverPorCodigos ahora devuelve una promesa
-      const habilidades = await this.habilidadService.resolverPorCodigos(codigosHabilidades);
-      habilidades.forEach((h) => colaborador.agregarHabilidad(h));
-    }
-
-    await this.colaboradorRepository.guardar(colaborador);
-    await avisarSinFallar(() => this.avisoAutomaticoService.avisarPorColaboradorNuevo(colaborador));
-    return colaborador;
+  async darDeBaja(colaborador, ahora = new Date()) {
+    this.exigirActiva(colaborador);
+    colaborador.darDeBaja(ahora);
+    return this.colaboradorRepository.guardar(colaborador);
   }
 
   async listar({ numeroPagina = 1, limitePorPagina = 10 } = {}) {
-    return armarPaginado(
-      await this.colaboradorRepository.listarPaginado(numeroPagina, limitePorPagina),
-      numeroPagina,
-      limitePorPagina,
-    );
+    const pagina = { numeroPagina, limitePorPagina };
+    return armarPaginado(await this.colaboradorRepository.listarPaginado(pagina), pagina);
   }
 
-  async buscarPorId(id) {
-    const colaborador = await this.colaboradorRepository.buscarPorId(id);
+  async mediosDeContacto(id) {
+    const colaborador = await this.buscarPorId(id);
+    return colaborador.mediosDeContacto.map(({ tipo, valor }) => ({ tipo, valor }));
+  }
+
+  async buscarPorId(id, { bloquear = false } = {}) {
+    const colaborador = bloquear
+      ? await this.colaboradorRepository.bloquear(id)
+      : await this.colaboradorRepository.buscarPorId(id);
 
     if (!colaborador) {
       throw new NotFoundError(`No existe un colaborador con id "${id}"`);
@@ -79,7 +104,10 @@ export class ColaboradorService {
     return colaborador;
   }
 
-  async actualizar(id, { pronombres, presentacion, recibeMensajeriaInterna, redesSociales }) {
+  async actualizar(
+    id,
+    { pronombres, presentacion, recibeMensajeriaInterna, redesSociales },
+  ) {
     const colaborador = await this.buscarPorId(id);
 
     if (redesSociales !== undefined) {
@@ -134,11 +162,9 @@ export class ColaboradorService {
     return this.colaboradorRepository.guardar(colaborador);
   }
 
-  // Los medios de contacto se registran pero no se muestran (ver el toJSON
-  // de ColaboradorModel): por eso el alta devuelve solo el medio cargado.
   async agregarMedioDeContacto(id, datos) {
     const colaborador = await this.buscarPorId(id);
-    const medio = this.construirMedioDeContacto(datos);
+    const [medio] = sinMediosRepetidos([datos]);
 
     if (colaborador.tieneMedioDeContacto(medio)) {
       throw new ConflictError(`El colaborador ya tiene registrado ese medio de contacto`);
@@ -151,7 +177,7 @@ export class ColaboradorService {
 
   async quitarMedioDeContacto(id, datos) {
     const colaborador = await this.buscarPorId(id);
-    const medio = this.construirMedioDeContacto(datos);
+    const [medio] = sinMediosRepetidos([datos]);
 
     if (!colaborador.tieneMedioDeContacto(medio)) {
       throw new NotFoundError("El colaborador no tiene registrado ese medio de contacto");
@@ -161,34 +187,14 @@ export class ColaboradorService {
     await this.colaboradorRepository.guardar(colaborador);
   }
 
-  construirMedioDeContacto({ tipo, valor }) {
-    if (!esTipoMedioContactoValido(tipo)) {
-      throw new DomainError(`Tipo de medio de contacto invalido: ${tipo}`);
-    }
-    if (typeof valor !== "string" || valor.trim().length === 0) {
-      throw new DomainError("El valor del medio de contacto es obligatorio");
-    }
-    return { tipo, valor: valor.trim() };
-  }
-
   validarIdentificacion({ nombreFantasia, nombre, apellido, cuentaGit }) {
     const tieneNombreYApellido = Boolean(nombre) && Boolean(apellido);
 
     if (!nombreFantasia && !cuentaGit && !tieneNombreYApellido) {
       throw new DomainError(
         "El colaborador debe tener al menos un dato de identificación: " +
-        "nombreFantasia, cuentaGit, o (nombre + apellido)",
+          "nombreFantasia, cuentaGit, o (nombre + apellido)",
       );
     }
-  }
-}
-
-// Los avisos automaticos son un efecto secundario del alta: si fallan, el
-// alta igual quedo hecha.
-async function avisarSinFallar(avisar) {
-  try {
-    await avisar();
-  } catch (error) {
-    console.error("No se pudieron enviar los avisos automaticos:", error.message);
   }
 }
