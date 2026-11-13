@@ -28,6 +28,7 @@ import { CuentaController } from "./controllers/CuentaController.js";
 import { MembresiaController } from "./controllers/MembresiaController.js";
 import { crearAutorizacion } from "./middlewares/autorizacion.js";
 import { CanalEmail } from "./canales/CanalEmail.js";
+import { CanalSMS } from "./canales/CanalSMS.js";
 import { CanalWhatsApp } from "./canales/CanalWhatsApp.js";
 import { CanalSimulado } from "./canales/CanalSimulado.js";
 import { CanalEnMemoria } from "./canales/CanalEnMemoria.js";
@@ -76,6 +77,14 @@ export function crearRepositoriosMongo() {
 }
 
 export function crearCanales(entorno = process.env) {
+  if (
+    entorno.TWILIO_SMS_REMITENTE &&
+    (!entorno.TWILIO_ACCOUNT_SID || !entorno.TWILIO_AUTH_TOKEN)
+  ) {
+    throw new Error(
+      "TWILIO_SMS_REMITENTE requiere TWILIO_ACCOUNT_SID y TWILIO_AUTH_TOKEN",
+    );
+  }
   const email = entorno.SMTP_URL
     ? new CanalEmail({
         transporte: nodemailer.createTransport(entorno.SMTP_URL),
@@ -84,14 +93,23 @@ export function crearCanales(entorno = process.env) {
     : new CanalSimulado("EMAIL");
 
   const whatsapp =
-    entorno.TWILIO_ACCOUNT_SID && entorno.TWILIO_AUTH_TOKEN
+    entorno.TWILIO_ACCOUNT_SID &&
+    entorno.TWILIO_AUTH_TOKEN &&
+    entorno.TWILIO_WHATSAPP_REMITENTE
       ? new CanalWhatsApp({
           cliente: twilio(entorno.TWILIO_ACCOUNT_SID, entorno.TWILIO_AUTH_TOKEN),
-          remitente: entorno.TWILIO_WHATSAPP_REMITENTE || "whatsapp:+14155238886",
+          remitente: entorno.TWILIO_WHATSAPP_REMITENTE,
         })
       : new CanalSimulado("WHATSAPP");
 
-  return { EMAIL: email, WHATSAPP: whatsapp, SMS: new CanalSimulado("SMS") };
+  const sms = entorno.TWILIO_SMS_REMITENTE
+    ? new CanalSMS({
+        cliente: twilio(entorno.TWILIO_ACCOUNT_SID, entorno.TWILIO_AUTH_TOKEN),
+        remitente: entorno.TWILIO_SMS_REMITENTE,
+      })
+    : new CanalSimulado("SMS");
+
+  return { EMAIL: email, WHATSAPP: whatsapp, SMS: sms };
 }
 
 export function crearCanalesEnMemoria() {

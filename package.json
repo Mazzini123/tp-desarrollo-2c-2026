@@ -11,6 +11,7 @@
   },
   "scripts": {
     "dev:backend": "npm run dev --workspace=backend",
+    "demo:notificaciones": "node packages/backend/scripts/demoNotificaciones.js",
     "start:backend": "npm start --workspace=backend",
     "lint": "eslint .",
     "format": "prettier . --write",
