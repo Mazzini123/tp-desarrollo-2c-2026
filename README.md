@@ -245,8 +245,43 @@ y terminan las colaboraciones en curso.
 
 WhatsApp usa Twilio cuando están definidos `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`
 y `TWILIO_WHATSAPP_REMITENTE`; en otro caso se simula. Email usa `SMTP_URL` si
-está configurado; SMS se simula. Un envío simulado termina en `SIMULADO` y
+está configurado; SMS usa Twilio cuando también se define `TWILIO_SMS_REMITENTE`.
+Sin ese remitente, SMS se simula. Un envío simulado termina en `SIMULADO` y
 `exito: false`: no acredita entrega a un proveedor real.
+
+### Demostracion de notificaciones (solo desarrollo)
+
+Desde la raiz, `npm run demo:notificaciones` crea un MongoDB temporal independiente
+y recorre una invitacion usando los servicios reales: muestra las copias
+`PENDIENTE` y luego `SIMULADO`, sin enviar mensajes. Requiere instalar tambien las
+dependencias de desarrollo; la primera ejecucion descarga MongoDB.
+
+Para enviar un email real con las credenciales de `packages/backend/.env`:
+
+```sh
+npm run demo:notificaciones -- --enviar --email destinatario@gmail.com
+```
+
+Para agregar SMS, sumar `--sms +5491155551234` con un destinatario habilitado por
+Twilio. El numero `TWILIO_SMS_REMITENTE` es el remitente, no ese destinatario.
+La cuenta trial puede restringir remitentes, destinos y contenido personalizado.
+`ENVIADO` indica aceptacion del proveedor, no entrega final.
+
+Si se configuran `DEMO_EMAIL_DESTINO` y `DEMO_SMS_DESTINO` en el `.env` local,
+basta ejecutar `npm run demo:notificaciones -- --enviar`. Los destinos explicitos
+en la linea de comandos reemplazan a los del archivo (para probar solo email,
+usar unicamente `--email`). Estas variables no se usan en la API productiva.
+
+Con una cuenta Twilio Trial, configurar `DEMO_SMS_PLANTILLA=sms_event_notifications`
+permite enviar la plantilla de prueba de Twilio en lugar del texto de la invitacion,
+solo dentro del comando de demo. El email y la notificacion interna conservan su
+contenido normal. La API productiva nunca usa esa variable. Ver
+[plantillas SMS de Trial](https://www.twilio.com/docs/usage/trials/try-out-sms).
+
+La demo no usa `MONGO_URI`, no inicia la API, no se ejecuta en produccion y
+elimina sus datos al terminar. Hace un intento por canal; si falla informa el
+error y termina con codigo distinto de cero. La demo visual del frontend
+(`npm run demo` en su repositorio) sigue funcionando sin backend ni envios reales.
 
 ### Manejo de errores
 

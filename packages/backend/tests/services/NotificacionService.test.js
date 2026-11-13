@@ -2,6 +2,9 @@ import { armarServices } from "../fixtures.js";
 import { NotFoundError } from "../../src/errors/NotFoundError.js";
 import { TIPO_NOTIFICACION } from "../../src/domain/enums/TIPO_NOTIFICACION.js";
 import { CanalEnMemoria } from "../../src/canales/CanalEnMemoria.js";
+import { CanalEmail } from "../../src/canales/CanalEmail.js";
+import { CanalSMS } from "../../src/canales/CanalSMS.js";
+import { CanalSimulado } from "../../src/canales/CanalSimulado.js";
 
 const AVISO = {
   tipo: TIPO_NOTIFICACION.INVITACION,
@@ -81,6 +84,101 @@ describe("NotificacionService", () => {
     await procesar();
     expect(services.canales.EMAIL.enviados).toHaveLength(0);
     expect((await services.notificacionService.listar(ada.id)).total).toBe(0);
+  });
+
+  test("SMTP rechazado se reintenta sin impedir SMS y ambos se entregan cuando SMTP se recupera", async () => {
+    let acepta = false;
+    const sms = [];
+    services.notificacionService.canales = {
+      EMAIL: new CanalEmail({
+        remitente: "avisos@example.org",
+        transporte: {
+          sendMail: async () => ({
+            accepted: acepta ? ["ada@example.org"] : [],
+            rejected: acepta ? [] : ["ada@example.org"],
+          }),
+        },
+      }),
+      SMS: new CanalSMS({
+        remitente: "+12345678910",
+        cliente: {
+          messages: {
+            create: async (pedido) => {
+              sms.push(pedido);
+              return { sid: "SMprueba" };
+            },
+          },
+        },
+      }),
+    };
+    const ada = await crearColaborador({
+      mediosDeContacto: [
+        { tipo: "EMAIL", valor: "ada@example.org" },
+        { tipo: "SMS", valor: "+5491155551234" },
+      ],
+    });
+    const notificacion = await services.notificacionService.notificar(ada, AVISO);
+    const ahora = new Date();
+    expect(await procesar(ahora)).toEqual({ enviados: 1, reintentos: 1, fallidos: 0 });
+    expect(await enviosDe(notificacion)).toEqual([
+      { canal: "EMAIL", estado: "PENDIENTE", exito: false, intentos: 1 },
+      { canal: "SMS", estado: "ENVIADO", exito: true, intentos: 1 },
+    ]);
+    acepta = true;
+    expect(await procesar(new Date(ahora.getTime() + 61_000))).toEqual({
+      enviados: 1,
+      reintentos: 0,
+      fallidos: 0,
+    });
+    expect(sms).toHaveLength(1);
+    expect(
+      (await enviosDe(notificacion)).every((envio) => envio.estado === "ENVIADO"),
+    ).toBe(true);
+  });
+
+  test("sin proveedores las copias email y SMS terminan SIMULADO", async () => {
+    services.notificacionService.canales = {
+      EMAIL: new CanalSimulado("EMAIL"),
+      SMS: new CanalSimulado("SMS"),
+    };
+    const ada = await crearColaborador({
+      mediosDeContacto: [
+        { tipo: "EMAIL", valor: "ada@example.org" },
+        { tipo: "SMS", valor: "+5491155551234" },
+      ],
+    });
+    const notificacion = await services.notificacionService.notificar(ada, AVISO);
+    await procesar();
+    expect(
+      (await enviosDe(notificacion)).map(({ estado, exito }) => ({ estado, exito })),
+    ).toEqual([
+      { estado: "SIMULADO", exito: false },
+      { estado: "SIMULADO", exito: false },
+    ]);
+  });
+
+  test("un SMS antiguo invalido agota intentos sin llamar a Twilio", async () => {
+    let llamadas = 0;
+    services.notificacionService.canales.SMS = new CanalSMS({
+      remitente: "+12345678910",
+      cliente: {
+        messages: {
+          create: async () => {
+            llamadas++;
+          },
+        },
+      },
+    });
+    const ada = await crearColaborador({
+      mediosDeContacto: [{ tipo: "SMS", valor: "1155551234" }],
+    });
+    const notificacion = await services.notificacionService.notificar(ada, AVISO);
+    const ahora = Date.now();
+    for (let i = 0; i < 5; i++) await procesar(new Date(ahora + i * 3_600_000));
+    expect(llamadas).toBe(0);
+    expect(await enviosDe(notificacion)).toEqual([
+      { canal: "SMS", estado: "FALLIDO", exito: false, intentos: 5 },
+    ]);
   });
 
   test("un proveedor caido no frena los otros envios, y el suyo se reintenta con espera", async () => {

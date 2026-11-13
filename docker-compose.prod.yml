@@ -68,6 +68,7 @@ services:
 
       TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
       TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_SMS_REMITENTE: ${TWILIO_SMS_REMITENTE:-}
       TWILIO_WHATSAPP_REMITENTE: ${TWILIO_WHATSAPP_REMITENTE:-}
 
     # Límite total de la API, con margen para memoria fuera del heap.
