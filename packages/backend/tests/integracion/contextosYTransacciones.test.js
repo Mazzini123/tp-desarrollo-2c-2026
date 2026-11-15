@@ -1,3 +1,4 @@
+import { conReferencias, contextoGuardado } from "../soporte/contextos.js";
 import mongoose from "mongoose";
 import { usarBaseDeTest, armarServicesConMongo } from "./baseDeTest.js";
 import { asegurarIndices } from "../../src/config/db.js";
@@ -10,6 +11,7 @@ import { ColaboradorModel } from "../../src/models/ColaboradorModel.js";
 import { ContextoUsuarioModel } from "../../src/security/persistencia/ContextoUsuarioModel.js";
 import { UsuarioModel } from "../../src/security/persistencia/UsuarioModel.js";
 import { asegurarValidadores } from "../../src/security/persistencia/validadoresDeColecciones.js";
+import { MongoCatalogoRepository } from "../../src/security/persistencia/MongoCatalogoRepository.js";
 import { SolicitudIngresoModel } from "../../src/security/persistencia/SolicitudIngresoModel.js";
 
 /**
@@ -20,14 +22,40 @@ usarBaseDeTest();
 
 const ObjectId = () => new mongoose.Types.ObjectId();
 const alta = (nombre) => ({ nombre, descripcion: "d", tipoColectivo: "ONG" });
+const esperar = (ms) => new Promise((resolver) => setTimeout(resolver, ms));
+
+function pausarLaPrimeraLlamada(objeto, metodo) {
+  const original = objeto[metodo].bind(objeto);
+  let avisar;
+  let liberar;
+  const llego = new Promise((resolver) => (avisar = resolver));
+  const permiso = new Promise((resolver) => (liberar = resolver));
+  let primera = true;
+  objeto[metodo] = async (...argumentos) => {
+    const resultado = await original(...argumentos);
+    if (primera) {
+      primera = false;
+      avisar();
+      await permiso;
+    }
+    return resultado;
+  };
+  return { llego, liberar };
+}
 
 describe("Integracion · contextos, transacciones e indices", () => {
   let services;
 
   beforeEach(async () => {
     services = await armarServicesConMongo();
-    await asegurarValidadores();
   });
+
+  // El contexto tal como lo entrega el repositorio: con los nombres de su rol y
+  // de su tipo resueltos, que es lo que reciben los services.
+  async function contextoDe(filtro) {
+    const guardado = await ContextoUsuarioModel.findOne(filtro);
+    return services.contextoService.contextoUsuarioRepository.buscarPorId(guardado.id);
+  }
 
   async function usuario(sub) {
     return (await services.registroService.registrar({ proveedor: "prueba", sub }))
@@ -55,7 +83,7 @@ describe("Integracion · contextos, transacciones e indices", () => {
     const ana = await usuario("ana");
     const colectivo = await services.modalidadService.crearColectivo(ana, alta("A"));
 
-    const contexto = await ContextoUsuarioModel.findOne({ colectivoId: colectivo._id });
+    const contexto = await contextoGuardado({ colectivoId: colectivo._id });
     expect(contexto).toMatchObject({ rol: "LIDER", tipo: "COLECTIVO", activo: true });
     expect(String((await UsuarioModel.findById(ana._id)).contextoActualId)).toBe(
       String(contexto._id),
@@ -69,18 +97,23 @@ describe("Integracion · contextos, transacciones e indices", () => {
       sub: "ana",
     });
     expect(a.id).not.toBe(b.id);
-    expect(await IdentidadExternaModel.countDocuments({ sub: "ana" })).toBe(2);
+    expect(
+      await IdentidadExternaModel.countDocuments({ identificadorExterno: "ana" }),
+    ).toBe(2);
   });
 
   test("el arranque crea los indices declarados y conserva indices ajenos", async () => {
     const coleccion = IdentidadExternaModel.collection;
-    await coleccion.dropIndex("proveedor_1_sub_1");
+    await coleccion.dropIndex("proveedorId_1_identificadorExterno_1");
     await coleccion.createIndex({ fechaAlta: 1 }, { name: "indice_de_operaciones" });
     await asegurarIndices();
     const indices = await coleccion.indexes();
     expect(indices).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ key: { proveedor: 1, sub: 1 }, unique: true }),
+        expect.objectContaining({
+          key: { proveedorId: 1, identificadorExterno: 1 },
+          unique: true,
+        }),
         expect.objectContaining({ name: "indice_de_operaciones" }),
       ]),
     );
@@ -98,35 +131,43 @@ describe("Integracion · contextos, transacciones e indices", () => {
 
   test("los indices impiden dos lideres activos y dos perfiles de colaboradora activos", async () => {
     const colectivoId = ObjectId();
-    await ContextoUsuarioModel.create({
-      usuarioId: ObjectId(),
-      tipo: "COLECTIVO",
-      colectivoId,
-      rol: "LIDER",
-    });
-    await expect(
-      ContextoUsuarioModel.create({
+    await ContextoUsuarioModel.create(
+      await conReferencias({
         usuarioId: ObjectId(),
         tipo: "COLECTIVO",
         colectivoId,
         rol: "LIDER",
       }),
+    );
+    await expect(
+      ContextoUsuarioModel.create(
+        await conReferencias({
+          usuarioId: ObjectId(),
+          tipo: "COLECTIVO",
+          colectivoId,
+          rol: "LIDER",
+        }),
+      ),
     ).rejects.toMatchObject({ code: 11000 });
 
     const usuarioId = ObjectId();
-    await ContextoUsuarioModel.create({
-      usuarioId,
-      tipo: "COLABORADOR",
-      colaboradorId: ObjectId(),
-      rol: "COLABORADOR",
-    });
-    await expect(
-      ContextoUsuarioModel.create({
+    await ContextoUsuarioModel.create(
+      await conReferencias({
         usuarioId,
         tipo: "COLABORADOR",
         colaboradorId: ObjectId(),
         rol: "COLABORADOR",
       }),
+    );
+    await expect(
+      ContextoUsuarioModel.create(
+        await conReferencias({
+          usuarioId,
+          tipo: "COLABORADOR",
+          colaboradorId: ObjectId(),
+          rol: "COLABORADOR",
+        }),
+      ),
     ).rejects.toMatchObject({ code: 11000 });
   });
 
@@ -139,7 +180,11 @@ describe("Integracion · contextos, transacciones e indices", () => {
     );
     await coleccion.createIndex({ fechaBaja: 1 }, { name: "indice_de_operaciones" });
     const usuarioId = ObjectId();
-    const contexto = { usuarioId, tipo: "COLABORADOR", rol: "COLABORADOR" };
+    const contexto = await conReferencias({
+      usuarioId,
+      tipo: "COLABORADOR",
+      rol: "COLABORADOR",
+    });
     const historico = await ContextoUsuarioModel.create({
       ...contexto,
       colaboradorId: ObjectId(),
@@ -161,7 +206,10 @@ describe("Integracion · contextos, transacciones e indices", () => {
           name: "colaborador_activo_por_usuario",
           key: { usuarioId: 1 },
           unique: true,
-          partialFilterExpression: { tipo: "COLABORADOR", activo: true },
+          partialFilterExpression: {
+            colaboradorId: { $type: "objectId" },
+            activo: true,
+          },
         }),
         expect.objectContaining({ name: "indice_de_operaciones" }),
       ]),
@@ -180,7 +228,7 @@ describe("Integracion · contextos, transacciones e indices", () => {
         colaboradorId: ObjectId(),
       }),
     ).rejects.toMatchObject({ code: 11000 });
-    expect(await ContextoUsuarioModel.findById(historico.id)).toMatchObject({
+    expect(await contextoGuardado(historico.id)).toMatchObject({
       activo: false,
       colaboradorId: historico.colaboradorId,
       fechaBaja: historico.fechaBaja,
@@ -190,14 +238,16 @@ describe("Integracion · contextos, transacciones e indices", () => {
 
   test("el validador de la base rechaza un contexto con las dos modalidades", async () => {
     await expect(
-      ContextoUsuarioModel.collection.insertOne({
-        usuarioId: ObjectId(),
-        tipo: "COLECTIVO",
-        rol: "LIDER",
-        activo: true,
-        colectivoId: ObjectId(),
-        colaboradorId: ObjectId(),
-      }),
+      ContextoUsuarioModel.collection.insertOne(
+        await conReferencias({
+          usuarioId: ObjectId(),
+          tipo: "COLECTIVO",
+          rol: "LIDER",
+          activo: true,
+          colectivoId: ObjectId(),
+          colaboradorId: ObjectId(),
+        }),
+      ),
     ).rejects.toMatchObject({ code: 121 });
   });
 
@@ -207,7 +257,12 @@ describe("Integracion · contextos, transacciones e indices", () => {
   ])(
     "el validador de %s exige ambos campos con el tipo correcto",
     async (tipo, rol, asociada, nula) => {
-      const base = { usuarioId: ObjectId(), tipo, rol, activo: true };
+      const base = await conReferencias({
+        usuarioId: ObjectId(),
+        tipo,
+        rol,
+        activo: true,
+      });
       const coleccion = ContextoUsuarioModel.collection;
       await expect(
         coleccion.insertOne({ ...base, [asociada]: ObjectId() }),
@@ -224,7 +279,7 @@ describe("Integracion · contextos, transacciones e indices", () => {
   test("un error de collMod impide completar la preparacion de la base", async () => {
     const error = new Error("collMod sin permisos");
     await expect(
-      asegurarValidadores({
+      asegurarValidadores(new MongoCatalogoRepository(), {
         async createCollection() {
           throw Object.assign(new Error("ya existe"), { code: 48 });
         },
@@ -238,7 +293,7 @@ describe("Integracion · contextos, transacciones e indices", () => {
   test("dos transferencias de liderazgo a la vez dejan un solo lider", async () => {
     const ana = await usuario("ana");
     const colectivo = await services.modalidadService.crearColectivo(ana, alta("A"));
-    const lider = await ContextoUsuarioModel.findOne({ colectivoId: colectivo._id });
+    const lider = await contextoDe({ colectivoId: colectivo._id });
     const miembros = [];
     for (const sub of ["caro", "dani"]) {
       const persona = await usuario(sub);
@@ -258,11 +313,13 @@ describe("Integracion · contextos, transacciones e indices", () => {
 
     expect(resultados.filter((r) => r.status === "fulfilled")).toHaveLength(1);
     expect(
-      await ContextoUsuarioModel.countDocuments({
-        colectivoId: colectivo._id,
-        rol: "LIDER",
-        activo: true,
-      }),
+      await ContextoUsuarioModel.countDocuments(
+        await conReferencias({
+          colectivoId: colectivo._id,
+          rol: "LIDER",
+          activo: true,
+        }),
+      ),
     ).toBe(1);
   });
 
@@ -352,7 +409,7 @@ describe("Integracion · contextos, transacciones e indices", () => {
     expect(resultados.filter((r) => r.status === "fulfilled")).toHaveLength(1);
 
     const guardado = await ColaboradorModel.findById(perfil.id);
-    const contexto = await ContextoUsuarioModel.findOne({ colaboradorId: perfil.id });
+    const contexto = await contextoDe({ colaboradorId: perfil.id });
     const persona = await UsuarioModel.findById(ada.id);
     const actualizado = await services.proyectoService.buscarPorId(proyecto.id);
     if (guardado.fechaBaja) {
@@ -367,24 +424,98 @@ describe("Integracion · contextos, transacciones e indices", () => {
     }
   });
 
-  test("las altas concurrentes de modalidades opuestas dejan un solo contexto valido", async () => {
+  async function cuentaConPerfilYSolicitudPendiente() {
+    const ana = await usuario("ana");
+    const colectivo = await services.modalidadService.crearColectivo(ana, alta("A"));
+    const lider = await contextoDe({ colectivoId: colectivo.id });
+    const proyecto = await crearProyecto(colectivo.id);
+    const { ada, perfil } = await colaboradora();
+    const solicitud = await services.membresiaService.solicitarIngreso(ada, colectivo.id);
+    return { colectivo, lider, proyecto, ada, perfil, solicitud };
+  }
+
+  const aceptarIngreso = ({ lider, colectivo, solicitud }) =>
+    services.membresiaService.aceptar(lider, colectivo.id, solicitud.id);
+
+  test("si el ingreso se acepta antes, la postulacion concurrente se rechaza con 422", async () => {
+    const caso = await cuentaConPerfilYSolicitudPendiente();
+    const pausa = pausarLaPrimeraLlamada(
+      services.membresiaService.usuarioRepository,
+      "bloquear",
+    );
+
+    const ingreso = Promise.allSettled([aceptarIngreso(caso)]);
+    await pausa.llego;
+    const postulacion = Promise.allSettled([postular(caso.proyecto, caso.perfil)]);
+    await esperar(300);
+    pausa.liberar();
+    const [[resultadoIngreso], [resultadoPostulacion]] = await Promise.all([
+      ingreso,
+      postulacion,
+    ]);
+
+    expect(resultadoIngreso.status).toBe("fulfilled");
+    expect(resultadoPostulacion).toMatchObject({
+      status: "rejected",
+      reason: { status: 422, codigo: "POSTULACION_EN_COLECTIVO_PROPIO" },
+    });
+    expect(
+      (await services.proyectoService.buscarPorId(caso.proyecto.id)).colaboraciones,
+    ).toHaveLength(0);
+    expect(
+      await contextoGuardado({
+        usuarioId: caso.ada._id,
+        colectivoId: caso.colectivo._id,
+      }),
+    ).toMatchObject({ rol: "MIEMBRO", activo: true });
+  });
+
+  test("si la postulacion se crea antes, el ingreso se acepta despues sin fallar", async () => {
+    const caso = await cuentaConPerfilYSolicitudPendiente();
+    const pausa = pausarLaPrimeraLlamada(
+      services.colaboracionService.usuarioRepository,
+      "bloquear",
+    );
+
+    const postulacion = Promise.allSettled([postular(caso.proyecto, caso.perfil)]);
+    await pausa.llego;
+    const ingreso = Promise.allSettled([aceptarIngreso(caso)]);
+    await esperar(300);
+    pausa.liberar();
+    const [[resultadoPostulacion], [resultadoIngreso]] = await Promise.all([
+      postulacion,
+      ingreso,
+    ]);
+
+    expect(resultadoPostulacion.status).toBe("fulfilled");
+    expect(resultadoIngreso.status).toBe("fulfilled");
+    const colaboraciones = (await services.proyectoService.buscarPorId(caso.proyecto.id))
+      .colaboraciones;
+    expect(colaboraciones).toHaveLength(1);
+    expect(colaboraciones[0].estado).toBe("PENDIENTE");
+    expect(
+      await contextoGuardado({
+        usuarioId: caso.ada._id,
+        colectivoId: caso.colectivo._id,
+      }),
+    ).toMatchObject({ rol: "MIEMBRO", activo: true });
+  });
+
+  test("las altas concurrentes de modalidades opuestas dejan los dos contextos", async () => {
     const ada = await usuario("ada");
     const resultados = await Promise.allSettled([
       services.modalidadService.crearColectivo(ada, alta("A")),
       services.modalidadService.crearPerfilColaborador(ada, { cuentaGit: "ada" }),
     ]);
-    expect(resultados.filter((r) => r.status === "fulfilled")).toHaveLength(1);
-    expect(resultados.find((r) => r.status === "rejected").reason).toMatchObject({
-      codigo: "MODALIDAD_INCOMPATIBLE",
-    });
+    expect(resultados.map((r) => r.status)).toEqual(["fulfilled", "fulfilled"]);
     const contextos = await ContextoUsuarioModel.find({ usuarioId: ada._id });
-    expect(contextos).toHaveLength(1);
-    expect((await UsuarioModel.findById(ada.id)).contextoActualId).toEqual(
-      contextos[0]._id,
+    expect(contextos).toHaveLength(2);
+    expect(contextos.every((c) => c.activo)).toBe(true);
+    expect(contextos.map((c) => String(c._id))).toContain(
+      String((await UsuarioModel.findById(ada.id)).contextoActualId),
     );
-    expect(
-      (await ColectivoModel.countDocuments()) + (await ColaboradorModel.countDocuments()),
-    ).toBe(1);
+    expect(await ColectivoModel.countDocuments()).toBe(1);
+    expect(await ColaboradorModel.countDocuments()).toBe(1);
   });
 
   test("aceptaciones concurrentes resuelven una sola vez y permiten un segundo colectivo", async () => {
@@ -393,7 +524,7 @@ describe("Integracion · contextos, transacciones e indices", () => {
     await services.modalidadService.crearColectivo(ada, alta("B"));
     const anterior = (await UsuarioModel.findById(ada.id)).contextoActualId;
     const colectivo = await services.modalidadService.crearColectivo(ana, alta("A"));
-    const lider = await ContextoUsuarioModel.findOne({ colectivoId: colectivo.id });
+    const lider = await contextoDe({ colectivoId: colectivo.id });
     const solicitud = await services.membresiaService.solicitarIngreso(ada, colectivo.id);
     expect(await ContextoUsuarioModel.countDocuments({ usuarioId: ada._id })).toBe(1);
 
@@ -408,40 +539,35 @@ describe("Integracion · contextos, transacciones e indices", () => {
       estado: "ACEPTADA",
     });
     expect(
-      await ContextoUsuarioModel.findOne({
-        usuarioId: ada._id,
-        colectivoId: colectivo.id,
-      }),
+      await contextoGuardado({ usuarioId: ada._id, colectivoId: colectivo._id }),
     ).toMatchObject({ rol: "MIEMBRO", activo: true });
     expect((await UsuarioModel.findById(ada.id)).contextoActualId).toEqual(anterior);
   });
 
-  test("aceptar una solicitud de quien paso a colaboradora conserva la solicitud pendiente", async () => {
+  test("aceptar una solicitud de quien paso a colaboradora suma la membresia sin cambiar su contexto actual", async () => {
     const ana = await usuario("ana");
     const ada = await usuario("ada");
     const colectivo = await services.modalidadService.crearColectivo(ana, alta("A"));
-    const lider = await ContextoUsuarioModel.findOne({ colectivoId: colectivo.id });
+    const lider = await contextoDe({ colectivoId: colectivo.id });
     const solicitud = await services.membresiaService.solicitarIngreso(ada, colectivo.id);
     await services.modalidadService.crearPerfilColaborador(ada, { cuentaGit: "ada" });
+    const actual = (await UsuarioModel.findById(ada.id)).contextoActualId;
 
-    await expect(
-      services.membresiaService.aceptar(lider, colectivo.id, solicitud.id),
-    ).rejects.toMatchObject({ codigo: "MODALIDAD_INCOMPATIBLE" });
+    await services.membresiaService.aceptar(lider, colectivo.id, solicitud.id);
+
     expect(await SolicitudIngresoModel.findById(solicitud.id)).toMatchObject({
-      estado: "PENDIENTE",
+      estado: "ACEPTADA",
     });
     expect(
-      await ContextoUsuarioModel.countDocuments({
-        usuarioId: ada._id,
-        tipo: "COLECTIVO",
-      }),
-    ).toBe(0);
+      await contextoGuardado({ usuarioId: ada._id, colectivoId: colectivo._id }),
+    ).toMatchObject({ rol: "MIEMBRO", activo: true });
+    expect((await UsuarioModel.findById(ada.id)).contextoActualId).toEqual(actual);
   });
 
   test("una falla al final de la baja revierte proyectos, postulaciones, membresias, solicitudes y avisos", async () => {
     const ana = await usuario("ana");
     const colectivo = await services.modalidadService.crearColectivo(ana, alta("A"));
-    const contexto = await ContextoUsuarioModel.findOne({ colectivoId: colectivo.id });
+    const contexto = await contextoDe({ colectivoId: colectivo.id });
     const otro = await usuario("otro");
     const solicitud = await services.membresiaService.solicitarIngreso(
       otro,
@@ -511,7 +637,7 @@ describe("Integracion · contextos, transacciones e indices", () => {
   test("seleccionar un contexto mientras se lo desactiva no deja un puntero invalido", async () => {
     const ana = await usuario("ana");
     const colectivo = await services.modalidadService.crearColectivo(ana, alta("A"));
-    const contexto = await ContextoUsuarioModel.findOne({ colectivoId: colectivo.id });
+    const contexto = await contextoDe({ colectivoId: colectivo.id });
     await services.contextoService.limpiarActual(ana);
 
     const [baja] = await Promise.allSettled([

@@ -14,7 +14,7 @@ export const PROBLEMA = {
         "Codigo estable para que el front distinga casos: NO_AUTENTICADO, TOKEN_INVALIDO, " +
         "PROVEEDOR_NO_DISPONIBLE, USUARIO_NO_REGISTRADO, CONTEXTO_REQUERIDO, " +
         "CONTEXTO_INVALIDO, CONTEXTO_NO_ACTUAL, CONTEXTO_INACTIVO, PERMISO_INSUFICIENTE, " +
-        "MODALIDAD_INCOMPATIBLE, SOLICITUD_PENDIENTE, LIDER_DEBE_TRANSFERIR, entre otros.",
+        "POSTULACION_EN_COLECTIVO_PROPIO, COLABORACION_PROPIA, SOLICITUD_PENDIENTE, LIDER_DEBE_TRANSFERIR, entre otros.",
     },
     detalle: {
       description:
@@ -95,6 +95,16 @@ export const paramEtiqueta = {
     "Filtra por etiqueta (req. adicional 34). Se normaliza igual que al cargarla: " +
     "`Educación Popular` busca `educacion-popular`.",
   schema: { type: "string" },
+};
+
+export const paramBusquedaPorNombre = {
+  name: "q",
+  in: "query",
+  description:
+    "Texto a buscar en el nombre (1 a 80 caracteres despues de recortar espacios). " +
+    "Coincidencia parcial, sin distinguir mayusculas ni tildes. Se toma literal: " +
+    "los caracteres especiales no se interpretan como expresion regular.",
+  schema: { type: "string", minLength: 1, maxLength: 80 },
 };
 
 export const paramsFiltroDeProyectos = [

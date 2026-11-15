@@ -43,7 +43,7 @@ export const rutasCuenta = {
                   id: { type: "string", description: "`sub` del token." },
                   rol: {
                     type: "string",
-                    enum: ["COLECTIVO", "COLABORADORA"],
+                    enum: ["COLECTIVO", "COLABORADORA", "ADMINISTRACION"],
                     nullable: true,
                   },
                   perfilId: { ...OBJECT_ID, nullable: true },
@@ -81,7 +81,8 @@ export const rutasCuenta = {
       summary: "Completar o cambiar el nombre del usuario",
       description:
         "El nombre es un dato de la aplicacion, no del proveedor de identidad. Hace falta " +
-        "antes de crear un colectivo o pedir el ingreso a uno (409 NOMBRE_REQUERIDO). Es " +
+        "antes de crear un colectivo, crear un perfil de colaboradora o pedir el ingreso a " +
+        "un colectivo (409 NOMBRE_REQUERIDO). Es " +
         "el que se muestra en miembros y solicitudes.",
       requestBody: {
         required: true,

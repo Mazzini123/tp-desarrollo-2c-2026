@@ -8,23 +8,40 @@ function repositorioEnMemoria() {
     permisos: new Map(),
     tipos: new Map(),
     roles: new Map(),
+    rolesXPermisos: new Map(),
     proveedores: new Map(),
   };
-  const upsert = (mapa, items, alCrear = {}) =>
+  const upsert = (mapa, clave, items, alCrear = {}) =>
     items.forEach((item) =>
-      mapa.set(item.codigo, { ...alCrear, ...mapa.get(item.codigo), ...item }),
+      mapa.set(item[clave], { ...alCrear, ...mapa.get(item[clave]), ...item }),
     );
   return {
     colecciones,
-    asegurarPermisos: async (items) => upsert(colecciones.permisos, items),
-    asegurarTiposDeContexto: async (items) => upsert(colecciones.tipos, items),
-    asegurarRoles: async (items) => upsert(colecciones.roles, items),
+    asegurarPermisos: async (items) => upsert(colecciones.permisos, "nombre", items),
+    asegurarTiposDeContexto: async (items) => upsert(colecciones.tipos, "nombre", items),
+    asegurarRoles: async (items) => upsert(colecciones.roles, "nombre", items),
+    asegurarPermisosDeRol: async (rol, permisos) => {
+      for (const clave of [...colecciones.rolesXPermisos.keys()]) {
+        if (clave.startsWith(`${rol}:`)) colecciones.rolesXPermisos.delete(clave);
+      }
+      permisos.forEach((permiso) =>
+        colecciones.rolesXPermisos.set(`${rol}:${permiso}`, { rol, permiso }),
+      );
+    },
     asegurarProveedores: async (items) =>
-      upsert(colecciones.proveedores, items, { activo: true }),
-    listarRoles: async () => [...colecciones.roles.values()],
-    listarCodigosDePermiso: async () => [...colecciones.permisos.keys()],
-    listarCodigosDeProveedoresActivos: async () =>
-      [...colecciones.proveedores.values()].filter((p) => p.activo).map((p) => p.codigo),
+      upsert(colecciones.proveedores, "proveedor", items, { activo: true }),
+    listarRoles: async () =>
+      [...colecciones.roles.values()].map((rol) => ({
+        nombre: rol.nombre,
+        permisos: [...colecciones.rolesXPermisos.values()]
+          .filter((par) => par.rol === rol.nombre)
+          .map((par) => par.permiso),
+      })),
+    listarNombresDePermiso: async () => [...colecciones.permisos.keys()],
+    listarProveedoresActivos: async () =>
+      [...colecciones.proveedores.values()]
+        .filter((p) => p.activo)
+        .map((p) => p.proveedor),
   };
 }
 
@@ -67,9 +84,21 @@ describe("catalogo de roles y permisos", () => {
     repositorio.colecciones.proveedores.get("logto").activo = false;
     const resultado = await asegurarCatalogos(repositorio, proveedores);
 
-    expect(repositorio.colecciones.roles.size).toBe(3);
+    expect(repositorio.colecciones.roles.size).toBe(4);
+    expect([...repositorio.colecciones.roles.values()]).toEqual([
+      { nombre: "COLABORADOR" },
+      { nombre: "MIEMBRO" },
+      { nombre: "LIDER" },
+      { nombre: "ADMIN" },
+    ]);
+    expect(repositorio.colecciones.rolesXPermisos.size).toBe(
+      ROLES.reduce((total, rol) => total + rol.permisos.length, 0),
+    );
+    expect(new CatalogoDeRoles(resultado.roles).permisosDe("LIDER").sort()).toEqual(
+      [...new CatalogoDeRoles().permisosDe("LIDER")].sort(),
+    );
     expect(repositorio.colecciones.permisos.size).toBe(Object.values(PERMISO).length);
-    expect(repositorio.colecciones.tipos.size).toBe(2);
+    expect(repositorio.colecciones.tipos.size).toBe(3);
     expect(resultado.proveedoresActivos).toEqual([]);
   });
 });

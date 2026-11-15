@@ -105,9 +105,10 @@ test("flujo HTTP con un JWT para la API: registro explicito, cuenta, nombre y co
   const { body: alta } = await registrar().expect(201);
   expect((await registrar().expect(200)).body).toEqual({ ...alta, creado: false });
   const usuarioGuardado = await UsuarioModel.findById(alta.usuarioId).lean();
-  const identidadGuardada = await IdentidadExternaModel.findOne({
-    usuarioId: alta.usuarioId,
-  }).lean();
+  const identidadGuardada = await IdentidadExternaModel.findById(
+    usuarioGuardado.identidadExternaId,
+  ).lean();
+  expect(identidadGuardada.identificadorExterno).toBe("usuario-1");
   const { body: cuenta } = await consulta().expect(200);
   expect(cuenta).toEqual({
     id: "usuario-1",
@@ -119,7 +120,7 @@ test("flujo HTTP con un JWT para la API: registro explicito, cuenta, nombre y co
   });
   expect(await UsuarioModel.findById(alta.usuarioId).lean()).toEqual(usuarioGuardado);
   expect(
-    await IdentidadExternaModel.findOne({ usuarioId: alta.usuarioId }).lean(),
+    await IdentidadExternaModel.findById(usuarioGuardado.identidadExternaId).lean(),
   ).toEqual(identidadGuardada);
   expect(await IdentidadExternaModel.countDocuments()).toBe(1);
   expect(await UsuarioModel.countDocuments()).toBe(1);

@@ -46,6 +46,19 @@ export function configuracionDeProceso(entorno = process.env) {
       2_147_483_647,
     ),
     enviosMs: enteroDeEntorno(entorno, "ENVIOS_INTERVALO_MS", 15_000, 2_147_483_647),
+    seguimientoMs: enteroDeEntorno(
+      entorno,
+      "SEGUIMIENTO_INTERVALO_MS",
+      3_600_000,
+      2_147_483_647,
+    ),
+    diasSinActualizaciones: enteroDeEntorno(
+      entorno,
+      "DIAS_SIN_ACTUALIZACIONES",
+      30,
+      3650,
+    ),
+    maxDestacadosActivos: enteroDeEntorno(entorno, "MAX_DESTACADOS_ACTIVOS", 6, 1000),
     apagadoMs: enteroDeEntorno(entorno, "APAGADO_PLAZO_MS", 25_000, 2_147_483_647),
     proxies: proxiesConfiables(entorno),
   };

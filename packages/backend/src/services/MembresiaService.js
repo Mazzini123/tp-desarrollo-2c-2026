@@ -1,4 +1,3 @@
-import { TIPO_CONTEXTO } from "../security/autorizacion/enums/TIPO_CONTEXTO.js";
 import { ROL } from "../security/autorizacion/enums/ROL.js";
 import { ESTADO_SOLICITUD } from "../security/application/ESTADO_SOLICITUD.js";
 import { ConflictError } from "../errors/ConflictError.js";
@@ -61,10 +60,6 @@ export class MembresiaService {
     return this.transacciones.ejecutar(async () => {
       await this.bloquearColectivoActivo(colectivoId);
       await this.usuarioRepository.bloquear(usuario._id);
-      await this.contextoService.exigirSinModalidad(
-        usuario._id,
-        TIPO_CONTEXTO.COLABORADOR,
-      );
       if (await this.esMiembro(usuario._id, colectivoId)) {
         throw new ConflictError(
           "Ya sos miembro de este colectivo",
@@ -142,10 +137,6 @@ export class MembresiaService {
       await this.bloquearColectivoActivo(colectivoId);
       await this.contextoService.exigirSinCambios(contextoLider, { exigirActual: true });
       await this.usuarioRepository.bloquear(solicitud.usuarioId);
-      await this.contextoService.exigirSinModalidad(
-        solicitud.usuarioId,
-        TIPO_CONTEXTO.COLABORADOR,
-      );
       if (await this.esMiembro(solicitud.usuarioId, colectivoId)) {
         throw new ConflictError(
           "Ya sos miembro de este colectivo",

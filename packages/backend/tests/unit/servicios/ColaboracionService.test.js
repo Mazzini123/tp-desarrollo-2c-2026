@@ -7,22 +7,30 @@ import { DomainError } from "../../../src/errors/DomainError.js";
 import { COLABORACION_ESTADO } from "../../../src/domain/enums/COLABORACION_ESTADO.js";
 import { MODO_ACEPTACION } from "../../../src/domain/enums/MODO_ACEPTACION.js";
 import { TIPO_NOTIFICACION } from "../../../src/domain/enums/TIPO_NOTIFICACION.js";
+import { ROL } from "../../../src/security/autorizacion/enums/ROL.js";
 import {
   colaboracion,
   colaborador,
+  contextoDeColaboradora,
+  contextoDeColectivo,
   habilidad,
+  nuevoId,
   perfil,
   proyecto,
 } from "../dobles/entidades.js";
 import {
+  ContextoUsuarioRepositoryEnMemoria,
   ProyectoRepositoryEnMemoria,
   notificacionServiceEspia,
   sinTransacciones,
+  usuarioRepositoryEspia,
 } from "../dobles/repositorios.js";
 
-function armar({ proyectos = [], personas = [] } = {}) {
+function armar({ proyectos = [], personas = [], contextos = [] } = {}) {
   const proyectoRepository = new ProyectoRepositoryEnMemoria(proyectos);
   const notificacionService = notificacionServiceEspia();
+  const contextoUsuarioRepository = new ContextoUsuarioRepositoryEnMemoria(contextos);
+  const usuarioRepository = usuarioRepositoryEspia();
   const proyectoService = {
     buscarPorId: async (id) => {
       const encontrado = await proyectoRepository.buscarPorId(id);
@@ -41,9 +49,18 @@ function armar({ proyectos = [], personas = [] } = {}) {
     proyectoService,
     colaboradorService,
     notificacionService,
+    contextoUsuarioRepository,
+    usuarioRepository,
     transacciones: sinTransacciones,
   });
-  return { service, proyectoRepository, proyectoService, notificacionService };
+  return {
+    service,
+    proyectoRepository,
+    proyectoService,
+    notificacionService,
+    contextoUsuarioRepository,
+    usuarioRepository,
+  };
 }
 
 describe("ColaboracionService · postularse (con dobles)", () => {
@@ -179,5 +196,127 @@ describe("ColaboracionService · aceptar (con dobles)", () => {
     );
     expect(pendiente.estado).toBe(COLABORACION_ESTADO.PENDIENTE);
     expect(notificacionService.notificar).not.toHaveBeenCalled();
+  });
+});
+
+describe("ColaboracionService · postularse al colectivo propio (con dobles)", () => {
+  function cuentaConPerfil(p, { rol, activo = true, colectivoId = p.colectivoId } = {}) {
+    const ada = colaborador();
+    const usuarioId = nuevoId();
+    const contextos = [
+      contextoDeColaboradora({ usuarioId, colaboradorId: ada.id }),
+      contextoDeColectivo({ usuarioId, colectivoId, rol, activo }),
+    ];
+    return { ada, usuarioId, contextos };
+  }
+
+  const postular = (service, p, ada) =>
+    service.registrar({
+      proyectoId: p.id,
+      perfilId: p.perfiles[0].id,
+      colaboradorId: ada.id,
+    });
+
+  test.each([ROL.LIDER, ROL.MIEMBRO])(
+    "una cuenta que es %s activa del colectivo del proyecto recibe 422 y no se guarda nada",
+    async (rol) => {
+      const p = proyecto();
+      const { ada, contextos } = cuentaConPerfil(p, { rol });
+      const { service, proyectoRepository, notificacionService } = armar({
+        proyectos: [p],
+        personas: [ada],
+        contextos,
+      });
+
+      const error = await postular(service, p, ada).catch((e) => e);
+
+      expect(error).toBeInstanceOf(DomainError);
+      expect(error).toMatchObject({
+        status: 422,
+        codigo: "POSTULACION_EN_COLECTIVO_PROPIO",
+      });
+      expect(proyectoRepository.guardar).not.toHaveBeenCalled();
+      expect(notificacionService.notificar).not.toHaveBeenCalled();
+      expect(p.colaboraciones).toHaveLength(0);
+    },
+  );
+
+  test("quien salio del colectivo (contexto inactivo) se puede postular", async () => {
+    const p = proyecto();
+    const { ada, contextos } = cuentaConPerfil(p, { rol: ROL.MIEMBRO, activo: false });
+    const { service } = armar({ proyectos: [p], personas: [ada], contextos });
+
+    const resultado = await postular(service, p, ada);
+
+    expect(resultado.estado).toBe(COLABORACION_ESTADO.PENDIENTE);
+  });
+
+  test("participar en otro colectivo no impide postularse", async () => {
+    const p = proyecto();
+    const { ada, contextos } = cuentaConPerfil(p, {
+      rol: ROL.LIDER,
+      colectivoId: nuevoId(),
+    });
+    const { service, proyectoRepository } = armar({
+      proyectos: [p],
+      personas: [ada],
+      contextos,
+    });
+
+    await postular(service, p, ada);
+
+    expect(proyectoRepository.guardar).toHaveBeenCalledWith(p);
+  });
+
+  test("una colaboradora sin contexto asociado no se ve afectada ni bloquea a nadie", async () => {
+    const p = proyecto();
+    const ada = colaborador();
+    const { service, usuarioRepository, contextoUsuarioRepository } = armar({
+      proyectos: [p],
+      personas: [ada],
+    });
+
+    const resultado = await postular(service, p, ada);
+
+    expect(resultado.estado).toBe(COLABORACION_ESTADO.PENDIENTE);
+    expect(contextoUsuarioRepository.buscarDeColaborador).toHaveBeenCalledWith(ada.id);
+    expect(usuarioRepository.bloquear).not.toHaveBeenCalled();
+    expect(contextoUsuarioRepository.buscarDeUsuarioEnColectivo).not.toHaveBeenCalled();
+  });
+
+  test("bloquea al usuario antes de consultar su membresia en el colectivo", async () => {
+    const p = proyecto();
+    const { ada, usuarioId, contextos } = cuentaConPerfil(p, { rol: ROL.MIEMBRO });
+    const { service, usuarioRepository, contextoUsuarioRepository } = armar({
+      proyectos: [p],
+      personas: [ada],
+      contextos,
+    });
+
+    await postular(service, p, ada).catch(() => {});
+
+    expect(usuarioRepository.bloquear).toHaveBeenCalledWith(usuarioId);
+    expect(contextoUsuarioRepository.buscarDeUsuarioEnColectivo).toHaveBeenCalledWith(
+      usuarioId,
+      p.colectivoId,
+    );
+    expect(usuarioRepository.bloquear.mock.invocationCallOrder[0]).toBeLessThan(
+      contextoUsuarioRepository.buscarDeUsuarioEnColectivo.mock.invocationCallOrder[0],
+    );
+  });
+
+  test("la regla se aplica aunque el proyecto este cerrado por fecha, sin cerrarlo", async () => {
+    const p = proyecto({ fechaCierre: new Date(Date.now() - 1000) });
+    const { ada, contextos } = cuentaConPerfil(p, { rol: ROL.LIDER });
+    const { service, proyectoService } = armar({
+      proyectos: [p],
+      personas: [ada],
+      contextos,
+    });
+
+    await expect(postular(service, p, ada)).rejects.toMatchObject({
+      codigo: "POSTULACION_EN_COLECTIVO_PROPIO",
+    });
+    expect(proyectoService.cerrar).not.toHaveBeenCalled();
   });
 });

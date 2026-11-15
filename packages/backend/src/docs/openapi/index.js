@@ -6,6 +6,7 @@ import { rutasProyectos } from "./rutas/proyectos.js";
 import { rutasCuenta } from "./rutas/cuenta.js";
 import { rutasCatalogos } from "./rutas/catalogos.js";
 import { rutasHabilidades } from "./rutas/habilidades.js";
+import { rutasAdministracion } from "./rutas/administracion.js";
 import { respuestas } from "./esquemas/respuestas.js";
 import { entradas } from "./esquemas/entradas.js";
 import { errores } from "./comunes.js";
@@ -64,7 +65,7 @@ export const openapi = {
       "Cada operacion en nombre de un colectivo o de una colaboradora",
       "manda ademas `X-Context-Id` con el contexto elegido, que tiene que ser el actual del",
       "usuario (`PUT /auth/contexto-actual`). El backend valida pertenencia, estado y el",
-      "permiso del rol (COLABORADOR, MIEMBRO o LIDER) en cada pedido.",
+      "permiso del rol (COLABORADOR, MIEMBRO, LIDER o ADMIN) en cada pedido.",
     ].join("\n"),
   },
   servers: [
@@ -120,6 +121,13 @@ export const openapi = {
         "se replican por sus medios de contacto.",
     },
     {
+      name: "Administracion",
+      description:
+        "Administracion de la plataforma (req. adicionales 18 y 35): destacados, revisiones " +
+        "manuales, auditoria y altas de administradores. Solo para el contexto de " +
+        "ADMINISTRACION, que no se obtiene por autoservicio.",
+    },
+    {
       name: "Estadisticas",
       description:
         "Calculadas con el Aggregation Framework de MongoDB (req. adicionales 16, 17 y 30).",
@@ -134,6 +142,7 @@ export const openapi = {
     ...rutasCuenta,
     ...rutasCatalogos,
     ...rutasHabilidades,
+    ...rutasAdministracion,
   },
 
   components: {

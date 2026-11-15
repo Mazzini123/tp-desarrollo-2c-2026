@@ -42,9 +42,10 @@ export const rutasColaboradores = {
         "se muestran** en ninguna respuesta. `recibeMensajeriaInterna` (default true) " +
         "decide si se le pueden mandar notificaciones. Al crearla, se le avisa que " +
         "proyectos abiertos le sirven (req. 9). Con autenticacion activa se requiere un " +
-        "usuario registrado. El contexto nuevo pasa a ser el actual. La cuenta puede tener " +
-        "perfiles anteriores dados de baja, pero recibe 409 si ya tiene uno activo o si " +
-        "opera como colectivo.",
+        "usuario registrado que ya haya completado su nombre (409 NOMBRE_REQUERIDO). El " +
+        "contexto nuevo, con rol COLABORADOR, pasa a ser el actual. La cuenta puede tener " +
+        "perfiles anteriores dados de baja, pero recibe 409 si ya tiene uno activo " +
+        "(PERFIL_COLABORADOR_EXISTENTE). Puede tener a la vez contextos de colectivo.",
       requestBody: body("CrearColaborador"),
       responses: {
         ...recurso("Colaborador", 201, "Colaborador creado."),

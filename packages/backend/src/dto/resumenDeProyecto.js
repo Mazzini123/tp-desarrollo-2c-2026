@@ -2,6 +2,7 @@ import { estadoDeBusquedaConCupo } from "../services/reglasDeBusqueda.js";
 import { versionDePerfil } from "../utils/versionDePerfil.js";
 import { MODO_ACEPTACION } from "../domain/enums/MODO_ACEPTACION.js";
 import { PROYECTO_ESTADO } from "../domain/enums/PROYECTO_ESTADO.js";
+import { esDestacadoVigente } from "../services/reglasDeDestacado.js";
 
 export function resumenDeProyecto(proyecto, ahora = new Date()) {
   return {
@@ -26,6 +27,7 @@ export function resumenDeProyecto(proyecto, ahora = new Date()) {
     perfiles: proyecto.perfiles.map((perfil) =>
       perfilParaRespuesta(perfil, proyecto, ahora),
     ),
+    ...(esDestacadoVigente(proyecto, ahora) && { destacado: true }),
   };
 }
 

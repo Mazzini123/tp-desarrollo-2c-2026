@@ -3,6 +3,7 @@ import { ColectivoModel } from "../models/ColectivoModel.js";
 import { ConcurrenciaError } from "../errors/ConcurrenciaError.js";
 import { esIdValido } from "./objectIds.js";
 import { paginar } from "./paginar.js";
+import { patronDeNombre } from "../domain/busquedaPorNombre.js";
 
 const ORDEN = { createdAt: 1, _id: 1 };
 
@@ -36,8 +37,12 @@ export class MongoColectivoRepository {
     return esIdValido(id) ? ColectivoModel.findById(id) : null;
   }
 
-  async listarPaginado(pagina, { etiqueta } = {}) {
-    const filtro = { fechaBaja: null, ...(etiqueta && { etiquetas: etiqueta }) };
+  async listarPaginado(pagina, { etiqueta, q } = {}) {
+    const filtro = {
+      fechaBaja: null,
+      ...(etiqueta && { etiquetas: etiqueta }),
+      ...(q && { nombre: { $regex: patronDeNombre(q), $options: "i" } }),
+    };
     return paginar(ColectivoModel, filtro, pagina, { orden: ORDEN });
   }
 

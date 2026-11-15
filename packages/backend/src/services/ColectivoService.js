@@ -45,10 +45,10 @@ export class ColectivoService {
     });
   }
 
-  async listar({ numeroPagina = 1, limitePorPagina = 10, etiqueta } = {}) {
+  async listar({ numeroPagina = 1, limitePorPagina = 10, etiqueta, q } = {}) {
     const pagina = { numeroPagina, limitePorPagina };
     return armarPaginado(
-      await this.colectivoRepository.listarPaginado(pagina, { etiqueta }),
+      await this.colectivoRepository.listarPaginado(pagina, { etiqueta, q }),
       pagina,
     );
   }

@@ -31,6 +31,7 @@ export function crearColaboradoresRouter(controllers, autorizacion) {
     "/",
     validarBody(crearColaboradorSchema),
     autorizacion.usuario(),
+    autorizacion.nombre,
     colaboradorController.crear,
   );
   router.get("/", validarQuery(paginacionSchema), colaboradorController.listar);

@@ -39,6 +39,11 @@ export const listadoDeProyectosSchema = paginacionSchema.extend({
   modalidad: z.enum(Object.values(MODALIDAD_COLABORACION)).optional(),
 });
 
+export const listadoDeColectivosSchema = paginacionSchema.extend({
+  etiqueta: z.string().trim().min(1).transform(normalizarEtiqueta).optional(),
+  q: z.string().trim().min(1).max(80).optional(),
+});
+
 export const listadoConEtiquetaSchema = paginacionSchema.extend({
   etiqueta: z.string().trim().min(1).transform(normalizarEtiqueta).optional(),
 });

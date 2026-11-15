@@ -83,6 +83,7 @@ describe("HTTP · vistas publicas de proyectos y colectivos", () => {
     await api.post("/auth/registro").set(como("ana")).expect(201);
     await api.put("/auth/usuario").set(como("ana")).send({ nombre: "Ana" }).expect(200);
     await api.post("/auth/registro").set(como("bea")).expect(201);
+    await api.put("/auth/usuario").set(como("bea")).send({ nombre: "Bea" }).expect(200);
 
     const colectivo = (
       await api

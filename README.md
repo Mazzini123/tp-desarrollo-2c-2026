@@ -91,14 +91,17 @@ tienen constructor (Mongoose no lo llama): los valores por defecto están en el
 schema. Las entidades se crean con el modelo (`new ColaboradorModel({...})`) o
 desde su repositorio (`colectivoRepository.crear(datos)`, `proyectoRepository.nuevo(datos)`).
 
-| Colección        | Qué guarda                                                   | Relaciones                                                                                                              |
-| ---------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| `habilidads`     | El catálogo                                                  | `codigo` único (`desarrollo_node`), aparte del `_id`                                                                    |
-| `colaboradors`   | Colaboradores                                                | Copia `{codigo, titulo}` de sus habilidades                                                                             |
-| `colectivos`     | El colectivo                                                 | —                                                                                                                       |
-| `proyectos`      | El proyecto **con sus perfiles, logros y avances embebidos** | `colectivoId` por referencia, más una copia de nombre, tipo y ubicación del colectivo; copia de habilidades en perfiles |
-| `colaboraciones` | Postulaciones y colaboraciones                               | `proyectoId`, `colectivoId` y `colaborador` por referencia (ObjectId)                                                   |
-| `notificaciones` | Los mensajes internos de cada persona                        | `destinatarioId` por referencia (ObjectId)                                                                              |
+| Colección                  | Qué guarda                                                     | Relaciones                                                                                                              |
+| -------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `habilidads`               | El catálogo                                                    | `codigo` único (`desarrollo_node`), aparte del `_id`                                                                    |
+| `colaboradors`             | Colaboradores                                                  | Copia `{codigo, titulo}` de sus habilidades                                                                             |
+| `colectivos`               | El colectivo                                                   | —                                                                                                                       |
+| `proyectos`                | El proyecto **con sus perfiles, logros y avances embebidos**   | `colectivoId` por referencia, más una copia de nombre, tipo y ubicación del colectivo; copia de habilidades en perfiles |
+| `colaboraciones`           | Postulaciones y colaboraciones                                 | `proyectoId`, `colectivoId` y `colaborador` por referencia (ObjectId)                                                   |
+| `notificaciones`           | Los mensajes internos de cada persona                          | `destinatarioId` por referencia (ObjectId)                                                                              |
+| `acciones_administrativas` | Auditoría: una fila por acción administrativa, solo se agregan | `usuarioId` y `contextoId` por referencia (nulos si la acción vino del comando)                                         |
+| `revisiones`               | Cola de revisiones manuales de proyectos                       | `proyectoId` por referencia                                                                                             |
+| `controles`                | Documento de control para serializar los destacados            | —                                                                                                                       |
 
 (Los nombres en inglés "mal pluralizados" los pone Mongoose solo.)
 
@@ -178,16 +181,19 @@ mapa, con el requerimiento del enunciado que resuelve cada cosa.
 | 14     | Límite de solicitudes                            | `src/middlewares/limiteDeTasa.js`: 300 cada 15 min por IP; 30 por minuto en búsquedas y estadísticas                                                                       |
 | 16, 30 | Estadísticas globales / API pública              | `GET /estadisticas`, con el Aggregation Framework                                                                                                                          |
 | 17     | Estadísticas por organización                    | `GET /colectivos/:id/estadisticas`; `GET /proyectos/:id` suma visualizaciones                                                                                              |
+| 18     | Proyectos destacados                             | `PUT/DELETE /administracion/proyectos/:id/destacado`, `GET /proyectos/destacados`; los listados ordenan primero los vigentes y los marcan con `destacado: true`            |
 | 19     | Línea de tiempo                                  | `GET /colectivos/:id/timeline`: alta, proyectos, logros, avances, colaboraciones cerradas y baja                                                                           |
 | 23     | Eliminación de colectivos                        | `POST /colectivos/:id/baja`                                                                                                                                                |
 | 27     | Redes sociales                                   | `redesSociales` en colectivos y colaboradores                                                                                                                              |
 | 34     | Etiquetas                                        | `etiquetas` en colectivos y proyectos; filtro `?etiqueta=` en los listados                                                                                                 |
+| 35     | Seguimiento de proyectos sin actualizaciones     | Job `src/jobs/seguimiento.js`; `GET /administracion/revisiones`, `POST /administracion/revisiones/:id/resolucion`                                                          |
 | 38     | Markdown (backend)                               | Las descripciones conservan la sintaxis Markdown y limpian HTML externo al código; el renderizado es del [frontend](https://github.com/Mazzini123/codigo-a-voluntad-front) |
 | 39     | Valoraciones mutuas                              | `POST .../colaboraciones/:colaboracionId/finalizacion` y `/valoraciones`; `GET /colaboradores/:id/valoraciones`, `GET /colectivos/:id/valoraciones`                        |
 
-Los adicionales 13, 18, 21, 29 y 35 quedan para la tercera entrega: todos
-necesitan saber quién está usando la plataforma (un equipo administrativo, o la
-organización dueña del proyecto), y los usuarios llegan con la autenticación.
+Los adicionales 18 y 35 se resuelven con el rol de administración (ver
+[Administración de la plataforma](#administración-de-la-plataforma)). Los adicionales 13
+(solo la parte de auditoría y destacados), 21 y 29 quedan para una próxima entrega: se
+apoyan en esa misma base.
 
 ### Ciclo de una postulación
 
@@ -239,6 +245,9 @@ y terminan las colaboraciones en curso.
 | `LIMITE_SOLICITUDES_GENERAL`     | no (300)        | Solicitudes por IP cada 15 minutos                                                                                                                            |
 | `LIMITE_SOLICITUDES_BUSQUEDAS`   | no (30)         | Solicitudes por IP por minuto en búsquedas y estadísticas                                                                                                     |
 | `CIERRE_AUTOMATICO_INTERVALO_MS` | no (60000)      | Cada cuánto se buscan proyectos con la fecha de cierre vencida                                                                                                |
+| `SEGUIMIENTO_INTERVALO_MS`       | no (3600000)    | Cada cuánto el job de seguimiento busca proyectos iniciados sin actualizaciones                                                                               |
+| `DIAS_SIN_ACTUALIZACIONES`       | no (30)         | Días sin avances, logros ni aceptaciones para abrir una revisión                                                                                              |
+| `MAX_DESTACADOS_ACTIVOS`         | no (6)          | Máximo de proyectos destacados vigentes a la vez                                                                                                              |
 | `ENVIOS_INTERVALO_MS`            | no (15000)      | Frecuencia de generación de avisos y entrega de envíos pendientes                                                                                             |
 | `APAGADO_PLAZO_MS`               | no (25000)      | Plazo máximo para terminar HTTP y jobs antes de cerrar MongoDB                                                                                                |
 | `TRUST_PROXY`                    | no (false)      | IP o redes CIDR explícitas de proxies confiables, separadas por coma                                                                                          |
@@ -307,15 +316,31 @@ Logto registra, autentica y emite el access token. Al iniciar o restaurar la ses
 
 **Identidad, contexto y permisos**
 
-- Cada `Usuario` tiene un ObjectId interno, `fechaAlta`, `nombre` inicialmente nulo y `contextoActualId`. `IdentidadExterna` vincula el usuario con el par único `proveedor` y `sub`. Dos proveedores pueden emitir el mismo `sub` sin compartir cuenta. Si una nueva cuenta de Logto tiene otro `sub`, su primer `POST /auth/registro` crea un usuario interno distinto. El correo y el nombre que el proveedor incluya en sus claims se mantienen fuera del registro interno.
-- `Usuario.nombre` se completa o cambia mediante `PUT /auth/usuario`. La API lo pide al crear un colectivo o enviar una solicitud de ingreso, y lo usa al listar miembros y solicitudes del colectivo. El perfil público de colaboradora mantiene su identificación propia.
-- Un contexto activo `COLABORADOR` representa el único perfil activo de la persona. Un contexto activo `COLECTIVO` representa su membresía en ese colectivo como `MIEMBRO` o `LIDER`. El usuario puede tener varios colectivos o ninguno. Las dos modalidades activas son excluyentes.
-- El seed toma los códigos y la matriz de `src/security/autorizacion/rolesYPermisos.js` y actualiza los catálogos por código. La API carga los roles sembrados al arrancar. Un cambio en código surte efecto al reiniciar la aplicación. Los proveedores configurados se siembran por código y conservan su indicador `activo` en MongoDB. Los miembros y el líder operan sobre proyectos y colaboraciones y consultan solicitudes y estadísticas. Solo el líder puede editar el colectivo y sus contactos, darlo de baja, aceptar o rechazar ingresos, quitar miembros y transferir el liderazgo. El listado de miembros está disponible para `MIEMBRO` y `LIDER` del colectivo seleccionado en su contexto actual. [Auditoría de autenticación y contextos](packages/backend/AUDITORIA-AUTH-CONTEXTOS.md)
+- El modelo de seguridad conserva cada clase del diseño como una colección propia, relacionada por referencias `ObjectId`. Ninguna se embebe ni se reemplaza por un arreglo o un código de texto:
+
+  | Clase del diseño          | Colección                     | Documento                                                                                             | Restricciones                                                                                        |
+  | ------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+  | `Usuario`                 | `usuarios`                    | `_id`, `identidadExternaId` → `identidadesExternas`, `contextoActualId` → `contextosUsuario` o `null` | `identidadExternaId` obligatorio y único                                                             |
+  | `IdentidadExterna`        | `identidadesExternas`         | `_id`, `proveedorId` → `proveedoresAutentificadores`, `identificadorExterno`                          | Único compuesto (`proveedorId`, `identificadorExterno`)                                              |
+  | `ProveedorAutentificador` | `proveedoresAutentificadores` | `_id`, `proveedor`                                                                                    | `proveedor` obligatorio y único                                                                      |
+  | `ContextoUsuario`         | `contextosUsuario`            | `_id`, `usuarioId`, `tipoContextoId`, `colectivoId` o `null`, `colaboradorId` o `null`, `rolId`       | Validador de la colección, membresía única, un perfil de colaboradora activo, un líder por colectivo |
+  | `TipoContexto`            | `tiposContexto`               | `_id`, `nombre` (`COLABORADOR`, `COLECTIVO`)                                                          | `nombre` único                                                                                       |
+  | `Rol`                     | `roles`                       | `_id`, `nombre` (`COLABORADOR`, `MIEMBRO`, `LIDER`, `ADMIN`)                                          | `nombre` único                                                                                       |
+  | `Permiso`                 | `permisos`                    | `_id`, `nombre`                                                                                       | `nombre` único                                                                                       |
+  | `RolXPermiso`             | `rolesXPermisos`              | `_id`, `rolId` → `roles`, `permisoId` → `permisos`                                                    | Único compuesto (`rolId`, `permisoId`)                                                               |
+
+  `colectivos` y `colaboradores` (la colección física se llama `colaboradors`, el plural que arma Mongoose) siguen siendo las entidades a las que apunta `ContextoUsuario`. Además de los atributos del diseño, se conservan los que ya usaba la aplicación y no reemplazan ninguna relación: `Usuario.nombre`, `fechaAlta` y `versionContextos` (escritura de control de las transacciones); `ContextoUsuario.activo`, `fechaAlta` y `fechaBaja`; `IdentidadExterna.fechaAlta`; `Permiso.descripcion`; y `nombre`, `mecanismo` y `activo` del proveedor.
+
+- MongoDB no tiene claves foráneas: la integridad referencial se valida en la capa de persistencia de `src/security` antes de escribir (el usuario, el colectivo o el colaborador de un contexto, la identidad de un usuario, el proveedor de una identidad, y que el contexto actual sea un contexto activo del propio usuario) y las escrituras relacionadas van en una transacción. Los validadores `$jsonSchema` de `usuarios`, `identidadesExternas`, `rolesXPermisos` y `contextosUsuario` rechazan en la base una referencia obligatoria ausente o que no sea un `ObjectId`.
+- Cada `Usuario` nace con `nombre` nulo y `contextoActualId` nulo. Dos proveedores pueden emitir el mismo identificador externo (`sub`) sin compartir cuenta. Si una nueva cuenta de Logto tiene otro `sub`, su primer `POST /auth/registro` crea una identidad externa y un usuario interno distintos. El correo y el nombre que el proveedor incluya en sus claims se mantienen fuera del registro interno.
+- `Usuario.nombre` se completa o cambia mediante `PUT /auth/usuario`. La API lo pide al crear un colectivo, crear un perfil de colaboradora o enviar una solicitud de ingreso (409 `NOMBRE_REQUERIDO`), y lo usa al listar miembros y solicitudes del colectivo. El perfil público de colaboradora mantiene su identificación propia.
+- Un contexto activo `COLABORADOR` representa el único perfil activo de la persona. Un contexto activo `COLECTIVO` representa su membresía en ese colectivo como `MIEMBRO` o `LIDER`. El usuario puede tener varios colectivos o ninguno. Una cuenta puede tener a la vez su perfil de colaboradora y contextos de colectivo, de forma independiente: cada contexto es de un solo tipo, y cada pedido opera en el que indica `X-Context-Id`. Una cuenta no puede postularse a proyectos de un colectivo donde participa como `LIDER` o `MIEMBRO` (422 `POSTULACION_EN_COLECTIVO_PROPIO`). Si ya se había postulado y después entra al colectivo, la postulación sigue, pero desde un contexto de colectivo no puede aceptarla, rechazarla, finalizarla, desvincularla ni valorarla como colectivo (422 `COLABORACION_PROPIA`); como colaboradora sí.
+- El seed toma los nombres y la matriz de `src/security/autorizacion/rolesYPermisos.js`, actualiza `tiposContexto`, `roles` y `permisos` por nombre y deja en `rolesXPermisos` exactamente un documento por cada permiso de cada rol (agrega los que faltan y quita los que sobran). La API arma su catálogo de autorización leyendo `roles`, `rolesXPermisos` y `permisos` al arrancar. Un cambio en código surte efecto al reiniciar la aplicación. Qué roles admite cada tipo de contexto es una regla de la aplicación (`ROLES_POR_TIPO`), no una relación entre `Rol` y `TipoContexto`. Los proveedores configurados se siembran por su código (campo `proveedor`) y conservan su indicador `activo` en MongoDB. Los repositorios traducen entre los nombres que usa el dominio (`LIDER`, `COLECTIVO`) y las referencias guardadas (`rolId`, `tipoContextoId`). Los miembros y el líder operan sobre proyectos y colaboraciones y consultan solicitudes y estadísticas. Solo el líder puede editar el colectivo y sus contactos, darlo de baja, aceptar o rechazar ingresos, quitar miembros y transferir el liderazgo. El listado de miembros está disponible para `MIEMBRO` y `LIDER` del colectivo seleccionado en su contexto actual. [Auditoría de autenticación y contextos](packages/backend/AUDITORIA-AUTH-CONTEXTOS.md)
 
 **Flujo HTTP**
 
 1. M1 (`src/security/http/autenticacion.js`) valida el Bearer. El registro de proveedores usa el emisor leído inicialmente para elegir adaptador. OIDC/JWT verifica firma con JWKS, algoritmo permitido, emisor, audiencia de la API, `sub`, `exp`, `iat`, `nbf` si está presente y los claims adicionales configurados. Un encabezado mal formado devuelve 401 `TOKEN_INVALIDO`. Si falla la disponibilidad de JWKS, devuelve 503 `PROVEEDOR_NO_DISPONIBLE`.
-2. M2 (`identificacion.js`) recupera la identidad externa y su usuario. Si falta el registro en una ruta de usuario, devuelve 403 `USUARIO_NO_REGISTRADO`. `POST /auth/registro` requiere solo M1 y crea ambos documentos en una transacción. Las rutas de cuenta, alta de modalidad y solicitud propia usan M2 y pueden operar sin contexto.
+2. M2 (`identificacion.js`) recupera la identidad externa (por proveedor e identificador externo) y el usuario que la referencia. Si falta el registro en una ruta de usuario, devuelve 403 `USUARIO_NO_REGISTRADO`. `POST /auth/registro` requiere solo M1 y crea ambos documentos en una transacción. Las rutas de cuenta, alta de modalidad y solicitud propia usan M2 y pueden operar sin contexto.
 3. M3 (`autorizarEnContexto.js`) protege las operaciones que se ejecutan en nombre de una colaboradora o colectivo. Valida que `X-Context-Id` sea del usuario, coincida con su contexto actual, esté activo, tenga una entidad asociada activa y posea el permiso de la ruta. Los guards de recurso verifican que el ID de negocio corresponda al contexto. Según el caso, la API responde `CONTEXTO_REQUERIDO` (400), `CONTEXTO_INVALIDO` (403), `CONTEXTO_NO_ACTUAL` (409), `CONTEXTO_INACTIVO` (403) o `PERMISO_INSUFICIENTE` (403).
 
 `Usuario.contextoActualId` es global. Elegir otro contexto afecta las demás ventanas y dispositivos. Un cliente con un contexto anterior puede actualizar su vista con `GET /auth/me`. El logout intenta limpiarlo con `DELETE /auth/contexto-actual`. Si la API está indisponible, la limpieza queda sin confirmar.
@@ -340,9 +365,9 @@ La compatibilidad transitoria `COMPAT_CONTEXTO_IMPLICITO=true` acepta la ausenci
 
 `AUTH_PROVEEDORES` acepta un arreglo JSON de proveedores con `codigo`, `mecanismo`, `issuers`, `audiencia`, `jwksUri` y `algoritmos`. Para `OIDC_JWT` se pueden configurar `tipo` del encabezado JWT, `claimsObligatorios`, `toleranciaReloj` y `cooldownJwksMs`. La audiencia se configura con el identificador de la API. Los emisores y JWKS usan HTTPS en producción. Códigos o emisores repetidos, algoritmos fuera de la lista asimétrica y una lista sin proveedores habilitados impiden el arranque con autenticación. Un proveedor compatible con OIDC/JWT se configura sin modificar el negocio. Un protocolo distinto requiere un adaptador y su mecanismo de selección en `src/security/auth`.
 
-Al arrancar, la API comprueba que MongoDB soporte transacciones, instala o actualiza el validador de contextos, asegura los índices declarados mediante `createIndexes()` y siembra los catálogos de seguridad y habilidades. Un error de persistencia en esas operaciones detiene el inicio. La cuenta de MongoDB necesita permisos para crear índices y colecciones y ejecutar `collMod` en la colección de contextos existente. El arranque ejecuta las migraciones 002 de proyectos y colaboraciones, 003 de envíos y 004 de unicidad del perfil activo. En bases que ya tienen el índice anterior, la 004 instala el índice nuevo antes de retirar el anterior y conserva los documentos.
+Al arrancar, la API comprueba que MongoDB soporte transacciones y que la base no tenga documentos del modelo de seguridad anterior, asegura los índices declarados mediante `createIndexes()`, siembra los catálogos de seguridad, instala o actualiza los validadores de `usuarios`, `identidadesExternas`, `rolesXPermisos` y `contextosUsuario`, crea el índice único del líder activo (que referencia al rol `LIDER` sembrado) y siembra las habilidades. El modelo no migra datos de la versión anterior: si la base los tiene, el arranque se detiene con un mensaje que pide recrearla (`docker compose down -v && docker compose up -d`). Un error de persistencia en esas operaciones detiene el inicio. La cuenta de MongoDB necesita permisos para crear índices y colecciones y ejecutar `collMod` en la colección de contextos existente. El arranque ejecuta las migraciones 002 de proyectos y colaboraciones, 003 de envíos y 004 de unicidad del perfil activo. En bases que ya tienen el índice anterior, la 004 instala el índice nuevo antes de retirar el anterior y conserva los documentos.
 
-El validador exige ambos campos de asociación en un contexto. Según el tipo, uno es ObjectId y el otro es explícitamente nulo. Los índices únicos cubren la identidad externa, el perfil activo por usuario, la membresía por usuario y colectivo, el líder activo y la solicitud pendiente. Las referencias entre documentos y la exclusividad de modalidades se coordinan en transacciones. Las altas y la aceptación comparten una escritura de control sobre el usuario. La publicación y las solicitudes de ingreso comparten una escritura de control sobre el colectivo con su baja. Una escritura de control sobre el perfil coordina la baja de colaboradora con nuevas postulaciones.
+El validador exige ambos campos de asociación en un contexto. Según el tipo, uno es ObjectId y el otro es explícitamente nulo. Los índices únicos cubren la identidad externa, el perfil activo por usuario, la membresía por usuario y colectivo, el líder activo y la solicitud pendiente. Las referencias entre documentos y el límite de un perfil de colaboradora activo por cuenta se coordinan en transacciones. Las altas, la aceptación de ingresos y las postulaciones comparten una escritura de control sobre el usuario: evita el alta doble de un perfil y ordena una aceptación contra una postulación simultánea a un proyecto del mismo colectivo. La publicación y las solicitudes de ingreso comparten una escritura de control sobre el colectivo con su baja. Una escritura de control sobre el perfil coordina la baja de colaboradora con nuevas postulaciones.
 
 Las operaciones reservadas al líder confirman el contexto actual dentro de su transacción. El cambio de contexto, el logout y la escritura privilegiada se ordenan mediante el documento del usuario. La baja de colectivo confirma en conjunto colectivo, cierre de proyectos y colaboraciones, solicitudes pendientes, membresías, contextos actuales y notificaciones encoladas. El job de envíos despacha después del commit. La baja de colaboradora es definitiva para ese perfil y conserva su historial. Se rechaza con `ACTIVIDAD_EN_CURSO` mientras haya postulaciones pendientes o colaboraciones aceptadas. Para volver, la misma cuenta usa `POST /colaboradores`. La API crea un perfil y un contexto distintos y selecciona ese contexto. Los perfiles y contextos anteriores conservan sus IDs y su historial.
 
@@ -353,6 +378,46 @@ El replica set de un solo nodo de Docker habilita transacciones en desarrollo y 
 1. Iniciar el back con las dos variables y el front con `VITE_LOGTO_ENDPOINT`, `VITE_LOGTO_APP_ID` y `VITE_LOGTO_API_RESOURCE`.
 2. Enviar el access token a `POST /auth/registro` y luego a `GET /auth/me`. Una cuenta recién registrada recibe 200 con `usuario.nombre: null` y `contextoActual: null`. Un token ausente o vencido recibe 401.
 3. Recorrer en el front: registro, alta del perfil, recarga de la página, cierre de sesión y vencimiento del token (esperar a que expire o acortar su vida en Logto).
+
+## Administración de la plataforma
+
+Hay un tercer tipo de contexto, `ADMINISTRACION`, con el rol `ADMIN`. No apunta a un
+colectivo ni a una colaboradora, y una cuenta puede tenerlo junto con los otros dos:
+cada pedido opera solo con el contexto que indica `X-Context-Id`. El rol no se pide
+desde la aplicación: el primer administrador se crea con el comando
+
+```bash
+npm run admin:otorgar -- <usuarioId | proveedor:sub>
+```
+
+(la cuenta tiene que haberse registrado antes con `POST /auth/registro`) y los siguientes los
+otorga un administrador con `POST /administracion/administradores`.
+
+| Ruta                                                     | Permiso             | Qué hace                                                         |
+| -------------------------------------------------------- | ------------------- | ---------------------------------------------------------------- |
+| `GET /administracion/auditoria`                          | `AUDITORIA_VER`     | Acciones administrativas, filtrables por acción, entidad y fecha |
+| `GET /administracion/revisiones`                         | `REVISION_VER`      | Cola de revisiones, filtrable por estado y motivo                |
+| `POST /administracion/revisiones/:id/resolucion`         | `REVISION_RESOLVER` | Pasa una revisión a `REVISADA` o `DESCARTADA`                    |
+| `PUT` / `DELETE /administracion/proyectos/:id/destacado` | `PROYECTO_DESTACAR` | Destaca un proyecto hasta una fecha futura, o lo quita           |
+| `POST /administracion/administradores`                   | `ADMIN_GESTIONAR`   | Otorga el rol a otra cuenta                                      |
+
+- **Auditoría.** Toda acción administrativa que cambia datos escribe su registro en la misma
+  transacción: sin registro, no hay cambio. Las altas hechas por el comando quedan sin autor y
+  con `origen: COMANDO`.
+- **Destacados.** Solo proyectos abiertos de un colectivo activo, con vencimiento futuro y un
+  máximo de `MAX_DESTACADOS_ACTIVOS` vigentes. El vencimiento se resuelve al consultar, sin job.
+  Los listados públicos ordenan primero los vigentes; `GET /proyectos/destacados` los devuelve
+  con el que menos tiempo lleva destacado primero.
+- **Revisiones.** Un job crea una revisión `SIN_ACTUALIZACIONES` para cada proyecto abierto con
+  al menos una colaboración aceptada y sin avances, logros ni aceptaciones en
+  `DIAS_SIN_ACTUALIZACIONES` días. Es idempotente (índice único parcial sobre las pendientes)
+  y no avisa a nadie: los administradores la ven en el listado. Una revisión resuelta no se
+  vuelve a crear hasta que pase otro período completo.
+- **Conflicto de intereses.** Un administrador que además es líder o miembro de un colectivo
+  no puede destacar, quitar el destacado ni resolver revisiones de los proyectos de ese
+  colectivo (422 `CONFLICTO_DE_INTERESES`).
+
+La spec completa está en [docs/administracion-de-plataforma.md](docs/administracion-de-plataforma.md).
 
 ## Puesta en marcha
 
@@ -399,19 +464,21 @@ npm run dev:backend                                # con recarga automática
 El `.env` tiene que tener `MONGO_URI`; si falta, el backend no arranca. El puerto
 sale de `SERVER_PORT` (default 8000) y el backend escucha en `0.0.0.0`. Al
 arrancar carga el catálogo de habilidades semilla si la colección está vacía,
-asegura los catálogos de roles y permisos, instala el validador de
-`contextosUsuario` y corre las migraciones pendientes.
+asegura los catálogos de seguridad (tipos de contexto, roles, permisos,
+`rolesXPermisos` y proveedores), instala los validadores de las colecciones de
+seguridad y corre las migraciones pendientes.
 
 ## Scripts
 
-| Comando                    | Qué hace                                                    |
-| -------------------------- | ----------------------------------------------------------- |
-| `npm run dev:backend`      | Backend con recarga automática (`node --watch`)             |
-| `npm run start:backend`    | Backend sin recarga (es el que corre dentro del contenedor) |
-| `npm test`                 | Todos los tests (Jest, contra un MongoDB que levanta solo)  |
-| `npm run test:integracion` | Solo los de `tests/integracion`                             |
-| `npm run lint`             | ESLint sobre todo el repo                                   |
-| `npm run format`           | Prettier sobre todo el repo                                 |
+| Comando                                                 | Qué hace                                                                 |
+| ------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `npm run dev:backend`                                   | Backend con recarga automática (`node --watch`)                          |
+| `npm run start:backend`                                 | Backend sin recarga (es el que corre dentro del contenedor)              |
+| `npm test`                                              | Todos los tests (Jest, contra un MongoDB que levanta solo)               |
+| `npm run test:integracion`                              | Solo los de `tests/integracion`                                          |
+| `npm run lint`                                          | ESLint sobre todo el repo                                                |
+| `npm run admin:otorgar -- <usuarioId \| proveedor:sub>` | Otorga el rol de administración a una cuenta ya registrada (idempotente) |
+| `npm run format`                                        | Prettier sobre todo el repo                                              |
 
 ## Tests
 
@@ -439,15 +506,17 @@ npm run test:integracion                     # solo tests/integracion
 npm test --workspace=backend -- --watch      # en watch
 ```
 
-| Archivo de integración            | Qué prueba                                                                                                                                            |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `persistencia.test.js`            | Cada entidad vuelve de la base con **todos** sus campos (Mongoose descarta en silencio lo que no está en el schema)                                   |
-| `busquedas.test.js`               | Las búsquedas de colaboradoras y proyectos potenciales, contra las reglas de `reglasDeBusqueda.js`                                                    |
-| `estadisticas.test.js`            | Los pipelines de estadísticas                                                                                                                         |
-| `concurrencia.test.js`            | Concurrencia optimista por proyecto: dos aceptaciones simultáneas no superan el cupo; editar un proyecto no choca con postularse a otro               |
-| `migracionProyectos.test.js`      | Migraciones 002 (proyectos y colaboraciones a sus colecciones) y 003 (envíos con estado)                                                              |
-| `api.test.js`                     | La app Express entera contra Mongo (test de integración de controladores)                                                                             |
-| `contextosYTransacciones.test.js` | Rollback de un alta que falla, índices únicos de contextos, validador `$jsonSchema`, transferencia de liderazgo concurrente y la migración de cuentas |
+| Archivo de integración               | Qué prueba                                                                                                                                            |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `administracionConcurrencia.test.js` | Tope de destacados con pedidos simultáneos, rollback de la auditoría e índice parcial de revisiones                                                   |
+| `contextoAdministracion.test.js`     | Validador `$jsonSchema` e índice único del contexto de administración                                                                                 |
+| `persistencia.test.js`               | Cada entidad vuelve de la base con **todos** sus campos (Mongoose descarta en silencio lo que no está en el schema)                                   |
+| `busquedas.test.js`                  | Las búsquedas de colaboradoras y proyectos potenciales, contra las reglas de `reglasDeBusqueda.js`                                                    |
+| `estadisticas.test.js`               | Los pipelines de estadísticas                                                                                                                         |
+| `concurrencia.test.js`               | Concurrencia optimista por proyecto: dos aceptaciones simultáneas no superan el cupo; editar un proyecto no choca con postularse a otro               |
+| `migracionProyectos.test.js`         | Migraciones 002 (proyectos y colaboraciones a sus colecciones) y 003 (envíos con estado)                                                              |
+| `api.test.js`                        | La app Express entera contra Mongo (test de integración de controladores)                                                                             |
+| `contextosYTransacciones.test.js`    | Rollback de un alta que falla, índices únicos de contextos, validador `$jsonSchema`, transferencia de liderazgo concurrente y la migración de cuentas |
 
 ## Despliegue
 

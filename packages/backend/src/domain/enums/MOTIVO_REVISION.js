@@ -1,0 +1,3 @@
+export const MOTIVO_REVISION = Object.freeze({
+  SIN_ACTUALIZACIONES: "SIN_ACTUALIZACIONES",
+});

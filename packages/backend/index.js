@@ -2,14 +2,16 @@ import "dotenv/config";
 import mongoose from "mongoose";
 import { configuracionDeProceso } from "./src/config/entorno.js";
 import { registrarApagado } from "./src/config/apagado.js";
-import { componerApp } from "./src/composicion.js";
+import { componerApp, crearRepositoriosMongo } from "./src/composicion.js";
 import { crearApp } from "./src/app.js";
 import { cargarHabilidadesIniciales } from "./src/seed/habilidadesSeed.js";
 import { asegurarCatalogos } from "./src/security/catalogosSeed.js";
 import { asegurarIndices, conectarBaseDeDatos } from "./src/config/db.js";
-import { asegurarValidadores } from "./src/security/persistencia/validadoresDeColecciones.js";
+import {
+  asegurarValidadores,
+  exigirModeloVigente,
+} from "./src/security/persistencia/validadoresDeColecciones.js";
 import { ejecutarMigraciones } from "./src/migraciones/ejecutarMigraciones.js";
-import { MongoCatalogoRepository } from "./src/security/persistencia/MongoCatalogoRepository.js";
 import { CatalogoDeRoles } from "./src/security/autorizacion/CatalogoDeRoles.js";
 import {
   crearAutenticador,
@@ -17,6 +19,7 @@ import {
 } from "./src/security/auth/configuracionAuth.js";
 import { iniciarCierreAutomatico } from "./src/jobs/cierreAutomatico.js";
 import { iniciarEnviosPendientes } from "./src/jobs/enviosPendientes.js";
+import { iniciarSeguimiento } from "./src/jobs/seguimiento.js";
 import { registro } from "./src/config/registro.js";
 
 const configuracion = configuracionDeProceso();
@@ -28,13 +31,15 @@ const proveedores = proveedoresDesdeEntorno();
 let detenerTareas = [];
 try {
   await conectarBaseDeDatos();
-  await asegurarValidadores();
+  await exigirModeloVigente();
   await asegurarIndices();
 
+  const repositorios = crearRepositoriosMongo();
   const { roles, proveedoresActivos } = await asegurarCatalogos(
-    new MongoCatalogoRepository(),
+    repositorios.catalogoRepository,
     proveedores,
   );
+  await asegurarValidadores(repositorios.catalogoRepository);
   await ejecutarMigraciones();
 
   const autenticador = crearAutenticador(proveedores, proveedoresActivos);
@@ -48,9 +53,14 @@ try {
   }
 
   const { controllers, services, autorizacion } = componerApp({
+    repositorios,
     autenticador,
     catalogoDeRoles: new CatalogoDeRoles(roles),
     compatContextoImplicito,
+    configuracionAdministracion: {
+      diasSinActualizaciones: configuracion.diasSinActualizaciones,
+      maxDestacadosActivos: configuracion.maxDestacadosActivos,
+    },
   });
 
   await cargarHabilidadesIniciales(services.habilidadService);
@@ -63,7 +73,11 @@ try {
     intervaloMs: configuracion.enviosMs,
   });
 
-  detenerTareas = [detenerCierre, detenerEnvios];
+  const detenerSeguimiento = iniciarSeguimiento(services.revisionService, {
+    intervaloMs: configuracion.seguimientoMs,
+  });
+
+  detenerTareas = [detenerCierre, detenerEnvios, detenerSeguimiento];
   const app = crearApp(controllers, { autorizacion });
 
   const servidor = app.listen(port, host, () => {

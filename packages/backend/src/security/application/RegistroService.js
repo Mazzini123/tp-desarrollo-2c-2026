@@ -14,10 +14,9 @@ export class RegistroService {
           (await this.identidadExternaRepository.buscar(proveedor, sub)) ??
           (await this.identidadExternaRepository.crear({
             proveedor,
-            sub,
-            usuarioId: this.usuarioRepository.nuevoId(),
+            identificadorExterno: sub,
           }));
-        return this.usuarioRepository.asegurar(identidad.usuarioId);
+        return this.usuarioRepository.asegurarDeIdentidad(identidad._id);
       });
 
     try {
@@ -37,6 +36,6 @@ export class RegistroService {
 
   async usuarioDe({ proveedor, sub }) {
     const identidad = await this.identidadExternaRepository.buscar(proveedor, sub);
-    return identidad ? this.usuarioRepository.buscarPorId(identidad.usuarioId) : null;
+    return identidad ? this.usuarioRepository.buscarPorIdentidad(identidad._id) : null;
   }
 }

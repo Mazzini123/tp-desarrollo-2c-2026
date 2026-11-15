@@ -44,11 +44,18 @@ export class ContextoService {
     if (contexto.tipo === TIPO_CONTEXTO.COLECTIVO) {
       return Boolean(await this.colectivoActivo(contexto.colectivoId));
     }
+    if (contexto.tipo === TIPO_CONTEXTO.ADMINISTRACION) return true;
     if (contexto.tipo !== TIPO_CONTEXTO.COLABORADOR) return false;
     const colaborador = await this.colaboradorRepository.buscarPorId(
       contexto.colaboradorId,
     );
     return Boolean(colaborador && !colaborador.fechaBaja);
+  }
+
+  async usuarioIdDeColaborador(colaboradorId) {
+    const contexto =
+      await this.contextoUsuarioRepository.buscarDeColaborador(colaboradorId);
+    return contexto ? contexto.usuarioId : null;
   }
 
   async validosDe(usuarioId) {
@@ -60,17 +67,6 @@ export class ContextoService {
       }
     }
     return validos;
-  }
-
-  async exigirSinModalidad(usuarioId, tipo) {
-    if (await this.contextoUsuarioRepository.existeActivoDeTipo(usuarioId, tipo)) {
-      throw new ConflictError(
-        tipo === TIPO_CONTEXTO.COLECTIVO
-          ? "La cuenta opera como colectivo: no puede tener ademas un perfil de colaboradora"
-          : "La cuenta opera como colaboradora: no puede operar ademas como colectivo",
-        CODIGO_ERROR.MODALIDAD_INCOMPATIBLE,
-      );
-    }
   }
 
   async describir(contexto) {
@@ -89,7 +85,7 @@ export class ContextoService {
       descripcion.colectivo = colectivo
         ? { id: colectivo.id, nombre: colectivo.nombre }
         : null;
-    } else {
+    } else if (contexto.tipo === TIPO_CONTEXTO.COLABORADOR) {
       const colaborador = await this.colaboradorRepository.buscarPorId(
         String(contexto.colaboradorId),
       );

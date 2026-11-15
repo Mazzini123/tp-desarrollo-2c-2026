@@ -3,6 +3,8 @@ import { UnauthorizedError } from "../errors/UnauthorizedError.js";
 import { ConflictError } from "../errors/ConflictError.js";
 import { CODIGO_ERROR } from "../errors/CODIGO_ERROR.js";
 import { ForbiddenError } from "../errors/ForbiddenError.js";
+import { DomainError } from "../errors/DomainError.js";
+import { mismoId } from "../utils/ids.js";
 import {
   crearAutenticacion,
   exigirAutenticacion,
@@ -57,6 +59,7 @@ export function autorizacionDesactivada() {
     colaboradoraDelBody: pasar,
     participanteDeLaColaboracion: () => pasar,
     autorDeLaValoracion: pasar,
+    colaboracionAjena: pasar,
   };
 }
 
@@ -104,6 +107,28 @@ export function crearAutorizacion({
       req.params.colaboracionId,
     );
     return duena === colaboradorId;
+  };
+
+  const esColaboracionPropia = async (req) => {
+    if (!colectivoDelContexto(req.contexto)) {
+      return false;
+    }
+    const colaboradorId = await proyectoService.colaboradorIdDe(
+      req.params.id,
+      req.params.colaboracionId,
+    );
+    if (!colaboradorId) {
+      return false;
+    }
+    const usuarioId = await contextoService.usuarioIdDeColaborador(colaboradorId);
+    return Boolean(usuarioId) && mismoId(usuarioId, req.usuario._id);
+  };
+
+  const rechazarColaboracionPropia = () => {
+    throw new DomainError(
+      "No podés gestionar tu propia colaboración desde un colectivo",
+      CODIGO_ERROR.COLABORACION_PROPIA,
+    );
   };
 
   const prohibir = () => {
@@ -160,14 +185,24 @@ export function crearAutorizacion({
         }
       }),
 
+    colaboracionAjena: guarda(async (req) => {
+      exigirSesion(req);
+      if (await esColaboracionPropia(req)) {
+        rechazarColaboracionPropia();
+      }
+    }),
+
     autorDeLaValoracion: guarda(async (req) => {
       exigirSesion(req);
-      const permitido =
-        req.body.autor === AUTOR_VALORACION.COLECTIVO
-          ? await esDuenoDelProyecto(req)
-          : await esLaPersonaDeLaColaboracion(req);
+      const comoColectivo = req.body.autor === AUTOR_VALORACION.COLECTIVO;
+      const permitido = comoColectivo
+        ? await esDuenoDelProyecto(req)
+        : await esLaPersonaDeLaColaboracion(req);
       if (!permitido) {
         prohibir();
+      }
+      if (comoColectivo && (await esColaboracionPropia(req))) {
+        rechazarColaboracionPropia();
       }
     }),
   };

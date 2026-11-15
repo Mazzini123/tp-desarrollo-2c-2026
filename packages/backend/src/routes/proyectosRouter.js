@@ -31,13 +31,14 @@ export function crearProyectosRouter(controllers, autorizacion) {
     avance: avanceController,
   } = controllers;
   const router = validarIdsDeRuta(Router());
-  const { permiso, duenoDelProyecto } = autorizacion;
+  const { permiso, duenoDelProyecto, colaboracionAjena } = autorizacion;
   const delDueno = (codigo) => [permiso(codigo), duenoDelProyecto];
   const editar = delDueno(PERMISO.PROYECTO_EDITAR);
   const reclutar = delDueno(PERMISO.RECLUTAMIENTO_GESTIONAR);
   const resolverPostulacion = delDueno(PERMISO.POSTULACION_RESOLVER);
 
   router.get("/", validarQuery(listadoDeProyectosSchema), proyectoController.listar);
+  router.get("/destacados", proyectoController.listarDestacados);
   router.get("/:id", autorizacion.opcional, proyectoController.obtenerPorId);
   router.put(
     "/:id",
@@ -127,11 +128,13 @@ export function crearProyectosRouter(controllers, autorizacion) {
   router.post(
     "/:id/colaboraciones/:colaboracionId/aceptacion",
     resolverPostulacion,
+    colaboracionAjena,
     postulacionController.aceptar,
   );
   router.post(
     "/:id/colaboraciones/:colaboracionId/rechazo",
     resolverPostulacion,
+    colaboracionAjena,
     postulacionController.rechazar,
   );
   router.post(
@@ -144,6 +147,7 @@ export function crearProyectosRouter(controllers, autorizacion) {
     "/:id/colaboraciones/:colaboracionId/desvinculacion",
     permiso(PERMISO.COLABORACION_DESVINCULAR),
     autorizacion.participanteDeLaColaboracion(),
+    colaboracionAjena,
     postulacionController.desvincular,
   );
 
@@ -151,6 +155,7 @@ export function crearProyectosRouter(controllers, autorizacion) {
     "/:id/colaboraciones/:colaboracionId/finalizacion",
     permiso(PERMISO.COLABORACION_FINALIZAR),
     autorizacion.participanteDeLaColaboracion(),
+    colaboracionAjena,
     postulacionController.finalizar,
   );
   router.post(

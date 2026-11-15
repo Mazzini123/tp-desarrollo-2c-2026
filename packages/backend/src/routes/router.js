@@ -7,6 +7,7 @@ import { crearColaboradoresRouter } from "./colaboradoresRouter.js";
 import { crearEstadisticasRouter } from "./estadisticasRouter.js";
 import { crearCatalogosRouter } from "./catalogosRouter.js";
 import { crearCuentaRouter } from "./cuentaRouter.js";
+import { crearAdministracionRouter } from "./administracionRouter.js";
 import { autorizacionDesactivada } from "../middlewares/autorizacion.js";
 
 export function crearRouter(controllers, autorizacion = autorizacionDesactivada()) {
@@ -21,6 +22,10 @@ export function crearRouter(controllers, autorizacion = autorizacionDesactivada(
   router.use("/habilidades", crearHabilidadesRouter(controllers.habilidad));
   router.use("/colaboradores", crearColaboradoresRouter(controllers, autorizacion));
   router.use("/auth", crearCuentaRouter(controllers.cuenta, autorizacion));
+  router.use(
+    "/administracion",
+    crearAdministracionRouter(controllers.administracion, autorizacion),
+  );
 
   return router;
 }

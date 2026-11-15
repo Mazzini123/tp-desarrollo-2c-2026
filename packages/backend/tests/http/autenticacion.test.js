@@ -38,6 +38,7 @@ async function armar() {
   };
   const crearPersona = async (cuenta, extra = {}) => {
     await registrar(cuenta);
+    await api.put("/auth/usuario").set(como(cuenta)).send({ nombre: cuenta }).expect(200);
     return (
       await api
         .post("/colaboradores")
@@ -83,7 +84,7 @@ describe("HTTP · sesion y cuenta", () => {
     expect(persona).not.toHaveProperty("cuentaId");
   });
 
-  test("las altas asocian el perfil a la cuenta y las modalidades no se mezclan", async () => {
+  test("las altas asocian el perfil a la cuenta y una misma cuenta suma colectivos y perfil", async () => {
     const { api, crearColectivo } = await armar();
 
     await api
@@ -100,12 +101,18 @@ describe("HTTP · sesion y cuenta", () => {
       .set(como("fundacion"))
       .send({ nombre: "Otro", descripcion: "d", tipoColectivo: "ONG" })
       .expect(201);
-    const conflicto = await api
+    const perfil = await api
       .post("/colaboradores")
       .set(como("fundacion"))
       .send({ cuentaGit: "ada" })
-      .expect(409);
-    expect(conflicto.body.codigo).toBe("MODALIDAD_INCOMPATIBLE");
+      .expect(201);
+    const cuenta = await api.get("/auth/me").set(como("fundacion")).expect(200);
+    expect(cuenta.body).toMatchObject({ rol: "COLABORADORA", perfilId: perfil.body.id });
+    expect(cuenta.body.contextos.map((c) => c.tipo).sort()).toEqual([
+      "COLABORADOR",
+      "COLECTIVO",
+      "COLECTIVO",
+    ]);
   });
 
   test("las lecturas publicas siguen abiertas sin sesion", async () => {
@@ -312,6 +319,11 @@ describe("HTTP · postulaciones, bandeja y contacto", () => {
   test("buscar y invitar candidatas es del dueño y no expone contactos", async () => {
     const { api, ada, proyecto, registrar } = await conPostulacion();
     await registrar("linus");
+    await api
+      .put("/auth/usuario")
+      .set(como("linus"))
+      .send({ nombre: "Linus" })
+      .expect(200);
     const nuevo = await api
       .post("/colaboradores")
       .set(como("linus"))
