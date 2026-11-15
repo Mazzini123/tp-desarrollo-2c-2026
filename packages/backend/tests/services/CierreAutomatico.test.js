@@ -1,4 +1,9 @@
-import { armarServices, crearColectivoDePrueba, datosDePerfil, CODIGOS } from "../fixtures.js";
+import {
+  armarServices,
+  crearColectivoDePrueba,
+  datosDePerfil,
+  CODIGOS,
+} from "../fixtures.js";
 import { DomainError } from "../../src/errors/DomainError.js";
 import { ConflictError } from "../../src/errors/ConflictError.js";
 
@@ -20,8 +25,12 @@ describe("Cierre automatico de proyectos", () => {
         colectivoId: colectivo.id,
         titulo: "Sitio",
         descripcion: "...",
-        perfiles: [datosDePerfil({ requeridas: [CODIGOS.node] })],
-        modoAceptacion: "REVISION_MANUAL",
+        perfiles: [
+          datosDePerfil({
+            requeridas: [CODIGOS.node],
+            modoAceptacion: "REVISION_MANUAL",
+          }),
+        ],
         fechaCierre: MANANA,
       },
       HOY,
@@ -31,7 +40,11 @@ describe("Cierre automatico de proyectos", () => {
       codigosHabilidades: [CODIGOS.node],
     });
     pendiente = await services.colaboracionService.registrar(
-      { proyectoId: proyecto.id, colaboradorId: ada.id },
+      {
+        proyectoId: proyecto.id,
+        perfilId: proyecto.perfiles[0].id,
+        colaboradorId: ada.id,
+      },
       HOY,
     );
   });
@@ -59,11 +72,17 @@ describe("Cierre automatico de proyectos", () => {
 
     await expect(
       services.colaboracionService.registrar(
-        { proyectoId: proyecto.id, colaboradorId: grace.id },
+        {
+          proyectoId: proyecto.id,
+          perfilId: proyecto.perfiles[0].id,
+          colaboradorId: grace.id,
+        },
         PASADO,
       ),
     ).rejects.toThrow(ConflictError);
-    expect(proyecto.estado).toBe("FINALIZADO");
+    expect((await services.proyectoService.buscarPorId(proyecto.id)).estado).toBe(
+      "FINALIZADO",
+    );
   });
 
   test("ni aceptar una postulacion que habia quedado pendiente", async () => {
@@ -74,7 +93,8 @@ describe("Cierre automatico de proyectos", () => {
 
   test("el cierre manual tiene las mismas consecuencias", async () => {
     await services.proyectoService.finalizar(proyecto.id, HOY);
-    expect(pendiente.estado).toBe("RECHAZADA");
+    const guardado = await services.proyectoService.buscarPorId(proyecto.id);
+    expect(guardado.buscarColaboracion(pendiente.id).estado).toBe("RECHAZADA");
   });
 
   test("la fecha de cierre tiene que ser futura, y se puede sacar", async () => {

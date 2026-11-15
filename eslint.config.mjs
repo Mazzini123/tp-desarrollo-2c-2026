@@ -9,7 +9,7 @@ export default [
   {
     files: ["packages/backend/**/*.js"],
     languageOptions: {
-      ecmaVersion: 2022,
+      ecmaVersion: "latest",
       sourceType: "module",
       globals: {
         ...globals.node,
@@ -17,7 +17,10 @@ export default [
       },
     },
     rules: {
-      "no-unused-vars": ["warn", { argsIgnorePattern: "^_|^next$" }],
+      "no-unused-vars": [
+        "warn",
+        { argsIgnorePattern: "^_|^next$", varsIgnorePattern: "^_" },
+      ],
     },
   },
 ];

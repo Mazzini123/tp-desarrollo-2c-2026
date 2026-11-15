@@ -1,26 +1,32 @@
 export class LogroController {
-    constructor({ logroService }) {
-        this.logroService = logroService
-    }
+  constructor({ logroService }) {
+    this.logroService = logroService;
+  }
 
-    crearParaProyecto = async (req, res) => {
-        res.status(201).json(await this.logroService.crearParaProyecto(req.params.id, req.body));
-    }
+  crear = async (req, res) => {
+    res.status(201).json(await this.logroService.crear(req.params.id, req.body));
+  };
 
-    conseguirTodosDeProyecto = async (req, res) => {
-        res.status(200).json(await this.logroService.conseguirTodosDeProyecto(req.params.id));
-    }
+  listar = async (req, res) => {
+    res.status(200).json(await this.logroService.listar(req.params.id));
+  };
 
-    conseguirPorIdParaProyecto = async (req, res) => {
-        res.status(200).json(await this.logroService.conseguirPorIdParaProyecto(req.params.id, req.params.logroId));
-    }
+  buscarPorId = async (req, res) => {
+    res
+      .status(200)
+      .json(await this.logroService.buscarPorId(req.params.id, req.params.logroId));
+  };
 
-    actualizarParaProyecto = async (req, res) => {
-        res.status(200).json(await this.logroService.actualizarParaProyecto(req.params.id, req.params.logroId, req.body));
-    }
+  actualizar = async (req, res) => {
+    res
+      .status(200)
+      .json(
+        await this.logroService.actualizar(req.params.id, req.params.logroId, req.body),
+      );
+  };
 
-    eliminarParaProyecto = async (req, res) => {
-        await this.logroService.eliminarParaProyecto(req.params.id, req.params.logroId);
-        res.status(204).send();
-    }
+  eliminar = async (req, res) => {
+    await this.logroService.eliminar(req.params.id, req.params.logroId);
+    res.status(204).send();
+  };
 }

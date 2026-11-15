@@ -1,0 +1,5 @@
+export const ESTADO_AVISO = Object.freeze({
+  PENDIENTE: "PENDIENTE",
+  COMPLETADO: "COMPLETADO",
+  FALLIDO: "FALLIDO",
+});

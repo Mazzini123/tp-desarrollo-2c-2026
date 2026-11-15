@@ -1,3 +1,5 @@
-export function noEncontrado(_req, res) {
-  res.status(404).json({ message: "Recurso no encontrado" });
+import { NotFoundError } from "../errors/NotFoundError.js";
+
+export function noEncontrado(_req, _res, next) {
+  next(new NotFoundError("Recurso no encontrado"));
 }

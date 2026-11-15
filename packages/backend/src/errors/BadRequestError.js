@@ -1,7 +1,7 @@
 import { AppError } from "./AppError.js";
 
 export class BadRequestError extends AppError {
-  constructor(mensaje) {
-    super(mensaje, 400);
+  constructor(mensaje, codigo = null, detalle = null) {
+    super(mensaje, 400, codigo, detalle);
   }
 }

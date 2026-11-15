@@ -1,0 +1,5 @@
+export const ESTADO_BUSQUEDA = Object.freeze({
+  ABIERTA: "ABIERTA",
+  LIMITE_ALCANZADO: "LIMITE_ALCANZADO",
+  CERRADA: "CERRADA",
+});

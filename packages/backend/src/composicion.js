@@ -1,17 +1,39 @@
+import { MongoAvisoRepository } from "./repositories/MongoAvisoRepository.js";
+import { ValoracionService } from "./services/ValoracionService.js";
+import { TimelineService } from "./services/TimelineService.js";
 import nodemailer from "nodemailer";
+import twilio from "twilio";
 
-import { InMemoryColectivoRepository } from "./repositories/InMemoryColectivoRepository.js";
-import { InMemoryHabilidadRepository } from "./repositories/InMemoryHabilidadRepository.js";
 import { MongoHabilidadRepository } from "./repositories/MongoHabilidadRepository.js";
 import { MongoColaboradorRepository } from "./repositories/MongoColaboradorRepository.js";
 import { MongoColectivoRepository } from "./repositories/MongoColectivoRepository.js";
+import { MongoProyectoRepository } from "./repositories/MongoProyectoRepository.js";
+import { MongoAuditoriaRepository } from "./repositories/MongoAuditoriaRepository.js";
+import { MongoRevisionRepository } from "./repositories/MongoRevisionRepository.js";
+import { MongoColaboracionRepository } from "./repositories/MongoColaboracionRepository.js";
 import { MongoNotificacionRepository } from "./repositories/MongoNotificacionRepository.js";
-import { InMemoryNotificacionRepository } from "./repositories/InMemoryNotificacionRepository.js";
-import { InMemoryColaboradorRepository } from "./repositories/InMemoryColaboradorRepository.js";
 import { MongoEstadisticaRepository } from "./repositories/MongoEstadisticaRepository.js";
-import { InMemoryEstadisticaRepository } from "./repositories/InMemoryEstadisticaRepository.js";
 
+import { MongoUsuarioRepository } from "./security/persistencia/MongoUsuarioRepository.js";
+import { MongoIdentidadExternaRepository } from "./security/persistencia/MongoIdentidadExternaRepository.js";
+import { MongoContextoUsuarioRepository } from "./security/persistencia/MongoContextoUsuarioRepository.js";
+import { MongoSolicitudIngresoRepository } from "./security/persistencia/MongoSolicitudIngresoRepository.js";
+import { MongoCatalogoRepository } from "./security/persistencia/MongoCatalogoRepository.js";
+import { transaccionesMongo } from "./config/transacciones.js";
+
+import { CatalogoDeRoles } from "./security/autorizacion/CatalogoDeRoles.js";
+import { RegistroService } from "./security/application/RegistroService.js";
+import { ContextoService } from "./security/application/ContextoService.js";
+import { AdministradorService } from "./security/application/AdministradorService.js";
+import { ModalidadService } from "./services/ModalidadService.js";
+import { MembresiaService } from "./services/MembresiaService.js";
+import { LiderazgoService } from "./security/application/LiderazgoService.js";
+import { CuentaController } from "./controllers/CuentaController.js";
+import { MembresiaController } from "./controllers/MembresiaController.js";
+import { crearAutorizacion } from "./middlewares/autorizacion.js";
 import { CanalEmail } from "./canales/CanalEmail.js";
+import { CanalSMS } from "./canales/CanalSMS.js";
+import { CanalWhatsApp } from "./canales/CanalWhatsApp.js";
 import { CanalSimulado } from "./canales/CanalSimulado.js";
 import { CanalEnMemoria } from "./canales/CanalEnMemoria.js";
 
@@ -27,6 +49,10 @@ import { AvisoAutomaticoService } from "./services/AvisoAutomaticoService.js";
 import { EstadisticaService } from "./services/EstadisticaService.js";
 import { LogroService } from "./services/LogroService.js";
 import { AvanceService } from "./services/AvanceService.js";
+import { AuditoriaService } from "./services/AuditoriaService.js";
+import { ConflictoDeInteresesService } from "./services/ConflictoDeInteresesService.js";
+import { DestacadoService } from "./services/DestacadoService.js";
+import { RevisionService } from "./services/RevisionService.js";
 
 import { ColectivoController } from "./controllers/ColectivoController.js";
 import { ProyectoController } from "./controllers/ProyectoController.js";
@@ -37,44 +63,43 @@ import { NotificacionController } from "./controllers/NotificacionController.js"
 import { ReclutamientoController } from "./controllers/ReclutamientoController.js";
 import { PostulacionController } from "./controllers/PostulacionController.js";
 import { EstadisticaController } from "./controllers/EstadisticaController.js";
-import { LogroController} from "./controllers/LogroController.js"
+import { LogroController } from "./controllers/LogroController.js";
 import { AvanceController } from "./controllers/AvanceController.js";
+import { AdministracionController } from "./controllers/AdministracionController.js";
 
-// Los repositorios de verdad: los que usa la app levantada.
 export function crearRepositoriosMongo() {
-  // Ya no se necesitan entre si: con loadClass no hay que reconstruir
-  // referencias a mano (las habilidades vienen copiadas y los colaboradores
-  // se traen con populate).
+  const catalogoRepository = new MongoCatalogoRepository();
   return {
+    catalogoRepository,
+    avisoRepository: new MongoAvisoRepository(),
     habilidadRepository: new MongoHabilidadRepository(),
     colaboradorRepository: new MongoColaboradorRepository(),
     colectivoRepository: new MongoColectivoRepository(),
+    proyectoRepository: new MongoProyectoRepository(),
+    colaboracionRepository: new MongoColaboracionRepository(),
     notificacionRepository: new MongoNotificacionRepository(),
     estadisticaRepository: new MongoEstadisticaRepository(),
-  };
-}
-
-// Los dobles de test: permiten correr los tests de services sin una base.
-export function crearRepositoriosEnMemoria() {
-  const colaboradorRepository = new InMemoryColaboradorRepository();
-  const colectivoRepository = new InMemoryColectivoRepository();
-
-  return {
-    habilidadRepository: new InMemoryHabilidadRepository(),
-    colaboradorRepository,
-    colectivoRepository,
-    notificacionRepository: new InMemoryNotificacionRepository(),
-    estadisticaRepository: new InMemoryEstadisticaRepository({
-      colectivoRepository,
-      colaboradorRepository,
+    usuarioRepository: new MongoUsuarioRepository(),
+    identidadExternaRepository: new MongoIdentidadExternaRepository({
+      catalogoRepository,
     }),
+    contextoUsuarioRepository: new MongoContextoUsuarioRepository({ catalogoRepository }),
+    solicitudIngresoRepository: new MongoSolicitudIngresoRepository(),
+    auditoriaRepository: new MongoAuditoriaRepository(),
+    revisionRepository: new MongoRevisionRepository(),
+    transacciones: transaccionesMongo,
   };
 }
 
-// Un canal por tipo de medio de contacto. El email es real si hay un servidor
-// SMTP configurado (SMTP_URL); si no, y siempre para WhatsApp y SMS, se usa
-// el canal simulado, que solo deja constancia en el log.
 export function crearCanales(entorno = process.env) {
+  if (
+    entorno.TWILIO_SMS_REMITENTE &&
+    (!entorno.TWILIO_ACCOUNT_SID || !entorno.TWILIO_AUTH_TOKEN)
+  ) {
+    throw new Error(
+      "TWILIO_SMS_REMITENTE requiere TWILIO_ACCOUNT_SID y TWILIO_AUTH_TOKEN",
+    );
+  }
   const email = entorno.SMTP_URL
     ? new CanalEmail({
         transporte: nodemailer.createTransport(entorno.SMTP_URL),
@@ -82,33 +107,64 @@ export function crearCanales(entorno = process.env) {
       })
     : new CanalSimulado("EMAIL");
 
-  return { EMAIL: email, WHATSAPP: new CanalSimulado("WHATSAPP"), SMS: new CanalSimulado("SMS") };
+  const whatsapp =
+    entorno.TWILIO_ACCOUNT_SID &&
+    entorno.TWILIO_AUTH_TOKEN &&
+    entorno.TWILIO_WHATSAPP_REMITENTE
+      ? new CanalWhatsApp({
+          cliente: twilio(entorno.TWILIO_ACCOUNT_SID, entorno.TWILIO_AUTH_TOKEN),
+          remitente: entorno.TWILIO_WHATSAPP_REMITENTE,
+        })
+      : new CanalSimulado("WHATSAPP");
+
+  const sms = entorno.TWILIO_SMS_REMITENTE
+    ? new CanalSMS({
+        cliente: twilio(entorno.TWILIO_ACCOUNT_SID, entorno.TWILIO_AUTH_TOKEN),
+        remitente: entorno.TWILIO_SMS_REMITENTE,
+      })
+    : new CanalSimulado("SMS");
+
+  return { EMAIL: email, WHATSAPP: whatsapp, SMS: sms };
 }
 
-// Dobles de test: guardan lo que "envian" para poder revisarlo.
 export function crearCanalesEnMemoria() {
-  return { EMAIL: new CanalEnMemoria(), WHATSAPP: new CanalEnMemoria(), SMS: new CanalEnMemoria() };
+  return {
+    EMAIL: new CanalEnMemoria(),
+    WHATSAPP: new CanalEnMemoria(),
+    SMS: new CanalEnMemoria(),
+  };
 }
 
 export function componerApp({
   repositorios = crearRepositoriosMongo(),
   canales = crearCanales(),
+  autenticador = null,
+  catalogoDeRoles = new CatalogoDeRoles(),
+  compatContextoImplicito = false,
+  avisarContextoImplicito,
+  configuracionAdministracion = {},
 } = {}) {
   const {
+    avisoRepository,
     habilidadRepository,
     colaboradorRepository,
     colectivoRepository,
+    proyectoRepository,
+    colaboracionRepository,
     notificacionRepository,
     estadisticaRepository,
+    usuarioRepository,
+    identidadExternaRepository,
+    contextoUsuarioRepository,
+    solicitudIngresoRepository,
+    auditoriaRepository,
+    revisionRepository,
+    transacciones,
   } = repositorios;
+  const { diasSinActualizaciones = 30, maxDestacadosActivos = 6 } =
+    configuracionAdministracion;
 
   const habilidadService = new HabilidadService({ habilidadRepository });
-
-
-  const perfilService = new PerfilService({
-    colectivoRepository,
-    habilidadService,
-  });
 
   const notificacionService = new NotificacionService({
     notificacionRepository,
@@ -116,22 +172,38 @@ export function componerApp({
     canales,
   });
 
+  const perfilService = new PerfilService({
+    transacciones,
+    proyectoRepository,
+    habilidadService,
+    notificacionService,
+  });
+
   const avisoAutomaticoService = new AvisoAutomaticoService({
+    avisoRepository,
     colaboradorRepository,
-    colectivoRepository,
+    proyectoRepository,
     notificacionService,
   });
 
   const colaboradorService = new ColaboradorService({
+    transacciones,
     colaboradorRepository,
     habilidadService,
     avisoAutomaticoService,
   });
 
-  const colectivoService = new ColectivoService({ colectivoRepository, notificacionService });
+  const colectivoService = new ColectivoService({
+    transacciones,
+    colectivoRepository,
+    proyectoRepository,
+    notificacionService,
+  });
 
   const proyectoService = new ProyectoService({
-    colectivoRepository,
+    colaboracionRepository,
+    transacciones,
+    proyectoRepository,
     colectivoService,
     perfilService,
     notificacionService,
@@ -140,41 +212,161 @@ export function componerApp({
 
   const reclutamientoService = new ReclutamientoService({
     colaboradorRepository,
-    colectivoRepository,
+    proyectoRepository,
     colaboradorService,
     perfilService,
     notificacionService,
   });
 
   const colaboracionService = new ColaboracionService({
-    colectivoRepository,
+    transacciones,
+    proyectoRepository,
+    colaboracionRepository,
     colectivoService,
     proyectoService,
     colaboradorService,
     notificacionService,
+    contextoUsuarioRepository,
+    usuarioRepository,
   });
 
-  const estadisticaService = new EstadisticaService({ estadisticaRepository, colectivoService });
+  const valoracionService = new ValoracionService({
+    colaboracionService,
+    colaboracionRepository,
+    proyectoRepository,
+    colectivoService,
+    colaboradorService,
+  });
+  const timelineService = new TimelineService({
+    colectivoService,
+    proyectoRepository,
+    colaboracionRepository,
+  });
 
-  const logroService = new LogroService({ colectivoRepository });
+  const estadisticaService = new EstadisticaService({
+    estadisticaRepository,
+    colectivoService,
+  });
 
-  const avanceService = new AvanceService({ colectivoRepository });
+  const logroService = new LogroService({ proyectoRepository });
+
+  const avanceService = new AvanceService({ proyectoRepository });
+
+  const registroService = new RegistroService({
+    transacciones,
+    identidadExternaRepository,
+    usuarioRepository,
+  });
+
+  const contextoService = new ContextoService({
+    transacciones,
+    contextoUsuarioRepository,
+    usuarioRepository,
+    colectivoRepository,
+    colaboradorRepository,
+    catalogoDeRoles,
+  });
+
+  const auditoriaService = new AuditoriaService({ auditoriaRepository });
+  const conflictoDeIntereses = new ConflictoDeInteresesService({
+    contextoUsuarioRepository,
+  });
+  const administradorService = new AdministradorService({
+    transacciones,
+    contextoUsuarioRepository,
+    usuarioRepository,
+    auditoriaService,
+  });
+  const destacadoService = new DestacadoService({
+    transacciones,
+    proyectoRepository,
+    colectivoRepository,
+    auditoriaService,
+    conflictoDeIntereses,
+    maxDestacadosActivos,
+  });
+  const revisionService = new RevisionService({
+    transacciones,
+    revisionRepository,
+    proyectoRepository,
+    colaboracionRepository,
+    auditoriaService,
+    conflictoDeIntereses,
+    diasSinActualizaciones,
+  });
+
+  const modalidadService = new ModalidadService({
+    transacciones,
+    contextoUsuarioRepository,
+    usuarioRepository,
+    colectivoService,
+    colaboradorService,
+    colaboracionService,
+  });
+
+  const membresiaService = new MembresiaService({
+    transacciones,
+    contextoService,
+    contextoUsuarioRepository,
+    solicitudIngresoRepository,
+    usuarioRepository,
+    colectivoService,
+  });
+
+  const liderazgoService = new LiderazgoService({
+    transacciones,
+    contextoService,
+    contextoUsuarioRepository,
+  });
+
+  const autorizacion = crearAutorizacion({
+    autenticador,
+    registroService,
+    contextoService,
+    catalogoDeRoles,
+    proyectoService,
+    compatContextoImplicito,
+    avisarContextoImplicito,
+  });
 
   const controllers = {
-    colectivo: new ColectivoController({ colectivoService, proyectoService, colaboracionService }),
+    cuenta: new CuentaController({ registroService, contextoService, membresiaService }),
+    membresia: new MembresiaController({ membresiaService, liderazgoService }),
+    colectivo: new ColectivoController({
+      timelineService,
+      valoracionService,
+      colectivoService,
+      proyectoService,
+      colaboracionService,
+      modalidadService,
+      membresiaService,
+    }),
     proyecto: new ProyectoController({ proyectoService, colaboracionService }),
     perfil: new PerfilController({ perfilService }),
     habilidad: new HabilidadController({ habilidadService }),
-    colaborador: new ColaboradorController({ colaboradorService, colaboracionService }),
+    colaborador: new ColaboradorController({
+      valoracionService,
+      colaboradorService,
+      colaboracionService,
+      modalidadService,
+    }),
     notificacion: new NotificacionController({ notificacionService }),
     reclutamiento: new ReclutamientoController({ reclutamientoService }),
-    postulacion: new PostulacionController({ colaboracionService }),
+    postulacion: new PostulacionController({ colaboracionService, valoracionService }),
     estadistica: new EstadisticaController({ estadisticaService }),
     logro: new LogroController({ logroService }),
-    avance: new AvanceController({ avanceService })
+    avance: new AvanceController({ avanceService }),
+    administracion: new AdministracionController({
+      auditoriaService,
+      revisionService,
+      destacadoService,
+      administradorService,
+    }),
   };
 
   const services = {
+    valoracionService,
+    timelineService,
     colectivoService,
     proyectoService,
     perfilService,
@@ -186,8 +378,17 @@ export function componerApp({
     avisoAutomaticoService,
     estadisticaService,
     logroService,
-    avanceService
+    avanceService,
+    registroService,
+    contextoService,
+    administradorService,
+    auditoriaService,
+    destacadoService,
+    revisionService,
+    modalidadService,
+    membresiaService,
+    liderazgoService,
   };
 
-  return { controllers, services };
+  return { controllers, services, autorizacion };
 }

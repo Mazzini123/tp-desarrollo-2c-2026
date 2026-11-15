@@ -18,13 +18,10 @@ export class PerfilController {
   };
 
   actualizar = async (req, res) => {
-    res.status(200)
+    res
+      .status(200)
       .json(
-        await this.perfilService.actualizar(
-          req.params.id,
-          req.params.perfilId,
-          req.body,
-        ),
+        await this.perfilService.actualizar(req.params.id, req.params.perfilId, req.body),
       );
   };
 

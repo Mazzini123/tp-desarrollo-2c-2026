@@ -1,12 +1,14 @@
-// Doble de test: guarda lo que "envia" para que el test lo pueda revisar.
-// Con fallar = true simula un proveedor caido.
 export class CanalEnMemoria {
-  constructor({ fallar = false } = {}) {
+  constructor({ fallar = false, colgar = false } = {}) {
     this.enviados = [];
     this.fallar = fallar;
+    this.colgar = colgar;
   }
 
   async enviar(mensaje) {
+    if (this.colgar) {
+      return new Promise(() => {});
+    }
     if (this.fallar) {
       throw new Error("Proveedor no disponible");
     }

@@ -12,6 +12,7 @@ describe("HTTP · estadisticas", () => {
 
   test("GET /colectivos/:id/estadisticas de uno que no existe da 404", async () => {
     const { api } = await armarApp();
-    await api.get("/colectivos/no-existe/estadisticas").expect(404);
+    await api.get("/colectivos/aaaaaaaaaaaaaaaaaaaaaaaa/estadisticas").expect(404);
+    await api.get("/colectivos/no-existe/estadisticas").expect(400);
   });
 });

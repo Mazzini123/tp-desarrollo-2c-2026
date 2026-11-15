@@ -1,10 +1,6 @@
 import { COLABORACION_ESTADO } from "../domain/enums/COLABORACION_ESTADO.js";
 import { PROYECTO_ESTADO } from "../domain/enums/PROYECTO_ESTADO.js";
 
-// Requerimientos adicionales 16 (estadisticas globales), 30 (API publica de
-// estadisticas) y 17 (estadisticas por organizacion). El calculo lo hace la
-// base con el Aggregation Framework (ver repositories/pipelinesDeEstadisticas.js);
-// el service le da la forma final a la respuesta.
 export class EstadisticaService {
   constructor({ estadisticaRepository, colectivoService }) {
     this.estadisticaRepository = estadisticaRepository;
@@ -35,7 +31,6 @@ export class EstadisticaService {
   }
 
   async deColectivo(colectivoId, ahora = new Date()) {
-    // Tira NotFoundError si no existe.
     const colectivo = await this.colectivoService.buscarPorId(colectivoId);
     const { totales, colaboracionesPorEstado, porProyecto } =
       await this.estadisticaRepository.deColectivo(colectivoId);
@@ -52,13 +47,11 @@ export class EstadisticaService {
       colaboraciones: {
         total: sumar(Object.values(colaboracionesPorEstado)),
         pendientes: porEstado(COLABORACION_ESTADO.PENDIENTE),
-        // Las guardadas antes de las postulaciones no tienen estado: eran aceptadas.
-        aceptadas: porEstado(COLABORACION_ESTADO.ACEPTADA) + porEstado(null),
+        aceptadas: porEstado(COLABORACION_ESTADO.ACEPTADA),
         rechazadas: porEstado(COLABORACION_ESTADO.RECHAZADA),
         finalizadas: porEstado(COLABORACION_ESTADO.FINALIZADA),
       },
       visualizaciones: totales?.visualizaciones ?? 0,
-      // "avances": el porcentaje de concrecion promedio, con un decimal.
       avancePromedio: totales ? Math.round(totales.avancePromedio * 10) / 10 : 0,
       logros: totales?.logros ?? 0,
       porProyecto,
@@ -72,10 +65,8 @@ function sumar(numeros) {
 }
 
 function resumirColaboraciones(grupos) {
-  const contar = (condicion) =>
-    sumar(grupos.filter(condicion).map((g) => g.cantidad));
-  // Sin estado = guardada antes de las postulaciones = aceptada.
-  const estado = (g) => g.estado ?? COLABORACION_ESTADO.ACEPTADA;
+  const contar = (condicion) => sumar(grupos.filter(condicion).map((g) => g.cantidad));
+  const estado = (g) => g.estado;
 
   return {
     total: contar(() => true),

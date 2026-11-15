@@ -1,27 +1,17 @@
-// Como se ve un documento cuando sale por la API (res.json llama a toJSON).
-//
-// - virtuals: true  → incluye `id` (el _id como string, lo arma Mongoose) y
-//   los getters de las clases de dominio (que loadClass convierte en virtuals).
-// - versionKey: false → el __v se guarda en la base, pero no se muestra.
-// - transform → saca el _id (ya va como `id`) y los campos que nunca se
-//   muestran, como los medios de contacto de una persona.
-//
-// Cada schema lo declara por su cuenta: Mongoose usa las opciones de toJSON
-// del schema de CADA subdocumento, no las del documento que lo contiene.
-//
-// `transformar(documento, salida)` permite un ajuste propio del schema (por
-// ejemplo, ocultar quien hizo una contribucion anonima).
-export function aplicarFormatoJSON(schema, { ocultar = [], transformar } = {}) {
+export function aplicarFormatoJSON(schema, { campos, transformar } = {}) {
+  if (!Array.isArray(campos) || campos.length === 0) {
+    throw new Error("aplicarFormatoJSON necesita la lista de campos visibles");
+  }
   schema.set("toJSON", {
     virtuals: true,
     versionKey: false,
     transform(documento, salida) {
-      delete salida._id;
-      for (const campo of ocultar) {
-        delete salida[campo];
+      const visible = {};
+      for (const campo of campos) {
+        if (campo in salida) visible[campo] = salida[campo];
       }
-      transformar?.(documento, salida);
-      return salida;
+      transformar?.(documento, visible);
+      return visible;
     },
   });
 }

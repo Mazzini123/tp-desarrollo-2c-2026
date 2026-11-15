@@ -14,8 +14,8 @@ export const ubicacionSchema = z
 
 export const crearColectivoSchema = z
   .object({
-    nombre: z.string().trim().min(1),
-    descripcion: z.string().trim().min(1),
+    nombre: z.string().trim().min(1).max(100),
+    descripcion: z.string().trim().min(1).max(2000),
     tipoColectivo: z.enum(Object.values(TIPO_COLECTIVO)),
     ubicacion: ubicacionSchema.nullish(),
     redesSociales: redesSocialesSchema.default([]),
@@ -26,12 +26,11 @@ export const crearColectivoSchema = z
 
 export const actualizarColectivoSchema = z
   .object({
-    nombre: z.string().trim().min(1).optional(),
-    descripcion: z.string().trim().min(1).optional(),
+    nombre: z.string().trim().min(1).max(100).optional(),
+    descripcion: z.string().trim().min(1).max(2000).optional(),
     ubicacion: ubicacionSchema.nullish(),
     redesSociales: redesSocialesSchema.optional(),
     etiquetas: etiquetasSchema.optional(),
-    mediosDeContacto: mediosDeContactoSchema.optional(),
   })
   .strict()
   .refine(tieneAlgunCampoDefinido, {

@@ -17,11 +17,27 @@ describe("HTTP · sanitizacion del body", () => {
     expect(guardado.body.descripcion).toBe("Ayudamos al barrio");
   });
 
+  test("el texto con angulos que no es HTML se guarda tal cual", async () => {
+    const { api } = await armarApp();
+    const descripcion = "Migramos de List<T> a Map<K,V> cuando x<y entonces z>w";
+    const alta = await api
+      .post("/colectivos")
+      .send({ nombre: "Fundacion Ejemplo", descripcion, tipoColectivo: "FUNDACION" })
+      .expect(201);
+
+    const guardado = await api.get(`/colectivos/${alta.body.id}`).expect(200);
+    expect(guardado.body.descripcion).toBe(descripcion);
+  });
+
   test("un campo que era solo HTML queda vacio y la validacion lo rechaza", async () => {
     const { api } = await armarApp();
     await api
       .post("/colectivos")
-      .send({ nombre: "<script>x</script>", descripcion: "d", tipoColectivo: "FUNDACION" })
+      .send({
+        nombre: "<script>x</script>",
+        descripcion: "d",
+        tipoColectivo: "FUNDACION",
+      })
       .expect(400);
   });
 });

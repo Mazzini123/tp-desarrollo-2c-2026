@@ -7,18 +7,23 @@ export class NotificacionController extends BaseController {
   }
 
   listar = async (req, res) => {
-    const paginacion = this.aPaginacionDeDominio(req.paginacion);
-    this.responderPaginado(
-      res,
-      await this.notificacionService.listar(req.params.id, paginacion),
-    );
+    const paginacion = this.aPaginacionDeDominio(req.consulta);
+    const { leida } = req.consulta;
+    const { noLeidas, ...pagina } = await this.notificacionService.listar(req.params.id, {
+      ...paginacion,
+      leida,
+    });
+    this.responderPaginado(res, pagina, { unread: noLeidas });
   };
 
   marcarComoLeida = async (req, res) => {
     res
       .status(200)
       .json(
-        await this.notificacionService.marcarComoLeida(req.params.id, req.params.notificacionId),
+        await this.notificacionService.marcarComoLeida(
+          req.params.id,
+          req.params.notificacionId,
+        ),
       );
   };
 }

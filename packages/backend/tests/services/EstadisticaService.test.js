@@ -1,4 +1,9 @@
-import { armarServices, crearColectivoDePrueba, datosDePerfil, CODIGOS } from "../fixtures.js";
+import {
+  armarServices,
+  crearColectivoDePrueba,
+  datosDePerfil,
+  CODIGOS,
+} from "../fixtures.js";
 import { NotFoundError } from "../../src/errors/NotFoundError.js";
 
 // Requerimientos adicionales 16, 17 y 30. Estos tests prueban el service con
@@ -27,9 +32,14 @@ describe("EstadisticaService", () => {
       cuentaGit: "ada",
       codigosHabilidades: [CODIGOS.node, CODIGOS.react],
     });
-    await services.colaboracionService.registrar({ proyectoId: api.id, colaboradorId: ada.id });
+    await services.colaboracionService.registrar({
+      proyectoId: api.id,
+      perfilId: api.perfiles[0].id,
+      colaboradorId: ada.id,
+    });
     await services.colaboracionService.registrar({
       proyectoId: front.id,
+      perfilId: front.perfiles[0].id,
       colaboradorId: ada.id,
       esPublica: false,
     });
@@ -64,7 +74,11 @@ describe("EstadisticaService", () => {
 
     expect(panel.proyectos).toEqual({ total: 2, abiertos: 1, finalizados: 1 });
     expect(panel.visualizaciones).toBe(2);
-    expect(panel.colaboraciones).toMatchObject({ total: 2, aceptadas: 1, finalizadas: 1 });
+    expect(panel.colaboraciones).toMatchObject({
+      total: 2,
+      aceptadas: 1,
+      finalizadas: 1,
+    });
     expect(panel.porProyecto.map((p) => p.titulo)).toEqual(["API", "Front"]);
     expect(panel.porProyecto[0].visualizaciones).toBe(2);
   });

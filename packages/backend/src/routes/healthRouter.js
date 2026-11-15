@@ -5,7 +5,8 @@ export function crearHealthRouter() {
   const router = Router();
   const healthController = new HealthController();
 
-  router.get("/", healthController.check);
+  router.get("/health", healthController.check);
+  router.get("/ready", healthController.ready);
 
   return router;
 }

@@ -1,8 +1,21 @@
 import mongoose from "mongoose";
 import { ZodError } from "zod";
 import { AppError } from "../errors/AppError.js";
+import { registro } from "../config/registro.js";
 
-export function manejadorErrores(err, _req, res, _next) {
+export function manejadorErrores(err, req, res, _next) {
+  if (err?.type === "entity.too.large") {
+    res
+      .status(413)
+      .json({ message: "El cuerpo de la solicitud supera el límite permitido" });
+    return;
+  }
+
+  if (err?.type === "encoding.unsupported" || err?.type === "charset.unsupported") {
+    res.status(415).json({ message: "Codificación del cuerpo no soportada" });
+    return;
+  }
+
   if (err instanceof SyntaxError && "body" in err) {
     res.status(400).json({ message: "JSON malformado en el body" });
     return;
@@ -14,27 +27,26 @@ export function manejadorErrores(err, _req, res, _next) {
   }
 
   if (err instanceof AppError) {
-    res.status(err.status).json({ message: err.message });
+    const cuerpo = { message: err.message };
+    if (err.codigo) cuerpo.codigo = err.codigo;
+    if (err.detalle) cuerpo.detalle = err.detalle;
+    res.status(err.status).json(cuerpo);
     return;
   }
 
-  // El schema de Mongoose rechazo el documento (un required, un enum...). Zod
-  // y los services validan antes, asi que llegar aca es raro, pero no es un
-  // error del servidor: son datos invalidos.
   if (err instanceof mongoose.Error.ValidationError) {
-    res.status(400).json({ message: "Datos invalidos", detalle: err.message });
+    res.status(400).json({
+      message: "Datos invalidos",
+      detalle: Object.values(err.errors).map((e) => e.message),
+    });
     return;
   }
 
-  // Un id con formato invalido que llego hasta una consulta.
   if (err instanceof mongoose.Error.CastError) {
     res.status(400).json({ message: `Identificador invalido: "${err.value}"` });
     return;
   }
 
-  // Concurrencia optimista (__v): otro pedido modifico el mismo documento
-  // entre que este lo leyo y lo quiso guardar. Guardar igual pisaria ese
-  // cambio, asi que se rechaza y el cliente puede reintentar.
   if (err instanceof mongoose.Error.VersionError) {
     res.status(409).json({
       message: "El recurso fue modificado por otro pedido al mismo tiempo. Reintenta.",
@@ -42,6 +54,17 @@ export function manejadorErrores(err, _req, res, _next) {
     return;
   }
 
-  console.error(err);
+  if (err?.code === 11000) {
+    res.status(409).json({ message: "Ya existe un recurso con esos datos" });
+    return;
+  }
+
+  registro.error("error_http", {
+    requestId: req.id,
+    metodo: req.method,
+    ruta: req.route?.path,
+    error: err.message,
+    stack: err.stack,
+  });
   res.status(500).json({ message: "Error interno del servidor" });
 }

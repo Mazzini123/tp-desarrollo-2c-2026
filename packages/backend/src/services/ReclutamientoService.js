@@ -1,28 +1,27 @@
 import { DomainError } from "../errors/DomainError.js";
 import { ConflictError } from "../errors/ConflictError.js";
 import { TIPO_NOTIFICACION } from "../domain/enums/TIPO_NOTIFICACION.js";
+import { ESTADO_BUSQUEDA } from "../domain/enums/ESTADO_BUSQUEDA.js";
 import { armarPaginado } from "../utils/paginacion.js";
+import { paginaDeResumenes } from "../dto/resumenDeProyecto.js";
+import { cumpleHabilidadesRequeridas, estadoDeBusqueda } from "./reglasDeBusqueda.js";
+import { yaSePostuloAlPerfil } from "./reglasDePostulacion.js";
 
-// "Las organizaciones pueden buscar colaboradoras acordes a perfiles y
-// contactarlas: si la persona destinataria ha aceptado ser contactada, se
-// envia un mensaje interno dentro de la aplicacion" — enunciado, 2da entrega.
 export class ReclutamientoService {
   constructor({
     colaboradorRepository,
-    colectivoRepository,
+    proyectoRepository,
     colaboradorService,
     perfilService,
     notificacionService,
   }) {
     this.colaboradorRepository = colaboradorRepository;
-    this.colectivoRepository = colectivoRepository;
+    this.proyectoRepository = proyectoRepository;
     this.colaboradorService = colaboradorService;
     this.perfilService = perfilService;
     this.notificacionService = notificacionService;
   }
 
-  // El service arma el pedido con la regla de negocio y el repositorio lo
-  // resuelve como consulta: la base filtra, ordena por opcionales y pagina.
   async buscarColaboradoras(
     proyectoId,
     perfilId,
@@ -32,54 +31,59 @@ export class ReclutamientoService {
       proyectoId,
       perfilId,
     );
+    const paginado = { numeroPagina, limitePorPagina };
 
     const pagina = await this.colaboradorRepository.buscarPotenciales(
       {
         requeridas: perfil.codigosRequeridos(),
         opcionales: perfil.codigosOpcionales(),
-        // Quien ya se postulo no es una colaboradora "potencial".
-        excluirIds: proyecto.colaboraciones.map((c) => c.colaborador._id),
+        excluirIds: proyecto.colaboraciones
+          .filter((c) => String(c.perfil) === perfil.id && !c.estaRetirada())
+          .map((c) => c.colaborador._id),
       },
-      numeroPagina,
-      limitePorPagina,
+      paginado,
     );
 
-    return armarPaginado(pagina, numeroPagina, limitePorPagina);
+    return armarPaginado(pagina, paginado);
   }
 
-  // "Las personas colaboradoras pueden buscar proyectos que encajen con sus
-  // habilidades" — enunciado, 2da entrega (requerimiento 3.d).
   async buscarProyectos(colaboradorId, { numeroPagina = 1, limitePorPagina = 10 } = {}) {
     const colaborador = await this.colaboradorService.buscarPorId(colaboradorId);
 
-    const pagina = await this.colectivoRepository.buscarProyectosCompatibles(
-      colaborador,
-      numeroPagina,
-      limitePorPagina,
-    );
+    const paginado = { numeroPagina, limitePorPagina };
+    const pagina = await this.proyectoRepository.buscarCompatibles(colaborador, paginado);
 
-    return armarPaginado(pagina, numeroPagina, limitePorPagina);
+    return paginaDeResumenes(armarPaginado(pagina, paginado));
   }
 
   async invitar(proyectoId, perfilId, { colaboradorId, mensaje }) {
-    const { colectivo, proyecto, perfil } =
-      await this.perfilService.buscarPerfilConProyecto(proyectoId, perfilId);
+    const { proyecto, perfil } = await this.perfilService.buscarPerfilConProyecto(
+      proyectoId,
+      perfilId,
+    );
+    const { colectivo } = proyecto;
     const colaborador = await this.colaboradorService.buscarPorId(colaboradorId);
+    this.colaboradorService.exigirActiva(colaborador);
 
-    if (!proyecto.aceptaPostulaciones()) {
+    if (estadoDeBusqueda(perfil, proyecto) !== ESTADO_BUSQUEDA.ABIERTA) {
       throw new ConflictError(
-        "El proyecto no esta recibiendo postulaciones (finalizado o con el cupo completo)",
+        "Este perfil no esta recibiendo postulaciones (proyecto finalizado, busqueda " +
+          "cerrada o cupo completo)",
       );
     }
 
-    if (!perfil.cumpleHabilidadesRequeridas(colaborador)) {
+    if (!cumpleHabilidadesRequeridas(perfil, colaborador)) {
       throw new DomainError(
         "La persona no tiene todas las habilidades requeridas del perfil",
       );
     }
 
-    if (proyecto.yaColaboraron(colaborador)) {
-      throw new ConflictError("La persona ya se postulo a este proyecto");
+    if (yaSePostuloAlPerfil(proyecto, colaborador, perfil)) {
+      throw new ConflictError("La persona ya se postulo a este perfil");
+    }
+
+    if (await this.notificacionService.yaInvitada(colaborador.id, perfil.id)) {
+      throw new ConflictError("La persona ya fue invitada a este perfil");
     }
 
     if (!colaborador.recibeMensajeriaInterna) {

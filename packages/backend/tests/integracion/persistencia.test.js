@@ -1,4 +1,6 @@
 import { ColectivoModel } from "../../src/models/ColectivoModel.js";
+import { ProyectoModel } from "../../src/models/ProyectoModel.js";
+import { ColaboracionModel } from "../../src/models/ColaboracionModel.js";
 import { ColaboradorModel } from "../../src/models/ColaboradorModel.js";
 import { HabilidadModel } from "../../src/models/HabilidadModel.js";
 import { NotificacionModel } from "../../src/models/NotificacionModel.js";
@@ -38,12 +40,18 @@ test("un colectivo con todo su agregado vuelve completo", async () => {
     colectivoId: colectivo.id,
     titulo: "Sitio institucional",
     descripcion: "Un sitio para la fundacion",
-    modoAceptacion: "REVISION_MANUAL",
-    limiteVacantes: 3,
     fechaCierre: new Date("2030-01-01T00:00:00Z"),
     etiquetas: ["web"],
     perfiles: [
-      datosDePerfil({ requeridas: [CODIGOS.node], opcionales: [CODIGOS.react] }),
+      {
+        ...datosDePerfil({
+          requeridas: [CODIGOS.node],
+          opcionales: [CODIGOS.react],
+          modoAceptacion: "REVISION_MANUAL",
+          limiteColaboraciones: 3,
+        }),
+        fechaCierreBusqueda: new Date("2029-06-01T00:00:00Z"),
+      },
     ],
   });
 
@@ -58,30 +66,29 @@ test("un colectivo con todo su agregado vuelve completo", async () => {
 
   const colaboracion = await s.colaboracionService.registrar({
     proyectoId: proyecto.id,
+    perfilId: proyecto.perfiles[0].id,
     colaboradorId: ada.id,
     esPublica: false,
   });
   await s.colaboracionService.aceptar(proyecto.id, colaboracion.id);
-  await s.logroService.crearParaProyecto(proyecto.id, {
+  await s.logroService.crear(proyecto.id, {
     titulo: "Primer hito",
     descripcion: "Quedo online",
   });
-  await s.avanceService.registrarAvanceParaProyecto(proyecto.id, {
+  await s.avanceService.registrar(proyecto.id, {
     porcentajeConcrecion: 40,
     urlSistema: "https://fundacion.org",
     urlRepositorio: "https://github.com/fundacion/sitio",
   });
   await s.colaboracionService.finalizar(proyecto.id, colaboracion.id);
-  await s.colaboracionService.valorar(proyecto.id, colaboracion.id, {
+  await s.valoracionService.valorar(proyecto.id, colaboracion.id, {
     autor: "COLECTIVO",
     puntaje: 5,
     comentario: "Excelente",
   });
 
   // Una consulta nueva, directo al modelo: nada de lo que quedo en memoria.
-  const leido = await ColectivoModel.findById(colectivo.id).populate(
-    "proyectos.colaboraciones.colaborador",
-  );
+  const leido = await ColectivoModel.findById(colectivo.id);
 
   expect(leido.nombre).toBe("Fundacion Ejemplo");
   expect(sinInternos(leido.ubicacion)).toEqual({
@@ -98,10 +105,10 @@ test("un colectivo con todo su agregado vuelve completo", async () => {
   expect(leido.fechaAlta).toBeInstanceOf(Date);
   expect(leido.fechaBaja).toBeNull();
 
-  const p = leido.proyectos[0];
+  // El proyecto y sus colaboraciones estan en sus propias colecciones.
+  const [p] = await ProyectoModel.find({ colectivoId: colectivo.id });
   expect(p.id).toBe(proyecto.id);
-  expect(p.modoAceptacion).toBe("REVISION_MANUAL");
-  expect(p.limiteVacantes).toBe(3);
+  expect(p.datosDelColectivo.nombre).toBe("Fundacion Ejemplo");
   expect(p.fechaCierre).toEqual(new Date("2030-01-01T00:00:00Z"));
   expect(lista(p.etiquetas)).toEqual(["web"]);
   // Los metodos de dominio estan en lo que vuelve de la base (loadClass).
@@ -117,9 +124,15 @@ test("un colectivo con todo su agregado vuelve completo", async () => {
     periodo: "HS_MENSUALES",
   });
   expect(perfil.modalidadColaboracion).toBe("GRATUITA");
+  expect(perfil.modoAceptacion).toBe("REVISION_MANUAL");
+  expect(perfil.limiteColaboraciones).toBe(3);
+  expect(perfil.busquedaAbierta).toBe(true);
+  expect(perfil.fechaCierreBusqueda).toEqual(new Date("2029-06-01T00:00:00Z"));
 
-  const c = p.colaboraciones[0];
+  const [c] = await ColaboracionModel.find({ proyectoId: p._id }).populate("colaborador");
+  expect(String(c.colectivoId)).toBe(colectivo.id);
   expect(c.estado).toBe("FINALIZADA");
+  expect(String(c.perfil)).toBe(perfil.id);
   expect(c.esPublica).toBe(false);
   expect(c.colaborador.cuentaGit).toBe("ada"); // poblado
   expect(c.fechaResolucion).toBeInstanceOf(Date);
@@ -173,6 +186,7 @@ test("las notificaciones quedan guardadas para su destinataria", async () => {
     mensaje: "Te esperamos",
   });
 
+  await s.avisoAutomaticoService.procesarPendientes(new Date(), { tope: 100 });
   const guardadas = await NotificacionModel.find({ destinatarioId: ada.id });
   // El aviso automatico al darla de alta y la invitacion.
   expect(guardadas.map((n) => n.tipo)).toEqual(

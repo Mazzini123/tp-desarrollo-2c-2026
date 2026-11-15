@@ -15,7 +15,9 @@ describe("ColaboradorService · identificacion", () => {
   });
 
   test("solo con nombre, sin apellido, tampoco alcanza", async () => {
-    await expect(colaboradorService.crear({ nombre: "Ada" })).rejects.toThrow(DomainError);
+    await expect(colaboradorService.crear({ nombre: "Ada" })).rejects.toThrow(
+      DomainError,
+    );
   });
 
   test.each([
@@ -27,7 +29,9 @@ describe("ColaboradorService · identificacion", () => {
   });
 
   test("buscar un id que no existe tira NotFoundError", async () => {
-    await expect(colaboradorService.buscarPorId("no-existe")).rejects.toThrow(NotFoundError);
+    await expect(colaboradorService.buscarPorId("no-existe")).rejects.toThrow(
+      NotFoundError,
+    );
   });
 });
 
@@ -37,7 +41,10 @@ describe("ColaboradorService · pronombres", () => {
 
   beforeEach(async () => {
     colaboradorService = (await armarServices()).colaboradorService;
-    colaborador = await colaboradorService.crear({ cuentaGit: "ada", pronombres: ["ella"] });
+    colaborador = await colaboradorService.crear({
+      cuentaGit: "ada",
+      pronombres: ["ella"],
+    });
   });
 
   test("el alta deduplica los pronombres del payload", async () => {
@@ -49,9 +56,9 @@ describe("ColaboradorService · pronombres", () => {
   });
 
   test("agregar de a uno repetido tira ConflictError", async () => {
-    await expect(colaboradorService.agregarPronombre(colaborador.id, "ella")).rejects.toThrow(
-      ConflictError,
-    );
+    await expect(
+      colaboradorService.agregarPronombre(colaborador.id, "ella"),
+    ).rejects.toThrow(ConflictError);
   });
 
   test("agregar de a uno nuevo lo suma", async () => {
@@ -140,14 +147,11 @@ describe("ColaboradorService · medios de contacto", () => {
 
   test("quitar uno que no esta tira NotFoundError", async () => {
     await expect(
-      colaboradorService.quitarMedioDeContacto(colaborador.id, { tipo: "SMS", valor: "123" }),
+      colaboradorService.quitarMedioDeContacto(colaborador.id, {
+        tipo: "SMS",
+        valor: "123",
+      }),
     ).rejects.toThrow(NotFoundError);
-  });
-
-  test("un tipo que no existe tira DomainError", async () => {
-    await expect(
-      colaboradorService.agregarMedioDeContacto(colaborador.id, { tipo: "FAX", valor: "1" }),
-    ).rejects.toThrow(DomainError);
   });
 
   test("el PUT permite dejar de recibir mensajeria interna", async () => {

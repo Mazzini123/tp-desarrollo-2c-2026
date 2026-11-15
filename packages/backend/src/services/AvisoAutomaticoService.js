@@ -1,80 +1,136 @@
 import { TIPO_NOTIFICACION } from "../domain/enums/TIPO_NOTIFICACION.js";
+import { ESTADO_BUSQUEDA } from "../domain/enums/ESTADO_BUSQUEDA.js";
+import { estadoDeBusquedaConCupo } from "./reglasDeBusqueda.js";
+import { TIPO_AVISO } from "../domain/enums/TIPO_AVISO.js";
+import { ESTADO_AVISO } from "../domain/enums/ESTADO_AVISO.js";
+import { registro } from "../config/registro.js";
 
-const MAXIMO_DE_PROYECTOS_EN_UN_AVISO = 5;
+const PROYECTOS_POR_AVISO = Object.freeze({ numeroPagina: 1, limitePorPagina: 5 });
 
-// Requerimiento adicional 9: "Al cargar un proyecto o colaborador, se buscan
-// candidatos/as compatibles y se los notifica (en tiempo real o de forma
-// periodica/programada)". Aca es en tiempo real: al momento del alta.
-//
-// Solo le escribe a personas: los colectivos todavia no tienen bandeja de
-// mensajes (no hay usuarios hasta la tercera entrega). Por eso, cuando se
-// carga una persona, el aviso le llega a ella con los proyectos que le
-// sirven, y no a los colectivos.
+export const POLITICA_DE_AVISOS = Object.freeze({
+  maximoDeIntentos: 5,
+  esperaInicialMs: 60_000,
+});
+
 export class AvisoAutomaticoService {
-  constructor({ colaboradorRepository, colectivoRepository, notificacionService }) {
+  constructor({
+    colaboradorRepository,
+    proyectoRepository,
+    notificacionService,
+    avisoRepository,
+  }) {
     this.colaboradorRepository = colaboradorRepository;
-    this.colectivoRepository = colectivoRepository;
+    this.proyectoRepository = proyectoRepository;
     this.notificacionService = notificacionService;
+    this.avisoRepository = avisoRepository;
   }
 
-  // Un proyecto nuevo: se avisa a quien cumple las habilidades requeridas de
-  // alguno de sus perfiles.
   async avisarPorProyectoNuevo(proyecto) {
-    if (!proyecto.aceptaPostulaciones()) {
-      return [];
-    }
+    return this.avisoRepository.encolar({
+      clave: `proyecto:${proyecto.id}`,
+      tipo: TIPO_AVISO.PROYECTO,
+      entidadId: proyecto._id,
+      hastaId: await this.colaboradorRepository.ultimoId(),
+    });
+  }
 
-    const candidatas = new Map();
-    for (const perfil of proyecto.perfiles) {
-      // La base ya devuelve solo las que tienen todas las requeridas ($all).
-      const encontradas = await this.colaboradorRepository.buscarPorHabilidades(
-        perfil.codigosRequeridos(),
-      );
-      encontradas.forEach((colaborador) => candidatas.set(colaborador.id, colaborador));
-    }
+  async avisarPorColaboradorNuevo(colaborador) {
+    return this.avisoRepository.encolar({
+      clave: `colaborador:${colaborador.id}`,
+      tipo: TIPO_AVISO.COLABORADOR,
+      entidadId: colaborador._id,
+      hastaId: await this.proyectoRepository.ultimoId(),
+    });
+  }
 
-    const avisos = [...candidatas.values()].map((colaborador) =>
-      this.notificacionService.notificar(colaborador, {
+  async procesarPendientes(
+    ahora = new Date(),
+    { tope = 10, debeDetenerse = () => false } = {},
+  ) {
+    const pendientes = await this.avisoRepository.listarPendientes(ahora, tope);
+    for (const aviso of pendientes) {
+      if (debeDetenerse()) break;
+      try {
+        if (aviso.tipo === TIPO_AVISO.PROYECTO) {
+          await this.generarPorProyecto(aviso, ahora, debeDetenerse);
+        } else {
+          await this.generarPorColaborador(aviso, ahora);
+        }
+        if (debeDetenerse()) break;
+        await this.avisoRepository.actualizar(aviso, {
+          estado: ESTADO_AVISO.COMPLETADO,
+          ultimoError: null,
+        });
+      } catch (error) {
+        const intentos = aviso.intentos + 1;
+        registro.error("generacion_de_avisos_fallida", {
+          avisoId: aviso.id,
+          intentos,
+          error: error.message,
+        });
+        await this.avisoRepository.actualizar(aviso, {
+          intentos,
+          estado:
+            intentos >= POLITICA_DE_AVISOS.maximoDeIntentos
+              ? ESTADO_AVISO.FALLIDO
+              : ESTADO_AVISO.PENDIENTE,
+          ultimoError: error.message,
+          proximoIntento: new Date(
+            ahora.getTime() + POLITICA_DE_AVISOS.esperaInicialMs * 2 ** (intentos - 1),
+          ),
+        });
+      }
+    }
+  }
+
+  async generarPorProyecto(aviso, ahora, debeDetenerse) {
+    const proyecto = await this.proyectoRepository.buscarSinColaboraciones(
+      aviso.entidadId,
+    );
+    if (!proyecto || !aviso.hastaId) return;
+    const perfiles = proyecto.perfiles.filter(
+      (perfil) =>
+        estadoDeBusquedaConCupo(
+          perfil,
+          {
+            proyectoAbierto: proyecto.estaAbierto(),
+            fechaCierre: proyecto.fechaCierre,
+            cupoCompleto: perfil.cupoCompleto,
+          },
+          ahora,
+        ) === ESTADO_BUSQUEDA.ABIERTA,
+    );
+    const personas = await this.colaboradorRepository.buscarParaAviso(
+      perfiles,
+      aviso.hastaId,
+    );
+    for (const persona of personas) {
+      if (debeDetenerse()) return;
+      await this.notificacionService.notificar(persona, {
+        clave: `${aviso.clave}:${persona.id}`,
         tipo: TIPO_NOTIFICACION.PROYECTOS_COMPATIBLES,
         asunto: `Hay un proyecto nuevo para vos: "${proyecto.titulo}"`,
         contenido: `El proyecto "${proyecto.titulo}" busca personas con tus habilidades.`,
         referencias: { proyectoIds: [proyecto.id] },
-      }),
-    );
-
-    return this.contarEnviados(avisos);
-  }
-
-  // Una persona nueva: se le avisa que proyectos abiertos le sirven.
-  async avisarPorColaboradorNuevo(colaborador) {
-    // La misma consulta que la busqueda de proyectos potenciales: la primera
-    // pagina trae los destacados y el total, sin cargar todos los proyectos.
-    const { items: destacados, total } =
-      await this.colectivoRepository.buscarProyectosCompatibles(
-        colaborador,
-        1,
-        MAXIMO_DE_PROYECTOS_EN_UN_AVISO,
-      );
-
-    if (total === 0) {
-      return [];
+      });
     }
-
-    const aviso = this.notificacionService.notificar(colaborador, {
-      tipo: TIPO_NOTIFICACION.PROYECTOS_COMPATIBLES,
-      asunto: `Hay ${total} proyecto(s) que coinciden con tus habilidades`,
-      contenido: destacados.map((p) => `- ${p.titulo}`).join("\n"),
-      referencias: { proyectoIds: destacados.map((p) => p.id) },
-    });
-
-    return this.contarEnviados([aviso]);
   }
 
-  // Un aviso que falla no frena a los demas.
-  async contarEnviados(avisos) {
-    const resultados = await Promise.allSettled(avisos);
-    return resultados
-      .filter((r) => r.status === "fulfilled" && r.value !== null)
-      .map((r) => r.value);
+  async generarPorColaborador(aviso, ahora) {
+    const persona = await this.colaboradorRepository.buscarPorId(aviso.entidadId);
+    if (!persona || persona.fechaBaja || !aviso.hastaId) return;
+    const { items, total } = await this.proyectoRepository.buscarCompatibles(
+      persona,
+      PROYECTOS_POR_AVISO,
+      { ahora, hastaId: aviso.hastaId },
+    );
+    if (total > 0)
+      await this.notificacionService.notificar(persona, {
+        clave: aviso.clave,
+        tipo: TIPO_NOTIFICACION.PROYECTOS_COMPATIBLES,
+        asunto: `Hay ${total} proyecto(s) que coinciden con tus habilidades`,
+        contenido: items.map((p) => `- ${p.titulo}`).join("\n"),
+        referencias: { proyectoIds: items.map((p) => String(p._id)) },
+      });
   }
 }

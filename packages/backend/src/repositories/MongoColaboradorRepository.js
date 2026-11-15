@@ -1,50 +1,71 @@
+import mongoose from "mongoose";
+import { ConcurrenciaError } from "../errors/ConcurrenciaError.js";
 import { ColaboradorModel } from "../models/ColaboradorModel.js";
-import { aObjectId, esIdValido } from "./ids.js";
+import { aObjectId, esIdValido } from "./objectIds.js";
+import { paginar } from "./paginar.js";
+import { salto } from "../utils/paginacion.js";
 
-// Sin traduccion dominio <-> documento: lo que devuelve Mongoose ya es un
-// Colaborador con sus metodos (loadClass). Las habilidades vienen adentro
-// (copia desnormalizada), asi que tampoco hay que ir a buscarlas.
 export class MongoColaboradorRepository {
+  async crear(datos) {
+    return new ColaboradorModel(datos).save();
+  }
+
   async guardar(colaborador) {
-    return colaborador.save();
+    try {
+      return await colaborador.save();
+    } catch (error) {
+      if (error instanceof mongoose.Error.VersionError) throw new ConcurrenciaError();
+      throw error;
+    }
+  }
+
+  async bloquear(id) {
+    return esIdValido(id)
+      ? ColaboradorModel.findByIdAndUpdate(
+          id,
+          { $inc: { __v: 1 } },
+          { returnDocument: "after" },
+        )
+      : null;
   }
 
   async buscarPorId(id) {
     return esIdValido(id) ? ColaboradorModel.findById(id) : null;
   }
 
-  async listar() {
-    return ColaboradorModel.find().sort({ _id: 1 });
+  async ultimoId() {
+    return (
+      (await ColaboradorModel.findOne().sort({ _id: -1 }).select("_id"))?._id ?? null
+    );
   }
 
-  // Las que tienen TODAS las habilidades pedidas: $all compara contra los
-  // codigos guardados, sin traer a memoria a las que no califican.
-  async buscarPorHabilidades(codigos) {
-    return ColaboradorModel.find({ "habilidades.codigo": { $all: codigos } }).sort({
-      _id: 1,
-    });
+  async buscarParaAviso(perfiles, hastaId) {
+    const alternativas = perfiles
+      .filter((p) => p.habilidadesRequeridas.length > 0)
+      .map((p) => ({
+        "habilidades.codigo": { $all: p.habilidadesRequeridas.map((h) => h.codigo) },
+      }));
+    if (alternativas.length === 0 || !hastaId) return [];
+    return ColaboradorModel.find({
+      fechaBaja: null,
+      recibeMensajeriaInterna: true,
+      _id: { $lte: hastaId },
+      $or: alternativas,
+    }).sort({ _id: 1 });
   }
 
-  // Colaboradoras potenciales para un perfil: tienen TODAS las requeridas,
-  // no estan ya en el proyecto y van primero las que tienen mas opcionales.
-  // La base filtra, ordena y pagina: a la API llega solo la pagina pedida.
   async buscarPotenciales(
     { requeridas, opcionales = [], excluirIds = [] },
-    numeroPagina,
-    limitePorPagina,
+    { numeroPagina, limitePorPagina },
   ) {
-    const salto = (numeroPagina - 1) * limitePorPagina;
-
     const [resultado] = await ColaboradorModel.aggregate([
-      // 1. Tiene todas las requeridas y no se postulo todavia.
       {
         $match: {
           "habilidades.codigo": { $all: requeridas },
           _id: { $nin: excluirIds.map(aObjectId) },
+          fechaBaja: null,
         },
       },
-      // 2. Cuantas opcionales tiene: la interseccion de sus codigos con los
-      //    opcionales del perfil, y el tamaño de esa interseccion.
       {
         $addFields: {
           cantidadDeOpcionales: {
@@ -54,26 +75,23 @@ export class MongoColaboradorRepository {
           },
         },
       },
-      // 3. Primero las que cumplen mas opcionales; el _id desempata, para que
-      //    dos paginas seguidas no se pisen.
       { $sort: { cantidadDeOpcionales: -1, _id: 1 } },
-      // 4. La pagina y el total, en una sola consulta.
       {
         $facet: {
-          items: [{ $skip: salto }, { $limit: limitePorPagina }],
+          items: [
+            { $skip: salto(numeroPagina, limitePorPagina) },
+            { $limit: limitePorPagina },
+          ],
           total: [{ $count: "cantidad" }],
         },
       },
     ]);
 
     return {
-      // aggregate devuelve objetos planos: hydrate les devuelve los metodos y
-      // el toJSON del modelo (que oculta los medios de contacto).
       items: resultado.items.map(({ cantidadDeOpcionales: _, ...documento }) => {
         const colaborador = ColaboradorModel.hydrate(documento);
         return {
           colaborador,
-          // En el orden en que las pide el perfil (solo sobre la pagina).
           habilidadesOpcionalesQueTiene: opcionales.filter((codigo) =>
             colaborador.habilidades.some((h) => h.codigo === codigo),
           ),
@@ -83,14 +101,7 @@ export class MongoColaboradorRepository {
     };
   }
 
-  async listarPaginado(numeroPagina, limitePorPagina) {
-    const salto = (numeroPagina - 1) * limitePorPagina;
-
-    const [items, total] = await Promise.all([
-      ColaboradorModel.find().sort({ _id: 1 }).skip(salto).limit(limitePorPagina),
-      ColaboradorModel.countDocuments(),
-    ]);
-
-    return { items, total };
+  async listarPaginado(pagina) {
+    return paginar(ColaboradorModel, { fechaBaja: null }, pagina, { orden: { _id: 1 } });
   }
 }

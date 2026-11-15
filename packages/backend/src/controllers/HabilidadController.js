@@ -6,12 +6,8 @@ export class HabilidadController extends BaseController {
     this.habilidadService = habilidadService;
   }
 
-  crear = async (req, res) => {
-    res.status(201).json(await this.habilidadService.crear(req.body));
-  };
-
   listar = async (req, res) => {
-    const paginacion = this.aPaginacionDeDominio(req.paginacion);
+    const paginacion = this.aPaginacionDeDominio(req.consulta);
     this.responderPaginado(res, await this.habilidadService.listar(paginacion));
   };
 }

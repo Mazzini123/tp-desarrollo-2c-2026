@@ -25,9 +25,11 @@ describe("HTTP · limite de solicitudes por IP (req. adicional 14)", () => {
     const colectivo = await api
       .post("/colectivos")
       .send({ nombre: "F", descripcion: "d", tipoColectivo: "ONG" });
-    const proyecto = await api
-      .post(`/colectivos/${colectivo.body.id}/proyectos`)
-      .send({ titulo: "P", descripcion: "d", perfiles: [datosDePerfil({ requeridas: [CODIGOS.node] })] });
+    const proyecto = await api.post(`/colectivos/${colectivo.body.id}/proyectos`).send({
+      titulo: "P",
+      descripcion: "d",
+      perfiles: [datosDePerfil({ requeridas: [CODIGOS.node] })],
+    });
     const ruta = `/proyectos/${proyecto.body.id}/perfiles/${proyecto.body.perfiles[0].id}/colaboradoras-potenciales`;
 
     await api.get(ruta).expect(200);

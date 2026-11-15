@@ -1,21 +1,11 @@
 import { rateLimit } from "express-rate-limit";
-
-// Requerimiento adicional 14: "Proteger las busquedas y APIs publicas contra
-// scraping o abuso mediante limites de solicitudes por IP/usuario".
-//
-// Todavia no hay usuarios (llegan con la autenticacion, en la tercera
-// entrega), asi que el limite es por IP. El contador vive en la memoria del
-// proceso: alcanza porque la API corre en un solo contenedor. Con varias
-// replicas habria que compartirlo (por ejemplo en Redis).
+import { enteroDeEntorno } from "../config/entorno.js";
 
 const QUINCE_MINUTOS = 15 * 60 * 1000;
 const UN_MINUTO = 60 * 1000;
 
 export const LIMITES_POR_DEFECTO = Object.freeze({
-  // Todo el trafico: generoso, para no molestar a un uso normal del frontend.
   general: 300,
-  // Busquedas y estadisticas: son las consultas mas caras y las que un
-  // scraper recorreria.
   busquedas: 30,
 });
 
@@ -23,12 +13,9 @@ function crearLimitador({ ventanaMs, limite, mensaje }) {
   return rateLimit({
     windowMs: ventanaMs,
     limit: limite,
-    // Informa el cupo en la cabecera estandar RateLimit.
     standardHeaders: "draft-8",
     legacyHeaders: false,
-    // /health lo consultan los monitores: no cuenta.
-    skip: (req) => req.path === "/health",
-    // Misma forma que el resto de los errores de la API: { message }.
+    skip: (req) => ["/health", "/ready"].includes(req.path.replace(/\/$/, "")),
     handler: (_req, res) => res.status(429).json({ message: mensaje }),
   });
 }
@@ -50,14 +37,13 @@ export function crearLimitadores(limites = {}) {
   };
 }
 
-// Permite ajustar los limites sin tocar codigo (por ejemplo, en la VM).
 export function limitesDesdeEntorno(entorno = process.env) {
   const limites = {};
   if (entorno.LIMITE_SOLICITUDES_GENERAL) {
-    limites.general = Number(entorno.LIMITE_SOLICITUDES_GENERAL);
+    limites.general = enteroDeEntorno(entorno, "LIMITE_SOLICITUDES_GENERAL", 300);
   }
   if (entorno.LIMITE_SOLICITUDES_BUSQUEDAS) {
-    limites.busquedas = Number(entorno.LIMITE_SOLICITUDES_BUSQUEDAS);
+    limites.busquedas = enteroDeEntorno(entorno, "LIMITE_SOLICITUDES_BUSQUEDAS", 30);
   }
   return limites;
 }
