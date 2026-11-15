@@ -1,7 +1,10 @@
 export class CanalWhatsApp {
-  constructor({ cliente, remitente }) {
+  // plantilla: ContentSid (HX...) de una plantilla de Twilio. Las cuentas Trial no
+  // aceptan texto propio en WhatsApp: con plantilla se envía esa en lugar del contenido.
+  constructor({ cliente, remitente, plantilla = null }) {
     this.cliente = cliente;
     this.remitente = remitente;
+    this.plantilla = plantilla;
   }
 
   async enviar({ destino, contenido }) {
@@ -11,7 +14,7 @@ export class CanalWhatsApp {
       : `whatsapp:${destino}`;
 
     await this.cliente.messages.create({
-      body: contenido,
+      ...(this.plantilla ? { contentSid: this.plantilla } : { body: contenido }),
       from: this.remitente,
       to: destinoFormateado,
     });
