@@ -3,8 +3,9 @@ import { ROL } from "./enums/ROL.js";
 import { TIPO_CONTEXTO } from "./enums/TIPO_CONTEXTO.js";
 
 export const TIPOS_DE_CONTEXTO = [
-  { codigo: TIPO_CONTEXTO.COLABORADOR, nombre: "Colaborador" },
-  { codigo: TIPO_CONTEXTO.COLECTIVO, nombre: "Colectivo" },
+  { nombre: TIPO_CONTEXTO.COLABORADOR },
+  { nombre: TIPO_CONTEXTO.COLECTIVO },
+  { nombre: TIPO_CONTEXTO.ADMINISTRACION },
 ];
 
 export const DESCRIPCION_DE_PERMISOS = {
@@ -33,6 +34,11 @@ export const DESCRIPCION_DE_PERMISOS = {
   [PERMISO.MEMBRESIA_SOLICITUD_RESOLVER]: "Aceptar o rechazar solicitudes de ingreso",
   [PERMISO.MIEMBRO_ELIMINAR]: "Quitar miembros del colectivo",
   [PERMISO.LIDER_ASIGNAR]: "Pasarle el liderazgo a otro miembro",
+  [PERMISO.PROYECTO_DESTACAR]: "Destacar proyectos en la portada",
+  [PERMISO.REVISION_VER]: "Ver las revisiones manuales de proyectos",
+  [PERMISO.REVISION_RESOLVER]: "Resolver las revisiones manuales de proyectos",
+  [PERMISO.AUDITORIA_VER]: "Ver el registro de acciones administrativas",
+  [PERMISO.ADMIN_GESTIONAR]: "Otorgar el rol de administracion de la plataforma",
 };
 
 const PERMISOS_DE_COLABORADOR = [
@@ -70,23 +76,47 @@ const PERMISOS_PROPIOS_DE_LIDER = [
   PERMISO.LIDER_ASIGNAR,
 ];
 
+const PERMISOS_DE_ADMIN = [
+  PERMISO.PROYECTO_DESTACAR,
+  PERMISO.REVISION_VER,
+  PERMISO.REVISION_RESOLVER,
+  PERMISO.AUDITORIA_VER,
+  PERMISO.ADMIN_GESTIONAR,
+];
+
+export const PERMISOS = Object.values(PERMISO).map((nombre) => ({
+  nombre,
+  descripcion: DESCRIPCION_DE_PERMISOS[nombre],
+}));
+
 export const ROLES = [
+  { nombre: ROL.COLABORADOR, permisos: PERMISOS_DE_COLABORADOR },
+  { nombre: ROL.MIEMBRO, permisos: PERMISOS_DE_MIEMBRO },
   {
-    codigo: ROL.COLABORADOR,
-    nombre: "Colaboradora",
-    tipoContexto: TIPO_CONTEXTO.COLABORADOR,
-    permisos: PERMISOS_DE_COLABORADOR,
-  },
-  {
-    codigo: ROL.MIEMBRO,
-    nombre: "Miembro",
-    tipoContexto: TIPO_CONTEXTO.COLECTIVO,
-    permisos: PERMISOS_DE_MIEMBRO,
-  },
-  {
-    codigo: ROL.LIDER,
-    nombre: "Lider",
-    tipoContexto: TIPO_CONTEXTO.COLECTIVO,
+    nombre: ROL.LIDER,
     permisos: [...PERMISOS_DE_MIEMBRO, ...PERMISOS_PROPIOS_DE_LIDER],
   },
+  { nombre: ROL.ADMIN, permisos: PERMISOS_DE_ADMIN },
 ];
+
+export const ROLES_POR_TIPO = Object.freeze({
+  [TIPO_CONTEXTO.COLABORADOR]: [ROL.COLABORADOR],
+  [TIPO_CONTEXTO.COLECTIVO]: [ROL.MIEMBRO, ROL.LIDER],
+  [TIPO_CONTEXTO.ADMINISTRACION]: [ROL.ADMIN],
+});
+
+export function problemaDeConsistencia({ tipo, rol, colectivoId, colaboradorId }) {
+  if (!ROLES_POR_TIPO[tipo]?.includes(rol)) {
+    return `El rol ${rol} no corresponde a un contexto ${tipo}`;
+  }
+  if (tipo === TIPO_CONTEXTO.COLABORADOR && (!colaboradorId || colectivoId)) {
+    return "Un contexto COLABORADOR tiene colaborador y no tiene colectivo";
+  }
+  if (tipo === TIPO_CONTEXTO.COLECTIVO && (!colectivoId || colaboradorId)) {
+    return "Un contexto COLECTIVO tiene colectivo y no tiene colaborador";
+  }
+  if (tipo === TIPO_CONTEXTO.ADMINISTRACION && (colectivoId || colaboradorId)) {
+    return "Un contexto ADMINISTRACION no tiene colectivo ni colaborador";
+  }
+  return null;
+}

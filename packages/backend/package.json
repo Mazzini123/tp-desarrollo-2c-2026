@@ -9,6 +9,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
+    "admin:otorgar": "node scripts/otorgarAdmin.js",
     "test": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js",
     "test:integracion": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js tests/integracion"
   },

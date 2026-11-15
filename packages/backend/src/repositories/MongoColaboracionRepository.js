@@ -31,6 +31,24 @@ export class MongoColaboracionRepository {
     );
   }
 
+  async ultimaAceptacionPorProyecto(proyectoIds) {
+    const filas = await ColaboracionModel.aggregate([
+      {
+        $match: {
+          proyectoId: { $in: proyectoIds.map(aObjectId) },
+          estado: COLABORACION_ESTADO.ACEPTADA,
+        },
+      },
+      {
+        $group: {
+          _id: "$proyectoId",
+          fecha: { $max: { $ifNull: ["$fechaResolucion", "$fecha"] } },
+        },
+      },
+    ]);
+    return new Map(filas.map((fila) => [String(fila._id), fila.fecha]));
+  }
+
   async contarAceptadasPorPerfil(proyectoId) {
     const filas = await ColaboracionModel.aggregate([
       {

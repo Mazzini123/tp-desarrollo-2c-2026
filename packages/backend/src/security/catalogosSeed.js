@@ -1,35 +1,30 @@
-import { PERMISO } from "./autorizacion/enums/PERMISO.js";
-import {
-  DESCRIPCION_DE_PERMISOS,
-  ROLES,
-  TIPOS_DE_CONTEXTO,
-} from "./autorizacion/rolesYPermisos.js";
+import { PERMISOS, ROLES, TIPOS_DE_CONTEXTO } from "./autorizacion/rolesYPermisos.js";
 
 export async function asegurarCatalogos(catalogoRepository, proveedores = []) {
-  await catalogoRepository.asegurarPermisos(
-    Object.values(PERMISO).map((codigo) => ({
-      codigo,
-      descripcion: DESCRIPCION_DE_PERMISOS[codigo],
-    })),
-  );
+  await catalogoRepository.asegurarPermisos(PERMISOS);
   await catalogoRepository.asegurarTiposDeContexto(TIPOS_DE_CONTEXTO);
-  await catalogoRepository.asegurarRoles(ROLES);
+  await catalogoRepository.asegurarRoles(ROLES.map(({ nombre }) => ({ nombre })));
+  for (const { nombre, permisos } of ROLES) {
+    await catalogoRepository.asegurarPermisosDeRol(nombre, permisos);
+  }
   await catalogoRepository.asegurarProveedores(
     proveedores.map(({ codigo, nombre, mecanismo }) => ({
-      codigo,
+      proveedor: codigo,
       nombre: nombre ?? codigo,
       mecanismo,
     })),
   );
 
-  const enLaBase = new Set(await catalogoRepository.listarCodigosDePermiso());
-  const faltantes = Object.values(PERMISO).filter((codigo) => !enLaBase.has(codigo));
+  const enLaBase = new Set(await catalogoRepository.listarNombresDePermiso());
+  const faltantes = PERMISOS.filter(({ nombre }) => !enLaBase.has(nombre));
   if (faltantes.length > 0) {
-    throw new Error(`Faltan permisos en el catalogo: ${faltantes.join(", ")}`);
+    throw new Error(
+      `Faltan permisos en el catalogo: ${faltantes.map((p) => p.nombre).join(", ")}`,
+    );
   }
 
   return {
     roles: await catalogoRepository.listarRoles(),
-    proveedoresActivos: await catalogoRepository.listarCodigosDeProveedoresActivos(),
+    proveedoresActivos: await catalogoRepository.listarProveedoresActivos(),
   };
 }

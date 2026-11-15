@@ -311,4 +311,38 @@ export const entradas = {
       comentario: { type: "string", maxLength: 280 },
     },
   },
+  DestacarProyecto: {
+    type: "object",
+    required: ["hasta"],
+    additionalProperties: false,
+    properties: {
+      hasta: {
+        type: "string",
+        description:
+          "Vencimiento: fecha-hora ISO con zona, o fecha (se toma el fin de ese dia en Argentina). Tiene que ser futuro.",
+        example: "2026-12-31",
+      },
+    },
+  },
+  ResolverRevision: {
+    type: "object",
+    required: ["estado"],
+    additionalProperties: false,
+    properties: {
+      estado: { type: "string", enum: ["REVISADA", "DESCARTADA"] },
+      nota: { type: "string", maxLength: 1000 },
+    },
+  },
+  OtorgarAdministrador: {
+    type: "object",
+    required: ["usuarioId"],
+    additionalProperties: false,
+    properties: {
+      usuarioId: {
+        type: "string",
+        pattern: "^[a-f0-9]{24}$",
+        description: "Id interno del usuario (`usuario.id` de GET /auth/me).",
+      },
+    },
+  },
 };

@@ -10,8 +10,8 @@ export const respuestas = {
     nullable: true,
     properties: {
       id: OBJECT_ID,
-      tipo: { type: "string", enum: ["COLABORADOR", "COLECTIVO"] },
-      rol: { type: "string", enum: ["COLABORADOR", "MIEMBRO", "LIDER"] },
+      tipo: { type: "string", enum: ["COLABORADOR", "COLECTIVO", "ADMINISTRACION"] },
+      rol: { type: "string", enum: ["COLABORADOR", "MIEMBRO", "LIDER", "ADMIN"] },
       colectivo: {
         type: "object",
         nullable: true,
@@ -577,6 +577,63 @@ respuestas.ResumenProyecto = {
     postulacionesPendientes: {
       type: "integer",
       description: "Solo en la lista propia del colectivo.",
+    },
+    destacado: {
+      type: "boolean",
+      description:
+        "Solo aparece (con valor true) si el proyecto esta destacado y vigente. " +
+        "Los destacados vigentes se listan primero.",
+    },
+  },
+};
+respuestas.AccionAdministrativa = {
+  type: "object",
+  properties: {
+    id: OBJECT_ID,
+    usuarioId: { ...OBJECT_ID, nullable: true },
+    contextoId: { ...OBJECT_ID, nullable: true },
+    accion: { type: "string" },
+    entidad: {
+      type: "object",
+      properties: { tipo: { type: "string" }, id: OBJECT_ID },
+    },
+    detalle: { type: "object" },
+    fecha: { type: "string", format: "date-time" },
+  },
+};
+respuestas.Revision = {
+  type: "object",
+  properties: {
+    id: OBJECT_ID,
+    proyecto: {
+      type: "object",
+      properties: {
+        id: OBJECT_ID,
+        titulo: { type: "string" },
+        colectivo: {
+          type: "object",
+          properties: { id: OBJECT_ID, nombre: { type: "string" } },
+        },
+      },
+    },
+    motivo: { type: "string", enum: ["SIN_ACTUALIZACIONES"] },
+    estado: { type: "string", enum: ["PENDIENTE", "REVISADA", "DESCARTADA"] },
+    creadaEn: { type: "string", format: "date-time" },
+    resueltaPor: { ...OBJECT_ID, nullable: true },
+    resueltaEn: { type: "string", format: "date-time", nullable: true },
+    nota: { type: "string", nullable: true },
+  },
+};
+respuestas.DestacadoDeProyecto = {
+  type: "object",
+  properties: {
+    id: OBJECT_ID,
+    destacado: {
+      type: "object",
+      properties: {
+        desde: { type: "string", format: "date-time" },
+        hasta: { type: "string", format: "date-time" },
+      },
     },
   },
 };

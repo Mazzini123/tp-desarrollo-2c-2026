@@ -33,8 +33,8 @@ export class ColectivoController extends BaseController {
 
   listar = async (req, res) => {
     const paginacion = this.aPaginacionDeDominio(req.consulta);
-    const { etiqueta } = req.consulta;
-    const pagina = await this.colectivoService.listar({ ...paginacion, etiqueta });
+    const { etiqueta, q } = req.consulta;
+    const pagina = await this.colectivoService.listar({ ...paginacion, etiqueta, q });
     const items = await this.colectivoService.conCantidadDeProyectos(pagina.items);
     this.responderPaginado(res, paginaPublica({ ...pagina, items }, colectivoPublico));
   };

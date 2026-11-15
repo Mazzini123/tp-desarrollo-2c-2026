@@ -19,7 +19,7 @@ import {
   medioDeContactoEnRutaSchema,
   medioDeContactoSchema,
 } from "../schemas/medioDeContactoSchema.js";
-import { listadoConEtiquetaSchema } from "../schemas/comunesSchema.js";
+import { listadoDeColectivosSchema } from "../schemas/comunesSchema.js";
 import {
   listadoDeSolicitudesSchema,
   transferirLiderazgoSchema,
@@ -42,7 +42,7 @@ export function crearColectivosRouter(controllers, autorizacion) {
     autorizacion.nombre,
     colectivoController.crear,
   );
-  router.get("/", validarQuery(listadoConEtiquetaSchema), colectivoController.listar);
+  router.get("/", validarQuery(listadoDeColectivosSchema), colectivoController.listar);
   router.get("/:id", autorizacion.opcional, colectivoController.obtenerPorId);
   router.put(
     "/:id",

@@ -1,5 +1,5 @@
 import { detalleDeProyecto } from "../dto/detalleDeProyecto.js";
-import { paginaDeResumenes } from "../dto/resumenDeProyecto.js";
+import { paginaDeResumenes, resumenDeProyecto } from "../dto/resumenDeProyecto.js";
 import { PRIMERA_PAGINA } from "../dto/paginacion.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
 import { notificarResoluciones } from "./soporte/notificarResoluciones.js";
@@ -102,6 +102,11 @@ export class ProyectoService {
         pagina,
       ),
     );
+  }
+
+  async listarDestacados(ahora = new Date()) {
+    const proyectos = await this.proyectoRepository.listarDestacadosVigentes(ahora);
+    return proyectos.map((proyecto) => resumenDeProyecto(proyecto, ahora));
   }
 
   async listarResumenesPorColectivo(

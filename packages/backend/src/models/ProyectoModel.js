@@ -121,6 +121,15 @@ aplicarFormatoJSON(avanceSchema, {
   campos: ["id", "porcentajeConcrecion", "urlSistema", "urlRepositorio", "fecha"],
 });
 
+const destacadoSchema = new mongoose.Schema(
+  {
+    desde: { type: Date, required: true },
+    hasta: { type: Date, required: true },
+    marcadoPor: { type: mongoose.Schema.Types.ObjectId, ref: "Usuario", required: true },
+  },
+  DE_VALOR,
+);
+
 const datosDelColectivoSchema = new mongoose.Schema(
   {
     nombre: { type: String, required: true },
@@ -160,6 +169,7 @@ const proyectoSchema = new mongoose.Schema(
     fechaFinalizacion: { type: Date, default: null },
     fechaCierre: { type: Date, default: null },
     visualizaciones: { type: Number, default: 0 },
+    destacado: { type: destacadoSchema, default: undefined },
     idempotenciaPublicacion: {
       clave: String,
       huella: String,
@@ -223,6 +233,7 @@ aplicarFormatoJSON(proyectoSchema, {
 proyectoSchema.index({ colectivoId: 1, fechaCreacion: 1 });
 proyectoSchema.index({ estado: 1, fechaCierre: 1 });
 proyectoSchema.index({ etiquetas: 1 });
+proyectoSchema.index({ "destacado.hasta": 1 });
 proyectoSchema.index({ "perfiles.habilidadesRequeridas.codigo": 1 });
 proyectoSchema.index(
   { colectivoId: 1, "idempotenciaPublicacion.clave": 1 },

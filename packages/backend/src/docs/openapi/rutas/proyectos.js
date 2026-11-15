@@ -21,10 +21,34 @@ export const rutasProyectos = {
       tags: ["Proyectos"],
       summary: "Listar proyectos",
       description:
-        "Todos los proyectos de todos los colectivos, en orden de creacion. " +
+        "Todos los proyectos de todos los colectivos, en orden de creacion; los " +
+        "destacados vigentes van primero. " +
         "Los filtros se combinan con AND.",
       parameters: [...paramsPaginacion, ...paramsFiltroDeProyectos],
       responses: listado("ResumenProyecto"),
+    },
+  },
+
+  "/proyectos/destacados": {
+    get: {
+      tags: ["Proyectos"],
+      summary: "Proyectos destacados vigentes",
+      description:
+        "Portada: los destacados vigentes, primero el que menos tiempo lleva destacado y, " +
+        "ante empate, el que vence antes. Publico. Un destacado vencido deja de listarse solo.",
+      responses: {
+        200: {
+          description: "Lista (maximo `MAX_DESTACADOS_ACTIVOS`, 6 por defecto).",
+          content: {
+            "application/json": {
+              schema: {
+                type: "array",
+                items: { $ref: "#/components/schemas/ResumenProyecto" },
+              },
+            },
+          },
+        },
+      },
     },
   },
 
@@ -364,7 +388,9 @@ export const rutasProyectos = {
       tags: ["Proyectos"],
       summary: "Postularse al proyecto",
       description:
-        "La persona se postula a un perfil (`perfilId`). Validaciones, en este orden: el " +
+        "La persona se postula a un perfil (`perfilId`). Validaciones, en este orden: su " +
+        "cuenta no puede participar, como lider o miembro, en el colectivo del proyecto " +
+        "(422 POSTULACION_EN_COLECTIVO_PROPIO), el " +
         "proyecto tiene que estar abierto (409 si no; si la fecha de cierre ya paso, se " +
         "cierra en el momento), el perfil tiene que existir (404) y tener la busqueda " +
         "abierta y sin vencer (409), la persona tiene que tener **todas** las habilidades " +
@@ -431,7 +457,8 @@ export const rutasProyectos = {
       summary: "Aceptar una postulacion",
       description:
         "Solo una PENDIENTE, de un proyecto abierto y con vacantes (409 si no). Si con esta " +
-        "se llena el cupo, en los modos automaticos se rechazan las pendientes restantes.",
+        "se llena el cupo, en los modos automaticos se rechazan las pendientes restantes." +
+        " Si la postulacion es de la misma cuenta que actua como colectivo, 422 COLABORACION_PROPIA.",
       responses: {
         ...recurso("Colaboracion", 200, "Postulacion aceptada."),
         404: errores[404],
@@ -445,7 +472,9 @@ export const rutasProyectos = {
     post: {
       tags: ["Postulaciones"],
       summary: "Rechazar una postulacion",
-      description: "Solo una PENDIENTE, de un proyecto abierto (409 si no).",
+      description:
+        "Solo una PENDIENTE, de un proyecto abierto (409 si no)." +
+        " Si la postulacion es de la misma cuenta que actua como colectivo, 422 COLABORACION_PROPIA.",
       responses: {
         ...recurso("Colaboracion", 200, "Postulacion rechazada."),
         404: errores[404],
@@ -477,7 +506,8 @@ export const rutasProyectos = {
       summary: "Desvincular a una persona de un proyecto",
       description:
         "La usa tanto el colectivo como la persona colaboradora. Solo una ACEPTADA " +
-        "(409 si no). Es permanente: la colaboracion queda DESVINCULADA en el historial.",
+        "(409 si no). Es permanente: la colaboracion queda DESVINCULADA en el historial." +
+        " Si la postulacion es de la misma cuenta que actua como colectivo, 422 COLABORACION_PROPIA.",
       responses: {
         ...recurso("Colaboracion", 200, "Colaboracion desvinculada."),
         404: errores[404],
@@ -493,7 +523,8 @@ export const rutasProyectos = {
       summary: "Finalizar una colaboracion",
       description:
         "La persona termina su parte antes de que cierre el proyecto. Solo una ACEPTADA " +
-        "(409 si no). Desde ahi las dos partes pueden valorarse.",
+        "(409 si no). Desde ahi las dos partes pueden valorarse." +
+        " Si la postulacion es de la misma cuenta que actua como colectivo, 422 COLABORACION_PROPIA.",
       responses: {
         ...recurso("Colaboracion", 200, "Colaboracion finalizada."),
         404: errores[404],
@@ -510,7 +541,7 @@ export const rutasProyectos = {
       description:
         "Req. adicional 39. Solo una colaboracion FINALIZADA, y cada parte (`autor`) una " +
         "sola vez (409 si no). Mientras no haya usuarios (tercera entrega), el autor se " +
-        "declara en el body.",
+        "declara en el body. Con `autor` COLECTIVO sobre la propia colaboracion, 422 COLABORACION_PROPIA.",
       requestBody: body("CrearValoracion"),
       responses: {
         ...recurso("Valoracion", 201, "Valoracion registrada."),

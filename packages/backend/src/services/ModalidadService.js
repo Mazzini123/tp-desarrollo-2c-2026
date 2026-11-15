@@ -24,7 +24,6 @@ function motivoDeActividad(enCurso) {
 export class ModalidadService {
   constructor({
     transacciones,
-    contextoService,
     contextoUsuarioRepository,
     usuarioRepository,
     colectivoService,
@@ -33,7 +32,6 @@ export class ModalidadService {
   }) {
     this.transacciones = transacciones;
     this.colaboracionService = colaboracionService;
-    this.contextoService = contextoService;
     this.contextoUsuarioRepository = contextoUsuarioRepository;
     this.usuarioRepository = usuarioRepository;
     this.colectivoService = colectivoService;
@@ -43,7 +41,6 @@ export class ModalidadService {
   async crearPerfilColaborador(usuario, datos) {
     const colaborador = await this.transacciones.ejecutar(async () => {
       await this.usuarioRepository.bloquear(usuario._id);
-      await this.contextoService.exigirSinModalidad(usuario._id, TIPO_CONTEXTO.COLECTIVO);
       const tienePerfilActivo = await this.contextoUsuarioRepository.existeActivoDeTipo(
         usuario._id,
         TIPO_CONTEXTO.COLABORADOR,
@@ -114,10 +111,6 @@ export class ModalidadService {
   async crearColectivo(usuario, datos) {
     return this.transacciones.ejecutar(async () => {
       await this.usuarioRepository.bloquear(usuario._id);
-      await this.contextoService.exigirSinModalidad(
-        usuario._id,
-        TIPO_CONTEXTO.COLABORADOR,
-      );
 
       const colectivo = await this.colectivoService.crear(datos);
       const contexto = await this.contextoUsuarioRepository.crear({

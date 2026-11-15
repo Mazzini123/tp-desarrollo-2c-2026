@@ -8,10 +8,19 @@ import { errorDeDuplicado, esDuplicado } from "./duplicados.js";
 import { esIdValido } from "./objectIds.js";
 import { paginar } from "./paginar.js";
 import { COLABORACION_ESTADO } from "../domain/enums/COLABORACION_ESTADO.js";
+import { ControlModel } from "../models/ControlModel.js";
+import { salto } from "../utils/paginacion.js";
 
 const ORDEN = { fechaCreacion: 1, _id: 1 };
+const ORDEN_DE_DESTACADOS = { "destacado.desde": -1, "destacado.hasta": 1, _id: 1 };
 const CAMPOS_DE_RESUMEN =
-  "titulo descripcion estado porcentajeConcrecion perfiles etiquetas fechaCreacion fechaCierre colectivoId datosDelColectivo";
+  "titulo descripcion estado porcentajeConcrecion perfiles etiquetas fechaCreacion fechaCierre colectivoId datosDelColectivo destacado";
+
+const filtroDeVigente = (ahora) => ({
+  estado: PROYECTO_ESTADO.ABIERTO,
+  "destacado.desde": { $lte: ahora },
+  "destacado.hasta": { $gt: ahora },
+});
 
 export class MongoProyectoRepository {
   nuevo(datos) {
@@ -169,8 +178,73 @@ export class MongoProyectoRepository {
     );
   }
 
-  async listarPaginado(pagina, filtros = {}) {
-    return this.paginarResumenes(filtroDeListado(filtros), pagina);
+  async listarPaginado(pagina, filtros = {}, ahora = new Date()) {
+    const filtro = filtroDeListado(filtros);
+    const vigentes = await ProyectoModel.find({ $and: [filtro, filtroDeVigente(ahora)] })
+      .select(CAMPOS_DE_RESUMEN)
+      .sort(ORDEN_DE_DESTACADOS)
+      .lean();
+    if (vigentes.length === 0) return this.paginarResumenes(filtro, pagina);
+
+    const { numeroPagina, limitePorPagina } = pagina;
+    const desde = salto(numeroPagina, limitePorPagina);
+    const delanteros = vigentes.slice(desde, desde + limitePorPagina);
+    const faltan = limitePorPagina - delanteros.length;
+    const restantes =
+      faltan > 0
+        ? await ProyectoModel.find({
+            $and: [filtro, { $nor: [filtroDeVigente(ahora)] }],
+          })
+            .sort(ORDEN)
+            .skip(Math.max(0, desde - vigentes.length))
+            .limit(faltan)
+            .select(CAMPOS_DE_RESUMEN)
+            .lean()
+        : [];
+    const total = await ProyectoModel.countDocuments(filtro);
+    return { items: [...delanteros, ...restantes], total };
+  }
+
+  async listarDestacadosVigentes(ahora = new Date()) {
+    return ProyectoModel.find(filtroDeVigente(ahora))
+      .select(CAMPOS_DE_RESUMEN)
+      .sort(ORDEN_DE_DESTACADOS)
+      .lean();
+  }
+
+  async contarDestacadosVigentes(ahora, excluirId = null) {
+    return ProyectoModel.countDocuments({
+      ...filtroDeVigente(ahora),
+      ...(excluirId && { _id: { $ne: excluirId } }),
+    });
+  }
+
+  async bloquearDestacados() {
+    await ControlModel.updateOne(
+      { _id: "destacados" },
+      { $inc: { version: 1 } },
+      { upsert: true },
+    );
+  }
+
+  async buscarParaDestacar(id) {
+    return esIdValido(id)
+      ? ProyectoModel.findById(id).select("estado colectivoId destacado").lean()
+      : null;
+  }
+
+  async fijarDestacado(id, destacado) {
+    await ProyectoModel.updateOne({ _id: id }, { $set: { destacado } });
+  }
+
+  async quitarDestacado(id) {
+    await ProyectoModel.updateOne({ _id: id }, { $unset: { destacado: "" } });
+  }
+
+  async buscarAbiertosParaSeguimiento() {
+    return ProyectoModel.find({ estado: PROYECTO_ESTADO.ABIERTO })
+      .select("estado avances.fecha logros.fecha")
+      .lean();
   }
 
   async contarPorColectivos(ids) {

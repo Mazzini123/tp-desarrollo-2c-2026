@@ -3,7 +3,7 @@ import { ROLES } from "./rolesYPermisos.js";
 export class CatalogoDeRoles {
   constructor(roles = ROLES) {
     this.permisosPorRol = new Map(
-      roles.map((rol) => [rol.codigo, new Set(rol.permisos)]),
+      roles.map((rol) => [rol.nombre, new Set(rol.permisos)]),
     );
   }
 

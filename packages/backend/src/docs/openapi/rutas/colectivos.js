@@ -4,6 +4,7 @@ import {
   OBJECT_ID,
   errores,
   paramEtiqueta,
+  paramBusquedaPorNombre,
   arrayDe,
   paramsPaginacion,
   paramId,
@@ -38,8 +39,10 @@ export const rutasColectivos = {
       tags: ["Colectivos"],
       summary: "Listar colectivos",
       description:
-        "No incluye a los colectivos dados de baja; su detalle por id sigue disponible.",
-      parameters: [...paramsPaginacion, paramEtiqueta],
+        "No incluye a los colectivos dados de baja; su detalle por id sigue disponible. " +
+        "`q` busca por coincidencia parcial en el nombre, sin distinguir mayusculas ni tildes, " +
+        "y se puede combinar con `etiqueta`.",
+      parameters: [...paramsPaginacion, paramEtiqueta, paramBusquedaPorNombre],
       responses: listado("ResumenColectivo"),
     },
   },
@@ -156,8 +159,8 @@ export const rutasColectivos = {
       description:
         "La pide el usuario por si mismo: no lleva X-Context-Id. Una solicitud pendiente " +
         "no da ningun permiso. 409 si ya es miembro, si ya tiene una pendiente, si el " +
-        "colectivo esta dado de baja, si opera como colaboradora o si todavia no cargo " +
-        "su nombre (NOMBRE_REQUERIDO).",
+        "colectivo esta dado de baja o si todavia no cargo su nombre (NOMBRE_REQUERIDO). " +
+        "La cuenta puede tener a la vez su perfil de colaboradora.",
       responses: {
         201: { description: "Solicitud PENDIENTE." },
         404: errores[404],

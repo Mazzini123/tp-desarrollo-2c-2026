@@ -1,5 +1,6 @@
 import { jest } from "@jest/globals";
 import { colaboracion, proyecto } from "./entidades.js";
+import { TIPO_CONTEXTO } from "../../../src/security/autorizacion/enums/TIPO_CONTEXTO.js";
 
 export const sinTransacciones = { ejecutar: (operacion) => operacion() };
 
@@ -60,4 +61,31 @@ export class ColectivoRepositoryEnMemoria {
   async bloquear(id) {
     return this.buscarPorId(id);
   }
+}
+
+export class ContextoUsuarioRepositoryEnMemoria {
+  constructor(contextos = []) {
+    this.contextos = contextos;
+    this.buscarDeColaborador = jest.fn(
+      async (colaboradorId) =>
+        this.contextos.find(
+          (c) =>
+            c.tipo === TIPO_CONTEXTO.COLABORADOR &&
+            String(c.colaboradorId) === String(colaboradorId),
+        ) ?? null,
+    );
+    this.buscarDeUsuarioEnColectivo = jest.fn(
+      async (usuarioId, colectivoId) =>
+        this.contextos.find(
+          (c) =>
+            c.tipo === TIPO_CONTEXTO.COLECTIVO &&
+            String(c.usuarioId) === String(usuarioId) &&
+            String(c.colectivoId) === String(colectivoId),
+        ) ?? null,
+    );
+  }
+}
+
+export function usuarioRepositoryEspia() {
+  return { bloquear: jest.fn(async () => {}) };
 }

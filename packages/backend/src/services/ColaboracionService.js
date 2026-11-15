@@ -2,6 +2,7 @@ import { armarPaginado } from "../utils/paginacion.js";
 import { notificarResoluciones } from "./soporte/notificarResoluciones.js";
 import { proyectosPorId } from "./soporte/proyectosPorId.js";
 import { DomainError } from "../errors/DomainError.js";
+import { CODIGO_ERROR } from "../errors/CODIGO_ERROR.js";
 import { ConflictError } from "../errors/ConflictError.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
 import { ForbiddenError } from "../errors/ForbiddenError.js";
@@ -25,15 +26,37 @@ export class ColaboracionService {
     proyectoService,
     colaboradorService,
     notificacionService,
+    contextoUsuarioRepository,
+    usuarioRepository,
     transacciones,
   }) {
     this.transacciones = transacciones;
+    this.contextoUsuarioRepository = contextoUsuarioRepository;
+    this.usuarioRepository = usuarioRepository;
     this.proyectoRepository = proyectoRepository;
     this.colaboracionRepository = colaboracionRepository;
     this.colectivoService = colectivoService;
     this.proyectoService = proyectoService;
     this.colaboradorService = colaboradorService;
     this.notificacionService = notificacionService;
+  }
+
+  async exigirFueraDelColectivoDelProyecto(colaborador, proyecto) {
+    const contexto = await this.contextoUsuarioRepository.buscarDeColaborador(
+      colaborador._id,
+    );
+    if (!contexto) return;
+    await this.usuarioRepository.bloquear(contexto.usuarioId);
+    const membresia = await this.contextoUsuarioRepository.buscarDeUsuarioEnColectivo(
+      contexto.usuarioId,
+      proyecto.colectivoId,
+    );
+    if (membresia?.activo) {
+      throw new DomainError(
+        "No podés postularte a un proyecto de un colectivo en el que participás",
+        CODIGO_ERROR.POSTULACION_EN_COLECTIVO_PROPIO,
+      );
+    }
   }
 
   async registrar(
@@ -46,6 +69,7 @@ export class ColaboracionService {
       });
       this.colaboradorService.exigirActiva(colaborador);
       const proyecto = await this.proyectoService.buscarPorId(proyectoId);
+      await this.exigirFueraDelColectivoDelProyecto(colaborador, proyecto);
 
       if (cierreVencido(proyecto, ahora)) {
         await this.proyectoService.cerrar(proyecto, ahora);

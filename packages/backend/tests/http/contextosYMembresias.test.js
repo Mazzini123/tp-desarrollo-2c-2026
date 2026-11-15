@@ -1,6 +1,8 @@
+import { conReferencias, contextoGuardado } from "../soporte/contextos.js";
 import mongoose from "mongoose";
 import { IdentidadExternaModel } from "../../src/security/persistencia/IdentidadExternaModel.js";
 import { UsuarioModel } from "../../src/security/persistencia/UsuarioModel.js";
+import { ProveedorAutentificadorModel } from "../../src/security/persistencia/catalogos.js";
 import { ContextoUsuarioModel } from "../../src/security/persistencia/ContextoUsuarioModel.js";
 import { ColectivoModel } from "../../src/models/ColectivoModel.js";
 import { SolicitudIngresoModel } from "../../src/security/persistencia/SolicitudIngresoModel.js";
@@ -49,7 +51,7 @@ async function armar({ compat = false } = {}) {
     return body;
   };
   const crearPersona = async (cuenta) => {
-    await registrar(cuenta);
+    await nombrar(cuenta);
     const { body } = await api
       .post("/colaboradores")
       .set(token(cuenta))
@@ -145,8 +147,8 @@ describe("HTTP · registro e identidad", () => {
   test("un fallo despues de ambas escrituras revierte el registro y permite reintentar", async () => {
     const { api, services, registrar, token } = await armar();
     const repositorio = services.registroService.usuarioRepository;
-    const asegurar = repositorio.asegurar;
-    repositorio.asegurar = async function (id) {
+    const asegurar = repositorio.asegurarDeIdentidad;
+    repositorio.asegurarDeIdentidad = async function (id) {
       await asegurar.call(this, id);
       throw new Error("falla inyectada en el registro");
     };
@@ -156,14 +158,16 @@ describe("HTTP · registro e identidad", () => {
     expect(await UsuarioModel.countDocuments()).toBe(0);
     await api.get("/auth/me").set(token("ana")).expect(403);
 
-    repositorio.asegurar = asegurar;
+    repositorio.asegurarDeIdentidad = asegurar;
     const { body } = await registrar("ana").expect(201);
+    const proveedor = await ProveedorAutentificadorModel.findOne({ proveedor: "prueba" });
     const identidad = await IdentidadExternaModel.findOne({
-      proveedor: "prueba",
-      sub: "cuenta-ana",
+      proveedorId: proveedor._id,
+      identificadorExterno: "cuenta-ana",
     });
-    expect(String(identidad.usuarioId)).toBe(body.usuarioId);
-    expect(await UsuarioModel.findById(body.usuarioId)).toMatchObject({ nombre: null });
+    const usuario = await UsuarioModel.findById(body.usuarioId);
+    expect(usuario).toMatchObject({ nombre: null, contextoActualId: null });
+    expect(usuario.identidadExternaId).toEqual(identidad._id);
   });
 
   test.each(["Basic abc", "Bearer", "Bearer cuenta-ana sobra"])(
@@ -424,6 +428,16 @@ describe("HTTP · nombre del usuario", () => {
     expect(
       codigo(
         await api
+          .post("/colaboradores")
+          .set(token("caro"))
+          .send({ cuentaGit: "caro" })
+          .expect(409),
+      ),
+    ).toBe("NOMBRE_REQUERIDO");
+    expect((await yo("caro")).contextos).toEqual([]);
+    expect(
+      codigo(
+        await api
           .post(`/colectivos/${a.id}/solicitudes-ingreso`)
           .set(token("caro"))
           .expect(409),
@@ -534,8 +548,7 @@ describe("HTTP · baja de colaboradora", () => {
   });
 
   test("la misma cuenta puede dar de alta un perfil y contexto nuevos despues de la baja", async () => {
-    const { api, token, como, proyecto, ada, crearPersona, yo, nombrar } =
-      await conProyecto();
+    const { api, token, como, proyecto, ada, crearPersona, yo } = await conProyecto();
     const eva = await crearPersona("eva");
     const cuentaEva = await yo("eva");
     const perfil = `/proyectos/${proyecto.id}/perfiles/${proyecto.perfiles[0].id}`;
@@ -569,9 +582,7 @@ describe("HTTP · baja de colaboradora", () => {
       usuarioId: cuentaEva.usuario.id,
       creado: false,
     });
-    expect(
-      await ContextoUsuarioModel.findById(cuentaEva.contextoActual.id),
-    ).toMatchObject({
+    expect(await contextoGuardado(cuentaEva.contextoActual.id)).toMatchObject({
       activo: false,
       colaboradorId: new mongoose.Types.ObjectId(eva.id),
     });
@@ -581,19 +592,6 @@ describe("HTTP · baja de colaboradora", () => {
         .post("/colaboradores")
         .set(token("eva"))
         .send({ cuentaGit, codigosHabilidades: [CODIGOS.node] });
-
-    // Puede pasar a colectivo después de la baja de colaboradora.
-    await nombrar("eva");
-    const { body: suyo } = await api
-      .post("/colectivos")
-      .set(token("eva"))
-      .send({ nombre: "De Eva", descripcion: "d", tipoColectivo: "ONG" })
-      .expect(201);
-    await yo("eva");
-    expect(codigo(await alta("eva2").expect(409))).toBe("MODALIDAD_INCOMPATIBLE");
-
-    await api.post(`/colectivos/${suyo.id}/baja`).set(como("eva")).expect(200);
-    expect(await yo("eva")).toMatchObject({ contextoActual: null, contextos: [] });
 
     const altas = await Promise.all([alta("eva2"), alta("eva3")]);
     expect(altas.map(({ status }) => status).sort()).toEqual([201, 409]);
@@ -608,14 +606,14 @@ describe("HTTP · baja de colaboradora", () => {
     expect(cuenta.contextos).toEqual([cuenta.contextoActual]);
     expect(cuenta.contextoActual.id).not.toBe(cuentaEva.contextoActual.id);
     expect(
-      await ContextoUsuarioModel.countDocuments({
-        usuarioId: cuenta.usuario.id,
-        tipo: "COLABORADOR",
-      }),
+      await ContextoUsuarioModel.countDocuments(
+        await conReferencias({
+          usuarioId: cuenta.usuario.id,
+          tipo: "COLABORADOR",
+        }),
+      ),
     ).toBe(2);
-    expect(
-      await ContextoUsuarioModel.findById(cuentaEva.contextoActual.id),
-    ).toMatchObject({
+    expect(await contextoGuardado(cuentaEva.contextoActual.id)).toMatchObject({
       activo: false,
       colaboradorId: new mongoose.Types.ObjectId(eva.id),
     });
@@ -629,36 +627,66 @@ describe("HTTP · baja de colaboradora", () => {
     expect(await candidatas()).not.toContain(eva.id);
     expect(await candidatas()).toContain(nuevo.id);
   });
+
+  test("tras la baja del perfil la cuenta suma un colectivo y un perfil nuevo sin perder ninguno", async () => {
+    const { api, token, como, crearPersona, yo, nombrar, elegir } = await armar();
+    const eva = await crearPersona("eva");
+    await api.post(`/colaboradores/${eva.id}/baja`).set(como("eva")).expect(200);
+    await nombrar("eva");
+    const { body: suyo } = await api
+      .post("/colectivos")
+      .set(token("eva"))
+      .send({ nombre: "De Eva", descripcion: "d", tipoColectivo: "ONG" })
+      .expect(201);
+    const contextoColectivo = (await yo("eva")).contextoActual.id;
+
+    const { body: nuevo } = await api
+      .post("/colaboradores")
+      .set(token("eva"))
+      .send({ cuentaGit: "eva2", codigosHabilidades: [CODIGOS.node] })
+      .expect(201);
+    const conAmbos = await yo("eva");
+    expect(conAmbos.contextoActual).toMatchObject({ colaborador: { id: nuevo.id } });
+    expect(conAmbos.contextos.map((c) => c.tipo).sort()).toEqual([
+      "COLABORADOR",
+      "COLECTIVO",
+    ]);
+    expect(
+      codigo(
+        await api
+          .post("/colaboradores")
+          .set(token("eva"))
+          .send({ cuentaGit: "eva3" })
+          .expect(409),
+      ),
+    ).toBe("PERFIL_COLABORADOR_EXISTENTE");
+
+    await elegir("eva", contextoColectivo);
+    await api.post(`/colectivos/${suyo.id}/baja`).set(como("eva")).expect(200);
+    const sinColectivo = await yo("eva");
+    expect(sinColectivo.contextoActual).toBeNull();
+    expect(sinColectivo.contextos).toEqual([conAmbos.contextoActual]);
+  });
 });
 
 describe("HTTP · modalidades", () => {
-  test("no se opera a la vez como colaboradora y como colectivo", async () => {
-    const { api, token, crearColectivo, crearPersona, nombrar } = await armar();
+  test("una misma cuenta opera como colaboradora y como colectivo, y un segundo perfil sigue dando 409", async () => {
+    const { api, token, yo, crearColectivo, crearPersona, nombrar } = await armar();
     const a = await crearColectivo("ana");
     await crearPersona("ada");
     await nombrar("ada");
 
     const alta = { nombre: "X", descripcion: "d", tipoColectivo: "ONG" };
-    expect(
-      codigo(await api.post("/colectivos").set(token("ada")).send(alta).expect(409)),
-    ).toBe("MODALIDAD_INCOMPATIBLE");
-    expect(
-      codigo(
-        await api
-          .post(`/colectivos/${a.id}/solicitudes-ingreso`)
-          .set(token("ada"))
-          .expect(409),
-      ),
-    ).toBe("MODALIDAD_INCOMPATIBLE");
-    expect(
-      codigo(
-        await api
-          .post("/colaboradores")
-          .set(token("ana"))
-          .send({ cuentaGit: "ana" })
-          .expect(409),
-      ),
-    ).toBe("MODALIDAD_INCOMPATIBLE");
+    await api.post("/colectivos").set(token("ada")).send(alta).expect(201);
+    await api
+      .post(`/colectivos/${a.id}/solicitudes-ingreso`)
+      .set(token("ada"))
+      .expect(201);
+    await api
+      .post("/colaboradores")
+      .set(token("ana"))
+      .send({ cuentaGit: "ana" })
+      .expect(201);
     expect(
       codigo(
         await api
@@ -668,9 +696,11 @@ describe("HTTP · modalidades", () => {
           .expect(409),
       ),
     ).toBe("PERFIL_COLABORADOR_EXISTENTE");
+    expect((await yo("ana")).contextos).toHaveLength(2);
+    expect((await yo("ada")).contextos).toHaveLength(2);
   });
 
-  test("cambia de modalidad cuando ya no le quedan contextos validos", async () => {
+  test("crea su perfil de colaboradora cuando su unico colectivo ya fue dado de baja", async () => {
     const { api, token, como, crearColectivo, yo } = await armar();
     const a = await crearColectivo("ana");
     await api.post(`/colectivos/${a.id}/baja`).set(como("ana")).expect(200);
@@ -834,20 +864,22 @@ describe("HTTP · membresias", () => {
     expect(await SolicitudIngresoModel.findById(pendiente.id)).toMatchObject({
       estado: "PENDIENTE",
     });
-    expect(await ContextoUsuarioModel.findById(contextoCaro)).toMatchObject({
+    expect(await contextoGuardado(contextoCaro)).toMatchObject({
       activo: true,
       rol: "MIEMBRO",
     });
-    expect(await ContextoUsuarioModel.findById(contextoB)).toMatchObject({
+    expect(await contextoGuardado(contextoB)).toMatchObject({
       activo: true,
       rol: "MIEMBRO",
     });
     expect(
-      await ContextoUsuarioModel.countDocuments({
-        colectivoId: b.id,
-        activo: true,
-        rol: "LIDER",
-      }),
+      await ContextoUsuarioModel.countDocuments(
+        await conReferencias({
+          colectivoId: b.id,
+          activo: true,
+          rol: "LIDER",
+        }),
+      ),
     ).toBe(1);
   });
 
@@ -904,11 +936,11 @@ describe("HTTP · membresias", () => {
         usuarioId: solicitud.usuarioId,
       }),
     ).toBe(0);
-    expect(await ContextoUsuarioModel.findById(miembro)).toMatchObject({
+    expect(await contextoGuardado(miembro)).toMatchObject({
       activo: true,
       rol: "MIEMBRO",
     });
-    expect(await ContextoUsuarioModel.findById(contextoA)).toMatchObject({
+    expect(await contextoGuardado(contextoA)).toMatchObject({
       activo: true,
       rol: "LIDER",
     });

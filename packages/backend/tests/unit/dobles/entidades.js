@@ -7,6 +7,8 @@ import { Habilidad } from "../../../src/domain/Habilidad.js";
 import { PROYECTO_ESTADO } from "../../../src/domain/enums/PROYECTO_ESTADO.js";
 import { COLABORACION_ESTADO } from "../../../src/domain/enums/COLABORACION_ESTADO.js";
 import { MODO_ACEPTACION } from "../../../src/domain/enums/MODO_ACEPTACION.js";
+import { TIPO_CONTEXTO } from "../../../src/security/autorizacion/enums/TIPO_CONTEXTO.js";
+import { ROL } from "../../../src/security/autorizacion/enums/ROL.js";
 
 let ultimoId = 0;
 export const nuevoId = () => (++ultimoId).toString(16).padStart(24, "0");
@@ -89,4 +91,34 @@ export function colectivo(datos = {}) {
     fechaBaja: null,
     ...datos,
   });
+}
+
+export function contextoDeColaboradora(datos = {}) {
+  const id = datos.id ?? nuevoId();
+  return {
+    id,
+    _id: id,
+    usuarioId: nuevoId(),
+    tipo: TIPO_CONTEXTO.COLABORADOR,
+    rol: ROL.COLABORADOR,
+    colaboradorId: nuevoId(),
+    colectivoId: null,
+    activo: true,
+    ...datos,
+  };
+}
+
+export function contextoDeColectivo(datos = {}) {
+  const id = datos.id ?? nuevoId();
+  return {
+    id,
+    _id: id,
+    usuarioId: nuevoId(),
+    tipo: TIPO_CONTEXTO.COLECTIVO,
+    rol: ROL.MIEMBRO,
+    colectivoId: nuevoId(),
+    colaboradorId: null,
+    activo: true,
+    ...datos,
+  };
 }

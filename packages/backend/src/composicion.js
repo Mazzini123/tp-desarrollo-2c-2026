@@ -8,6 +8,8 @@ import { MongoHabilidadRepository } from "./repositories/MongoHabilidadRepositor
 import { MongoColaboradorRepository } from "./repositories/MongoColaboradorRepository.js";
 import { MongoColectivoRepository } from "./repositories/MongoColectivoRepository.js";
 import { MongoProyectoRepository } from "./repositories/MongoProyectoRepository.js";
+import { MongoAuditoriaRepository } from "./repositories/MongoAuditoriaRepository.js";
+import { MongoRevisionRepository } from "./repositories/MongoRevisionRepository.js";
 import { MongoColaboracionRepository } from "./repositories/MongoColaboracionRepository.js";
 import { MongoNotificacionRepository } from "./repositories/MongoNotificacionRepository.js";
 import { MongoEstadisticaRepository } from "./repositories/MongoEstadisticaRepository.js";
@@ -16,11 +18,13 @@ import { MongoUsuarioRepository } from "./security/persistencia/MongoUsuarioRepo
 import { MongoIdentidadExternaRepository } from "./security/persistencia/MongoIdentidadExternaRepository.js";
 import { MongoContextoUsuarioRepository } from "./security/persistencia/MongoContextoUsuarioRepository.js";
 import { MongoSolicitudIngresoRepository } from "./security/persistencia/MongoSolicitudIngresoRepository.js";
+import { MongoCatalogoRepository } from "./security/persistencia/MongoCatalogoRepository.js";
 import { transaccionesMongo } from "./config/transacciones.js";
 
 import { CatalogoDeRoles } from "./security/autorizacion/CatalogoDeRoles.js";
 import { RegistroService } from "./security/application/RegistroService.js";
 import { ContextoService } from "./security/application/ContextoService.js";
+import { AdministradorService } from "./security/application/AdministradorService.js";
 import { ModalidadService } from "./services/ModalidadService.js";
 import { MembresiaService } from "./services/MembresiaService.js";
 import { LiderazgoService } from "./security/application/LiderazgoService.js";
@@ -45,6 +49,10 @@ import { AvisoAutomaticoService } from "./services/AvisoAutomaticoService.js";
 import { EstadisticaService } from "./services/EstadisticaService.js";
 import { LogroService } from "./services/LogroService.js";
 import { AvanceService } from "./services/AvanceService.js";
+import { AuditoriaService } from "./services/AuditoriaService.js";
+import { ConflictoDeInteresesService } from "./services/ConflictoDeInteresesService.js";
+import { DestacadoService } from "./services/DestacadoService.js";
+import { RevisionService } from "./services/RevisionService.js";
 
 import { ColectivoController } from "./controllers/ColectivoController.js";
 import { ProyectoController } from "./controllers/ProyectoController.js";
@@ -57,9 +65,12 @@ import { PostulacionController } from "./controllers/PostulacionController.js";
 import { EstadisticaController } from "./controllers/EstadisticaController.js";
 import { LogroController } from "./controllers/LogroController.js";
 import { AvanceController } from "./controllers/AvanceController.js";
+import { AdministracionController } from "./controllers/AdministracionController.js";
 
 export function crearRepositoriosMongo() {
+  const catalogoRepository = new MongoCatalogoRepository();
   return {
+    catalogoRepository,
     avisoRepository: new MongoAvisoRepository(),
     habilidadRepository: new MongoHabilidadRepository(),
     colaboradorRepository: new MongoColaboradorRepository(),
@@ -69,9 +80,13 @@ export function crearRepositoriosMongo() {
     notificacionRepository: new MongoNotificacionRepository(),
     estadisticaRepository: new MongoEstadisticaRepository(),
     usuarioRepository: new MongoUsuarioRepository(),
-    identidadExternaRepository: new MongoIdentidadExternaRepository(),
-    contextoUsuarioRepository: new MongoContextoUsuarioRepository(),
+    identidadExternaRepository: new MongoIdentidadExternaRepository({
+      catalogoRepository,
+    }),
+    contextoUsuarioRepository: new MongoContextoUsuarioRepository({ catalogoRepository }),
     solicitudIngresoRepository: new MongoSolicitudIngresoRepository(),
+    auditoriaRepository: new MongoAuditoriaRepository(),
+    revisionRepository: new MongoRevisionRepository(),
     transacciones: transaccionesMongo,
   };
 }
@@ -127,6 +142,7 @@ export function componerApp({
   catalogoDeRoles = new CatalogoDeRoles(),
   compatContextoImplicito = false,
   avisarContextoImplicito,
+  configuracionAdministracion = {},
 } = {}) {
   const {
     avisoRepository,
@@ -141,8 +157,12 @@ export function componerApp({
     identidadExternaRepository,
     contextoUsuarioRepository,
     solicitudIngresoRepository,
+    auditoriaRepository,
+    revisionRepository,
     transacciones,
   } = repositorios;
+  const { diasSinActualizaciones = 30, maxDestacadosActivos = 6 } =
+    configuracionAdministracion;
 
   const habilidadService = new HabilidadService({ habilidadRepository });
 
@@ -206,6 +226,8 @@ export function componerApp({
     proyectoService,
     colaboradorService,
     notificacionService,
+    contextoUsuarioRepository,
+    usuarioRepository,
   });
 
   const valoracionService = new ValoracionService({
@@ -245,9 +267,36 @@ export function componerApp({
     catalogoDeRoles,
   });
 
+  const auditoriaService = new AuditoriaService({ auditoriaRepository });
+  const conflictoDeIntereses = new ConflictoDeInteresesService({
+    contextoUsuarioRepository,
+  });
+  const administradorService = new AdministradorService({
+    transacciones,
+    contextoUsuarioRepository,
+    usuarioRepository,
+    auditoriaService,
+  });
+  const destacadoService = new DestacadoService({
+    transacciones,
+    proyectoRepository,
+    colectivoRepository,
+    auditoriaService,
+    conflictoDeIntereses,
+    maxDestacadosActivos,
+  });
+  const revisionService = new RevisionService({
+    transacciones,
+    revisionRepository,
+    proyectoRepository,
+    colaboracionRepository,
+    auditoriaService,
+    conflictoDeIntereses,
+    diasSinActualizaciones,
+  });
+
   const modalidadService = new ModalidadService({
     transacciones,
-    contextoService,
     contextoUsuarioRepository,
     usuarioRepository,
     colectivoService,
@@ -307,6 +356,12 @@ export function componerApp({
     estadistica: new EstadisticaController({ estadisticaService }),
     logro: new LogroController({ logroService }),
     avance: new AvanceController({ avanceService }),
+    administracion: new AdministracionController({
+      auditoriaService,
+      revisionService,
+      destacadoService,
+      administradorService,
+    }),
   };
 
   const services = {
@@ -326,6 +381,10 @@ export function componerApp({
     avanceService,
     registroService,
     contextoService,
+    administradorService,
+    auditoriaService,
+    destacadoService,
+    revisionService,
     modalidadService,
     membresiaService,
     liderazgoService,

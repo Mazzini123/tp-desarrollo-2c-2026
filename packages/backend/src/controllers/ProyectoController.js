@@ -18,6 +18,10 @@ export class ProyectoController extends BaseController {
     this.responderPaginado(res, pagina);
   };
 
+  listarDestacados = async (_req, res) => {
+    res.status(200).json(await this.proyectoService.listarDestacados());
+  };
+
   obtenerPorId = async (req, res) => {
     const { proyecto, esDueno } = await this.proyectoService.verDetalle(
       req.params.id,
