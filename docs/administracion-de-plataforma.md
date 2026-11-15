@@ -47,13 +47,13 @@ Rol: administradores de la plataforma. Lectura pública solo de los destacados.
 
 Colección `acciones_administrativas`, solo se agregan registros:
 
-| Campo | Contenido |
-| --- | --- |
-| `usuarioId`, `contextoId` | Quién actuó y con qué contexto |
-| `accion` | Código, por ejemplo `PROYECTO_DESTACADO`, `PROYECTO_DESTACADO_QUITADO`, `REVISION_RESUELTA`, `ADMIN_OTORGADO` |
-| `entidad` | `{ tipo, id }` de lo afectado |
-| `detalle` | Datos útiles y acotados (motivo, vencimiento, resolución), sin datos personales |
-| `fecha` | Cuándo |
+| Campo                     | Contenido                                                                                                     |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `usuarioId`, `contextoId` | Quién actuó y con qué contexto                                                                                |
+| `accion`                  | Código, por ejemplo `PROYECTO_DESTACADO`, `PROYECTO_DESTACADO_QUITADO`, `REVISION_RESUELTA`, `ADMIN_OTORGADO` |
+| `entidad`                 | `{ tipo, id }` de lo afectado                                                                                 |
+| `detalle`                 | Datos útiles y acotados (motivo, vencimiento, resolución), sin datos personales                               |
+| `fecha`                   | Cuándo                                                                                                        |
 
 `GET /administracion/auditoria`, paginado y filtrable por acción, entidad y fecha, con `AUDITORIA_VER`.
 
@@ -61,13 +61,13 @@ Colección `acciones_administrativas`, solo se agregan registros:
 
 Colección `revisiones`:
 
-| Campo | Contenido |
-| --- | --- |
-| `proyectoId` | Proyecto marcado |
-| `motivo` | `SIN_ACTUALIZACIONES` (más adelante, otros) |
-| `estado` | `PENDIENTE`, `REVISADA`, `DESCARTADA` |
-| `creadaEn` | Cuándo se marcó |
-| `resueltaPor`, `resueltaEn`, `nota` | Quién y cuándo la resolvió |
+| Campo                               | Contenido                                   |
+| ----------------------------------- | ------------------------------------------- |
+| `proyectoId`                        | Proyecto marcado                            |
+| `motivo`                            | `SIN_ACTUALIZACIONES` (más adelante, otros) |
+| `estado`                            | `PENDIENTE`, `REVISADA`, `DESCARTADA`       |
+| `creadaEn`                          | Cuándo se marcó                             |
+| `resueltaPor`, `resueltaEn`, `nota` | Quién y cuándo la resolvió                  |
 
 - Índice único parcial sobre `(proyectoId, motivo)` cuando `estado = PENDIENTE`: el job puede correr varias veces sin duplicar.
 - Un proyecto «iniciado» es uno abierto con al menos una colaboración aceptada. «Sin actualizaciones» es no tener avances ni logros nuevos en los últimos `DIAS_SIN_ACTUALIZACIONES` (configurable, por defecto 30), contados desde el último avance, logro o aceptación.
@@ -171,11 +171,11 @@ Cada paso empieza por tests que fallan y termina con el código mínimo que los 
 
 ## Variables de entorno
 
-| Variable | Por defecto | Qué hace |
-| --- | --- | --- |
-| `DIAS_SIN_ACTUALIZACIONES` | 30 | Plazo sin avances, logros ni aceptaciones para abrir una revisión |
-| `MAX_DESTACADOS_ACTIVOS` | 6 | Tope de destacados vigentes |
-| `SEGUIMIENTO_INTERVALO_MS` | 3600000 | Cadencia del job de seguimiento |
+| Variable                   | Por defecto | Qué hace                                                          |
+| -------------------------- | ----------- | ----------------------------------------------------------------- |
+| `DIAS_SIN_ACTUALIZACIONES` | 30          | Plazo sin avances, logros ni aceptaciones para abrir una revisión |
+| `MAX_DESTACADOS_ACTIVOS`   | 6           | Tope de destacados vigentes                                       |
+| `SEGUIMIENTO_INTERVALO_MS` | 3600000     | Cadencia del job de seguimiento                                   |
 
 ## Notas de implementación
 

@@ -43,6 +43,14 @@ try {
   await ejecutarMigraciones();
 
   const autenticador = crearAutenticador(proveedores, proveedoresActivos);
+  if (process.env.TWILIO_SMS_REMITENTE && process.env.TWILIO_SMS_PLANTILLA) {
+    registro.aviso("sms_con_plantilla_de_twilio", {
+      plantilla: process.env.TWILIO_SMS_PLANTILLA,
+      detalle:
+        "Los SMS envían la plantilla predefinida en lugar del texto de la notificación " +
+        "(requisito de las cuentas Trial). Quitar la variable al pasar la cuenta a paga.",
+    });
+  }
   const compatContextoImplicito = process.env.COMPAT_CONTEXTO_IMPLICITO === "true";
   if (compatContextoImplicito) {
     registro.aviso("compatibilidad_contexto_implicito", {
