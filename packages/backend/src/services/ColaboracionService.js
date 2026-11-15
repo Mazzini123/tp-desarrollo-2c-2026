@@ -78,6 +78,7 @@ export class ColaboracionService {
       if (!proyecto.estaAbierto()) {
         throw new ConflictError(
           "No se puede anotar a un proyecto que ya está finalizado",
+          CODIGO_ERROR.PROYECTO_FINALIZADO,
         );
       }
 
@@ -88,15 +89,22 @@ export class ColaboracionService {
         );
       }
       if (!perfilAceptaPostulaciones(perfil, ahora)) {
-        throw new ConflictError("La búsqueda de este perfil está cerrada");
+        throw new ConflictError(
+          "La búsqueda de este perfil está cerrada",
+          CODIGO_ERROR.BUSQUEDA_CERRADA,
+        );
       }
       if (!cumpleHabilidadesRequeridas(perfil, colaborador)) {
         throw new DomainError(
           "El colaborador debe cumplir todas las habilidades requeridas del perfil",
+          CODIGO_ERROR.HABILIDADES_REQUERIDAS_FALTANTES,
         );
       }
       if (yaSePostuloAlPerfil(proyecto, colaborador, perfil)) {
-        throw new ConflictError("El colaborador ya está anotado en este perfil");
+        throw new ConflictError(
+          "El colaborador ya está anotado en este perfil",
+          CODIGO_ERROR.POSTULACION_EXISTENTE,
+        );
       }
 
       const colaboracion = proyecto.agregarColaboracion(
@@ -117,7 +125,10 @@ export class ColaboracionService {
     });
 
     if (!resultado) {
-      throw new ConflictError("No se puede anotar a un proyecto que ya está finalizado");
+      throw new ConflictError(
+        "No se puede anotar a un proyecto que ya está finalizado",
+        CODIGO_ERROR.PROYECTO_FINALIZADO,
+      );
     }
 
     return resultado;

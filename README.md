@@ -258,6 +258,12 @@ está configurado; SMS usa Twilio cuando también se define `TWILIO_SMS_REMITENT
 Sin ese remitente, SMS se simula. Un envío simulado termina en `SIMULADO` y
 `exito: false`: no acredita entrega a un proveedor real.
 
+Las cuentas **Trial** de Twilio rechazan SMS con texto propio (`Invalid template name.
+Trial accounts can only use predefined SMS templates.`). Con `TWILIO_SMS_PLANTILLA`
+(por ejemplo `sms_event_notifications`) el canal SMS envía esa plantilla predefinida
+en lugar del texto de la notificación, y la API lo avisa al arrancar
+(`sms_con_plantilla_de_twilio`). Al pasar la cuenta a paga se quita la variable.
+
 ### Demostracion de notificaciones (solo desarrollo)
 
 Desde la raiz, `npm run demo:notificaciones` crea un MongoDB temporal independiente

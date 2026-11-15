@@ -121,6 +121,7 @@ export function crearCanales(entorno = process.env) {
     ? new CanalSMS({
         cliente: twilio(entorno.TWILIO_ACCOUNT_SID, entorno.TWILIO_AUTH_TOKEN),
         remitente: entorno.TWILIO_SMS_REMITENTE,
+        plantilla: entorno.TWILIO_SMS_PLANTILLA || null,
       })
     : new CanalSimulado("SMS");
 

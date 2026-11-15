@@ -1,7 +1,10 @@
 export class CanalSMS {
-  constructor({ cliente, remitente }) {
+  // plantilla: nombre de una plantilla predefinida de Twilio. Las cuentas Trial
+  // rechazan textos propios, así que con plantilla se envía esa en lugar del contenido.
+  constructor({ cliente, remitente, plantilla = null }) {
     this.cliente = cliente;
     this.remitente = remitente;
+    this.plantilla = plantilla;
   }
 
   async enviar({ destino, contenido }) {
@@ -13,7 +16,7 @@ export class CanalSMS {
     await this.cliente.messages.create({
       to: destino,
       from: this.remitente,
-      body: contenido,
+      body: this.plantilla ?? contenido,
     });
   }
 }
