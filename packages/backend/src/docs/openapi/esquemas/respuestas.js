@@ -93,6 +93,8 @@ export const respuestas = {
 
   MedioDeContacto: {
     type: "object",
+    description:
+      "Nuevos SMS: + y codigo de pais, entre 8 y 15 digitos, sin cero inicial. Se quitan espacios y guiones. Los contactos SMS antiguos se pueden consultar y eliminar sin convertirlos.",
     required: ["tipo", "valor"],
     additionalProperties: false,
     properties: {

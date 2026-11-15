@@ -247,7 +247,7 @@ export const rutasColaboradores = {
       tags: ["Colaboradores"],
       summary: "Registrar un medio de contacto",
       description:
-        "EMAIL con formato de email; WHATSAPP y SMS con telefono (se guarda solo con " +
+        "EMAIL con formato de email; SMS internacional con + y 8 a 15 digitos (primer digito distinto de cero); WHATSAPP con telefono (se guarda solo con " +
         "digitos y el + inicial). Responde solo el medio registrado: los medios no se " +
         "muestran en el colaborador. Uno repetido responde 409.",
       requestBody: body("MedioDeContacto"),

@@ -50,6 +50,10 @@ services:
 
       TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
       TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_SMS_REMITENTE: ${TWILIO_SMS_REMITENTE:-}
+      TWILIO_WHATSAPP_REMITENTE: ${TWILIO_WHATSAPP_REMITENTE:-}
+      SMTP_URL: ${SMTP_URL:-}
+      SMTP_REMITENTE: ${SMTP_REMITENTE:-}
     depends_on:
       mongo:
         condition: service_healthy

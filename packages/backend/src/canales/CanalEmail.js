@@ -5,11 +5,14 @@ export class CanalEmail {
   }
 
   async enviar({ destino, asunto, contenido }) {
-    await this.transporte.sendMail({
+    const resultado = await this.transporte.sendMail({
       from: this.remitente,
       to: destino,
       subject: asunto,
       text: contenido,
     });
+    if (!resultado.accepted?.length || resultado.rejected?.length) {
+      throw new Error("El servidor SMTP no acepto al destinatario");
+    }
   }
 }
