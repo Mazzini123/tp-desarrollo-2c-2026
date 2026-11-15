@@ -51,6 +51,14 @@ try {
         "(requisito de las cuentas Trial). Quitar la variable al pasar la cuenta a paga.",
     });
   }
+  if (process.env.TWILIO_WHATSAPP_REMITENTE && process.env.TWILIO_WHATSAPP_PLANTILLA) {
+    registro.aviso("whatsapp_con_plantilla_de_twilio", {
+      plantilla: process.env.TWILIO_WHATSAPP_PLANTILLA,
+      detalle:
+        "WhatsApp envía la plantilla de Twilio en lugar del texto de la notificación " +
+        "(requisito de las cuentas Trial). Quitar la variable al pasar la cuenta a paga.",
+    });
+  }
   const compatContextoImplicito = process.env.COMPAT_CONTEXTO_IMPLICITO === "true";
   if (compatContextoImplicito) {
     registro.aviso("compatibilidad_contexto_implicito", {

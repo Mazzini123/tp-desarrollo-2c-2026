@@ -264,6 +264,14 @@ Trial accounts can only use predefined SMS templates.`). Con `TWILIO_SMS_PLANTIL
 en lugar del texto de la notificación, y la API lo avisa al arrancar
 (`sms_con_plantilla_de_twilio`). Al pasar la cuenta a paga se quita la variable.
 
+WhatsApp tiene la misma restricción en Trial, pero la plantilla se identifica por su
+`ContentSid` (`HX...`, el que muestra "Try out WhatsApp" en la consola):
+`TWILIO_WHATSAPP_PLANTILLA` hace que se envíe esa plantilla en lugar del texto
+(aviso `whatsapp_con_plantilla_de_twilio` al arrancar). En Trial el destinatario tiene
+que estar verificado y unido al sandbox. Si WhatsApp usa otra cuenta de Twilio que SMS,
+`TWILIO_WHATSAPP_ACCOUNT_SID` y `TWILIO_WHATSAPP_AUTH_TOKEN` reemplazan a las generales
+solo para ese canal.
+
 ### Demostracion de notificaciones (solo desarrollo)
 
 Desde la raiz, `npm run demo:notificaciones` crea un MongoDB temporal independiente
