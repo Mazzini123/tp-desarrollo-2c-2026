@@ -33,6 +33,21 @@ test("SMS envia el contenido al destino con su propio remitente", async () => {
   });
 });
 
+test("SMS con plantilla de Twilio Trial envia la plantilla en lugar del contenido", async () => {
+  const create = jest.fn().mockResolvedValue({ sid: "SMprueba" });
+  const canal = new CanalSMS({
+    cliente: { messages: { create } },
+    remitente: "+12345678910",
+    plantilla: "sms_event_notifications",
+  });
+  await canal.enviar(mensaje);
+  expect(create).toHaveBeenCalledWith({
+    to: mensaje.destino,
+    from: "+12345678910",
+    body: "sms_event_notifications",
+  });
+});
+
 test.each([
   "1155551234",
   "+0123456789",
