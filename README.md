@@ -260,6 +260,20 @@ está configurado; SMS usa Twilio cuando también se define `TWILIO_SMS_REMITENT
 Sin ese remitente, SMS se simula. Un envío simulado termina en `SIMULADO` y
 `exito: false`: no acredita entrega a un proveedor real.
 
+Las cuentas **Trial** de Twilio rechazan SMS con texto propio (`Invalid template name.
+Trial accounts can only use predefined SMS templates.`). Con `TWILIO_SMS_PLANTILLA`
+(por ejemplo `sms_event_notifications`) el canal SMS envía esa plantilla predefinida
+en lugar del texto de la notificación, y la API lo avisa al arrancar
+(`sms_con_plantilla_de_twilio`). Al pasar la cuenta a paga se quita la variable.
+
+WhatsApp tiene la misma restricción en Trial, pero la plantilla se identifica por su
+`ContentSid` (`HX...`, el que muestra "Try out WhatsApp" en la consola):
+`TWILIO_WHATSAPP_PLANTILLA` hace que se envíe esa plantilla en lugar del texto
+(aviso `whatsapp_con_plantilla_de_twilio` al arrancar). En Trial el destinatario tiene
+que estar verificado y unido al sandbox. Si WhatsApp usa otra cuenta de Twilio que SMS,
+`TWILIO_WHATSAPP_ACCOUNT_SID` y `TWILIO_WHATSAPP_AUTH_TOKEN` reemplazan a las generales
+solo para ese canal.
+
 ### Demostracion de notificaciones (solo desarrollo)
 
 Desde la raiz, `npm run demo:notificaciones` crea un MongoDB temporal independiente
@@ -586,12 +600,14 @@ npm test --workspace=backend -- --watch      # en watch
 ## Despliegue
 
 VM en Oracle Cloud, región San Pablo (la más cercana): Ubuntu 20.04, 1 GB de
-RAM + 2 GB de swap, con Docker y Docker Compose instalados. La API y MongoDB
-corren en contenedores con `docker-compose.prod.yml`.
+RAM + 2 GB de swap, con Docker y Docker Compose instalados. Todo corre en
+contenedores con `docker-compose.prod.yml`: MongoDB, la API y, desde la tercera
+entrega, el front servido por Caddy (ver "Tercera entrega: front y HTTPS").
 
 ```
-http://147.15.102.156:8000/health
-http://147.15.102.156:8000/docs
+https://<DOMINIO>/                 front
+https://<DOMINIO>/api/health       API a través de Caddy
+http://147.15.102.156:8000/docs    Swagger (puerto directo de la API)
 ```
 
 La IP es de Oracle y puede cambiar si se recrea la instancia; conviene
@@ -732,6 +748,90 @@ API no se puede conectar. En ese caso, hay que borrar el volumen (y con él los
 datos) con `docker compose -f docker-compose.prod.yml down -v`, o cambiar la
 contraseña desde `mongosh`.
 
+### Tercera entrega: front y HTTPS
+
+```
+navegador ──https──▶ VM :443 ──▶ cav-web (Caddy)
+                                   ├─ /        → build de React (/srv)
+                                   └─ /api/*   → cav-api :8000 ──▶ cav-mongo
+```
+
+El servicio `web` se construye desde el repo del front
+([codigo-a-voluntad-front](https://github.com/Mazzini123/codigo-a-voluntad-front)),
+clonado al lado de este en la VM. Su imagen compila el front con Node y lo
+sirve con Caddy (ver la sección "Despliegue" de su README).
+
+**Por qué HTTPS.** El SDK de Logto usa `crypto.subtle` del navegador para el
+login, y el navegador solo lo habilita en HTTPS o en `localhost`. Entrando por
+`http://<IP>` el ingreso no funciona. Un certificado necesita un nombre de
+dominio: se usa un subdominio gratuito de [DuckDNS](https://www.duckdns.org).
+
+**Por qué Caddy.** Cumple el mismo rol que NGINX, que el enunciado menciona
+como opcional: proxy reverso delante de la API y servidor del bundle del
+cliente. Además obtiene y renueva solo el certificado de Let's Encrypt; con
+NGINX haría falta certbot aparte.
+
+**Variables nuevas en `.env`** (además de las de Mongo):
+
+| Variable             | Para qué                                                                 |
+| -------------------- | ------------------------------------------------------------------------ |
+| `DOMINIO`            | Subdominio de DuckDNS, sin `https://`. Caddy saca el certificado para él |
+| `CORS_ORIGENES`      | `https://` + `DOMINIO`                                                   |
+| `LOGTO_ENDPOINT`     | Endpoint del tenant. Lo usan la API y el front                           |
+| `LOGTO_API_RESOURCE` | Identificador del API resource. Lo usan la API (audiencia) y el front    |
+| `LOGTO_APP_ID`       | App ID de la aplicación "Single page app" del front en Logto             |
+
+Las de Logto se escriben en el JavaScript del front al compilar: si cambian,
+hay que reconstruir con `--build`.
+
+**Preparación (una sola vez).**
+
+1. **DuckDNS:** iniciar sesión en duckdns.org, crear el subdominio y cargarle
+   la IP pública de la VM.
+2. **Oracle** (consola → Networking → VCN → Security List): reglas de entrada
+   TCP 80 y 443 desde `0.0.0.0/0`. El 80 hace falta para que Let's Encrypt
+   valide el dominio y para redirigir a HTTPS.
+3. **Logto** (aplicación "Single page app" del front): agregar la Redirect URI
+   `https://<DOMINIO>/auth/callback` y la Post sign-out redirect URI
+   `https://<DOMINIO>/`, y copiar su App ID.
+
+**Despliegue en la VM.**
+
+```bash
+# 1. Clonar el front al lado del back (una sola vez)
+cd ~
+git clone https://github.com/Mazzini123/codigo-a-voluntad-front.git
+
+# 2. Traer los cambios del back (la VM está en main)
+cd ~/tp-desarrollo-2c-2026
+git pull
+
+# 3. Completar las variables nuevas
+nano .env
+
+# 4. (Opcional) Validar el Caddyfile antes de construir
+docker run --rm -v ~/codigo-a-voluntad-front/Caddyfile:/etc/caddy/Caddyfile:ro \
+  -e DOMINIO=ejemplo.duckdns.org caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
+
+# 5. Construir y levantar
+docker compose -f docker-compose.prod.yml up -d --build
+
+# 6. Ver cómo Caddy saca el certificado
+docker compose -f docker-compose.prod.yml logs -f web   # Ctrl+C para salir
+```
+
+Verificar desde el navegador: `https://<DOMINIO>/` abre la landing, recargar
+una ruta interna (por ejemplo `/proyectos`) no da 404,
+`https://<DOMINIO>/api/health` responde y el ingreso con Logto vuelve a la app.
+
+| Problema                                          | Causa probable                                              | Solución                                                                           |
+| ------------------------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Caddy no obtiene el certificado                   | El dominio no apunta a la VM o el 80 está cerrado en Oracle | `ping <DOMINIO>` debe dar la IP de la VM; revisar la Security List                 |
+| El build del front se corta por memoria           | 1 GB de RAM con Mongo y la API corriendo                    | `docker compose -f docker-compose.prod.yml stop api`, volver a `up -d --build`     |
+| Logto dice que la redirect URI no es válida       | Falta cargar la URI de producción en Logto                  | Paso 3 de la preparación, con `https://` y sin barra extra                         |
+| El front carga pero las llamadas fallan por CORS  | `CORS_ORIGENES` no coincide con el origen del front         | `CORS_ORIGENES=https://<DOMINIO>` y `docker compose ... up -d` para recrear la API |
+| Cambié una variable de Logto y el front no cambia | Las `VITE_*` se fijan al compilar                           | `docker compose -f docker-compose.prod.yml up -d --build`                          |
+
 ### Puertos
 
 Para que un puerto de un contenedor llegue a internet hacen falta tres cosas:
@@ -748,7 +848,8 @@ contenedor ──"ports" del compose──▶ VM ──firewall de la VM──�
 | Security List        | consola de Oracle → VCN | El firewall de la nube: sin una regla de entrada para el puerto, no llega nada |
 
 El 8000 de la API está abierto en la Security List (por eso se llega desde el
-navegador). Para exponer Mongo habría que publicar el 27017 **y** abrirlo en
+navegador). El 80 y el 443 los publica el servicio `web` (Caddy) y también
+tienen que estar abiertos en la Security List. Para exponer Mongo habría que publicar el 27017 **y** abrirlo en
 Oracle; como no se publica, aunque se abriera en Oracle por error no habría
 nada escuchando.
 
@@ -793,8 +894,8 @@ El oplog ocupa 512 MB fijos (`--oplogSize`). Conviene volver a medir con
 ### Actualizar después de un cambio
 
 ```bash
-cd ~/tp-desarrollo-2c-2026
-git pull
+cd ~/codigo-a-voluntad-front && git pull   # si cambió el front
+cd ~/tp-desarrollo-2c-2026 && git pull
 docker compose -f docker-compose.prod.yml up -d --build
 docker image prune -f        # borra las imágenes viejas (el disco es chico)
 ```
@@ -811,6 +912,7 @@ docker image prune -f        # borra las imágenes viejas (el disco es chico)
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------- |
 | `docker compose -f docker-compose.prod.yml ps`                                                       | Estado                                |
 | `docker compose -f docker-compose.prod.yml logs -f api`                                              | Logs de la api                        |
+| `docker compose -f docker-compose.prod.yml logs -f web`                                              | Logs de Caddy (certificado, pedidos)  |
 | `docker compose -f docker-compose.prod.yml restart api`                                              | Reiniciar la api                      |
 | `docker stats --no-stream`                                                                           | Consumo de memoria de cada contenedor |
 | `docker exec -it cav-mongo mongosh -u <usuario> -p --authenticationDatabase admin codigo-a-voluntad` | Consola de Mongo (pide la contraseña) |

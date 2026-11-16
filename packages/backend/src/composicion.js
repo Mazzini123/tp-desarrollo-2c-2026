@@ -112,13 +112,24 @@ export function crearCanales(entorno = process.env) {
       })
     : new CanalSimulado("EMAIL");
 
+  // WhatsApp puede usar otra cuenta de Twilio que SMS; sin credenciales propias usa las generales.
+  if (
+    Boolean(entorno.TWILIO_WHATSAPP_ACCOUNT_SID) !==
+    Boolean(entorno.TWILIO_WHATSAPP_AUTH_TOKEN)
+  ) {
+    throw new Error(
+      "TWILIO_WHATSAPP_ACCOUNT_SID y TWILIO_WHATSAPP_AUTH_TOKEN van juntas",
+    );
+  }
+  const cuentaWhatsApp = entorno.TWILIO_WHATSAPP_ACCOUNT_SID
+    ? [entorno.TWILIO_WHATSAPP_ACCOUNT_SID, entorno.TWILIO_WHATSAPP_AUTH_TOKEN]
+    : [entorno.TWILIO_ACCOUNT_SID, entorno.TWILIO_AUTH_TOKEN];
   const whatsapp =
-    entorno.TWILIO_ACCOUNT_SID &&
-    entorno.TWILIO_AUTH_TOKEN &&
-    entorno.TWILIO_WHATSAPP_REMITENTE
+    cuentaWhatsApp[0] && cuentaWhatsApp[1] && entorno.TWILIO_WHATSAPP_REMITENTE
       ? new CanalWhatsApp({
-          cliente: twilio(entorno.TWILIO_ACCOUNT_SID, entorno.TWILIO_AUTH_TOKEN),
+          cliente: twilio(...cuentaWhatsApp),
           remitente: entorno.TWILIO_WHATSAPP_REMITENTE,
+          plantilla: entorno.TWILIO_WHATSAPP_PLANTILLA || null,
         })
       : new CanalSimulado("WHATSAPP");
 
@@ -126,6 +137,7 @@ export function crearCanales(entorno = process.env) {
     ? new CanalSMS({
         cliente: twilio(entorno.TWILIO_ACCOUNT_SID, entorno.TWILIO_AUTH_TOKEN),
         remitente: entorno.TWILIO_SMS_REMITENTE,
+        plantilla: entorno.TWILIO_SMS_PLANTILLA || null,
       })
     : new CanalSimulado("SMS");
 
