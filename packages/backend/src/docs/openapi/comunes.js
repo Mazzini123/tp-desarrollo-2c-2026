@@ -112,7 +112,8 @@ export const paramsFiltroDeProyectos = [
   {
     name: "estado",
     in: "query",
-    description: "ABIERTO o FINALIZADO. Sin el parametro se devuelven todos.",
+    description:
+      "ABIERTO o FINALIZADO. Sin el parametro se devuelven los dos. Los borradores, los proyectos en revision y los dados de baja nunca se listan (BORRADOR, EN_REVISION o DADO_DE_BAJA dan 400).",
     schema: { type: "string", enum: ["ABIERTO", "FINALIZADO"] },
   },
   {

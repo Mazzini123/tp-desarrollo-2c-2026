@@ -60,7 +60,11 @@ export const rutasProyectos = {
       description:
         "Devuelve la primera página de 20 participaciones y colaboracionesMeta. El dueño ve " +
         "postulaciones privadas; el público solo ACEPTADA/FINALIZADA. Los anónimos nunca " +
-        "revelan identidad. Las visitas del contexto del colectivo dueño no suman visualizaciones.",
+        "revelan identidad. Las visitas del contexto del colectivo dueño no suman visualizaciones. " +
+        "Un BORRADOR o EN_REVISION responde 404 salvo al colectivo dueño y a administracion, " +
+        "que reciben ademas `publicacion` (con la nota si administracion lo rechazo); esas " +
+        "visitas no suman visualizaciones. El mismo 404 aplica a perfiles, participaciones, " +
+        "logros y avances del proyecto.",
       responses: { ...recurso("Proyecto"), 404: errores[404] },
     },
     put: {
@@ -68,7 +72,8 @@ export const rutasProyectos = {
       summary: "Actualizar proyecto",
       description:
         "Todos los campos son opcionales. `fechaCierre: null` saca la fecha " +
-        "de cierre; si viene, tiene que ser futura (422). Un proyecto finalizado no se puede modificar: responde 409.",
+        "de cierre; si viene, tiene que ser futura (422). Se edita en BORRADOR y ABIERTO; " +
+        "EN_REVISION o FINALIZADO responden 409 (tambien al editar sus perfiles).",
       requestBody: body("ActualizarProyecto"),
       responses: {
         ...recurso("Proyecto"),
@@ -76,6 +81,25 @@ export const rutasProyectos = {
         422: errores[422],
         404: errores[404],
         409: errores[409],
+      },
+    },
+  },
+
+  "/proyectos/{id}/publicacion": {
+    parameters: [paramId],
+    post: {
+      tags: ["Proyectos"],
+      summary: "Pedir la publicacion de un borrador",
+      description:
+        "Adicional 29. Solo el colectivo dueño (permiso PROYECTO_EDITAR) y solo desde BORRADOR " +
+        "(409 si no). Sin body. Crea una revision PENDIENTE con motivo PUBLICACION y el " +
+        "proyecto pasa a EN_REVISION, donde no se puede editar. 422 si la fecha de cierre ya " +
+        "paso. Administracion lo resuelve con POST /administracion/revisiones/{id}/resolucion.",
+      responses: {
+        ...recurso("Proyecto", 200, "Proyecto en revision."),
+        404: errores[404],
+        409: errores[409],
+        422: errores[422],
       },
     },
   },

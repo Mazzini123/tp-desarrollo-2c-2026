@@ -1,5 +1,5 @@
 import { BaseController } from "./BaseController.js";
-import { colectivoDelContexto } from "../security/http/contexto.js";
+import { lectorDelPedido } from "../security/http/contexto.js";
 import { proyectoPublico } from "../dto/vistasPublicas.js";
 
 export class ProyectoController extends BaseController {
@@ -25,9 +25,21 @@ export class ProyectoController extends BaseController {
   obtenerPorId = async (req, res) => {
     const { proyecto, esDueno } = await this.proyectoService.verDetalle(
       req.params.id,
-      colectivoDelContexto(req.contexto),
+      lectorDelPedido(req.contexto),
     );
     res.status(200).json(esDueno ? proyecto : proyectoPublico(proyecto));
+  };
+
+  exigirVisible = async (req, _res, next) => {
+    await this.proyectoService.exigirVisible(
+      req.params.id,
+      lectorDelPedido(req.contexto),
+    );
+    next();
+  };
+
+  pedirPublicacion = async (req, res) => {
+    res.status(200).json(await this.proyectoService.pedirPublicacion(req.params.id));
   };
 
   actualizar = async (req, res) => {

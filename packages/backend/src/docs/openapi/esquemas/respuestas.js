@@ -196,7 +196,55 @@ export const respuestas = {
       id: OBJECT_ID,
       titulo: { type: "string" },
       descripcion: { type: "string", description: "Admite Markdown (req. 38)." },
-      estado: { type: "string", enum: ["ABIERTO", "FINALIZADO"] },
+      estado: {
+        type: "string",
+        enum: ["BORRADOR", "EN_REVISION", "ABIERTO", "FINALIZADO", "DADO_DE_BAJA"],
+        description:
+          "BORRADOR, EN_REVISION y DADO_DE_BAJA solo los ven el colectivo dueño y " +
+          "administracion.",
+      },
+      terminos: {
+        type: "object",
+        nullable: true,
+        description:
+          "Solo para el colectivo dueño y administracion, en el detalle. Version de los " +
+          "terminos aceptada al crearlo; si es menor que la de GET /terminos, acepto una " +
+          "version vieja. null si se creo sin terminos publicados.",
+        properties: {
+          version: { type: "integer" },
+          aceptadosEn: { type: "string", format: "date-time" },
+        },
+      },
+      baja: {
+        type: "object",
+        nullable: true,
+        description:
+          "Solo para el colectivo dueño y administracion, en el detalle. Motivo de la baja " +
+          "por infraccion; null si no esta DADO_DE_BAJA.",
+        properties: {
+          motivo: { type: "string" },
+          fecha: { type: "string", format: "date-time" },
+        },
+      },
+      publicacion: {
+        type: "object",
+        nullable: true,
+        description:
+          "Solo para el colectivo dueño y administracion, en el detalle. null si se publico directo.",
+        properties: {
+          solicitadaEn: { type: "string", format: "date-time" },
+          revisionId: OBJECT_ID,
+          rechazo: {
+            type: "object",
+            nullable: true,
+            properties: {
+              nota: { type: "string", nullable: true },
+              fecha: { type: "string", format: "date-time" },
+            },
+          },
+          aprobadaEn: { type: "string", format: "date-time", nullable: true },
+        },
+      },
       colectivo: {
         type: "object",
         description:
@@ -576,6 +624,18 @@ respuestas.ResumenProyecto = {
       type: "integer",
       description: "Solo en la lista propia del colectivo.",
     },
+    publicacion: {
+      ...respuestas.Proyecto.properties.publicacion,
+      description:
+        "Solo en la lista propia del colectivo (GET /colectivos/{id}/proyectos), igual que " +
+        "en el detalle. null si nunca se pidio la publicacion.",
+    },
+    baja: {
+      ...respuestas.Proyecto.properties.baja,
+      description:
+        "Solo en la lista propia del colectivo (GET /colectivos/{id}/proyectos), igual que " +
+        "en el detalle. null si no esta DADO_DE_BAJA.",
+    },
     destacado: {
       type: "boolean",
       description:
@@ -614,7 +674,7 @@ respuestas.Revision = {
         },
       },
     },
-    motivo: { type: "string", enum: ["SIN_ACTUALIZACIONES"] },
+    motivo: { type: "string", enum: ["SIN_ACTUALIZACIONES", "PUBLICACION"] },
     estado: { type: "string", enum: ["PENDIENTE", "REVISADA", "DESCARTADA"] },
     creadaEn: { type: "string", format: "date-time" },
     resueltaPor: { ...OBJECT_ID, nullable: true },
@@ -632,6 +692,20 @@ respuestas.DestacadoDeProyecto = {
         desde: { type: "string", format: "date-time" },
         hasta: { type: "string", format: "date-time" },
       },
+    },
+  },
+};
+respuestas.DestacadoParaAdministracion = {
+  type: "object",
+  properties: {
+    ...Object.fromEntries(
+      camposResumen.map((campo) => [campo, respuestas.Proyecto.properties[campo]]),
+    ),
+    destacado: respuestas.DestacadoDeProyecto.properties.destacado,
+    conflictoDeIntereses: {
+      type: "boolean",
+      description:
+        "true si quien consulta es lider o miembro del colectivo: quitarlo daria 422.",
     },
   },
 };
@@ -667,5 +741,62 @@ respuestas.PostulacionPendiente = {
       },
     },
     colaboracion: { $ref: "#/components/schemas/Colaboracion" },
+  },
+};
+respuestas.Terminos = {
+  type: "object",
+  properties: {
+    version: { type: "integer", example: 1 },
+    texto: { type: "string", description: "Markdown." },
+    publicadoEn: { type: "string", format: "date-time" },
+  },
+};
+respuestas.TerminosPublicados = {
+  type: "object",
+  properties: {
+    ...respuestas.Terminos.properties,
+    publicadoPor: { ...OBJECT_ID, nullable: true },
+  },
+};
+respuestas.BajaDeProyecto = {
+  type: "object",
+  properties: {
+    id: OBJECT_ID,
+    estado: { type: "string", enum: ["DADO_DE_BAJA"] },
+    baja: {
+      type: "object",
+      properties: {
+        motivo: { type: "string" },
+        fecha: { type: "string", format: "date-time" },
+      },
+    },
+  },
+};
+respuestas.ProyectoParaBaja = {
+  type: "object",
+  properties: {
+    id: OBJECT_ID,
+    titulo: { type: "string" },
+    estado: {
+      type: "string",
+      enum: ["BORRADOR", "EN_REVISION", "ABIERTO", "FINALIZADO"],
+    },
+    fechaCreacion: { type: "string", format: "date-time", nullable: true },
+    colectivo: {
+      type: "object",
+      properties: { id: OBJECT_ID, nombre: { type: "string" } },
+    },
+    conflictoDeIntereses: {
+      type: "boolean",
+      description:
+        "true si quien consulta es lider o miembro del colectivo: la baja daria 422.",
+    },
+  },
+};
+respuestas.BajaDeColectivo = {
+  type: "object",
+  properties: {
+    id: OBJECT_ID,
+    fechaBaja: { type: "string", format: "date-time" },
   },
 };

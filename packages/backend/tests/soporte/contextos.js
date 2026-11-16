@@ -4,10 +4,6 @@ import {
   TipoContextoModel,
 } from "../../src/security/persistencia/catalogos.js";
 
-// Los contextos guardan referencias (rolId, tipoContextoId) a los catalogos
-// `roles` y `tiposContexto`. Estas ayudas dejan que un test hable de "LIDER" o
-// "COLECTIVO" y traducen a las referencias reales de la base.
-
 async function idPorNombre(modelo, nombre) {
   const documento = await modelo.findOne({ nombre }).lean();
   if (!documento) throw new Error(`No esta "${nombre}" en ${modelo.collection.name}`);
@@ -17,7 +13,6 @@ async function idPorNombre(modelo, nombre) {
 export const idDeRol = (nombre) => idPorNombre(RolModel, nombre);
 export const idDeTipoDeContexto = (nombre) => idPorNombre(TipoContextoModel, nombre);
 
-// { rol: "LIDER", tipo: "COLECTIVO", ...resto } -> { rolId, tipoContextoId, ...resto }
 export async function conReferencias({ rol, tipo, ...resto }) {
   return {
     ...resto,
@@ -26,8 +21,6 @@ export async function conReferencias({ rol, tipo, ...resto }) {
   };
 }
 
-// El contexto guardado (por id o por filtro) con los nombres de su rol y de su
-// tipo resueltos contra los catalogos, para comparar con toMatchObject.
 export async function contextoGuardado(idOFiltro) {
   const esFiltro = idOFiltro && typeof idOFiltro === "object" && !idOFiltro._bsontype;
   const contexto = await (

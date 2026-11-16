@@ -65,6 +65,10 @@ import { EstadisticaController } from "./controllers/EstadisticaController.js";
 import { LogroController } from "./controllers/LogroController.js";
 import { AvanceController } from "./controllers/AvanceController.js";
 import { AdministracionController } from "./controllers/AdministracionController.js";
+import { TerminosController } from "./controllers/TerminosController.js";
+import { TerminosService } from "./services/TerminosService.js";
+import { BajaPorInfraccionService } from "./services/BajaPorInfraccionService.js";
+import { MongoTerminosRepository } from "./repositories/MongoTerminosRepository.js";
 
 export function crearRepositoriosMongo() {
   const catalogoRepository = new MongoCatalogoRepository();
@@ -86,6 +90,7 @@ export function crearRepositoriosMongo() {
     solicitudIngresoRepository: new MongoSolicitudIngresoRepository(),
     auditoriaRepository: new MongoAuditoriaRepository(),
     revisionRepository: new MongoRevisionRepository(),
+    terminosRepository: new MongoTerminosRepository(),
     transacciones: transaccionesMongo,
   };
 }
@@ -141,6 +146,7 @@ export function componerApp({
     solicitudIngresoRepository,
     auditoriaRepository,
     revisionRepository,
+    terminosRepository = new MongoTerminosRepository(),
     transacciones,
   } = repositorios;
   const { diasSinActualizaciones = 30, maxDestacadosActivos = 6 } =
@@ -152,6 +158,14 @@ export function componerApp({
     notificacionRepository,
     colaboradorRepository,
     canales,
+  });
+
+  // La auditoria se arma antes porque la usan los terminos, y estos el alta de proyectos.
+  const auditoriaService = new AuditoriaService({ auditoriaRepository });
+  const terminosService = new TerminosService({
+    terminosRepository,
+    auditoriaService,
+    transacciones,
   });
 
   const perfilService = new PerfilService({
@@ -190,6 +204,8 @@ export function componerApp({
     perfilService,
     notificacionService,
     avisoAutomaticoService,
+    revisionRepository,
+    terminosService,
   });
 
   const reclutamientoService = new ReclutamientoService({
@@ -249,7 +265,6 @@ export function componerApp({
     catalogoDeRoles,
   });
 
-  const auditoriaService = new AuditoriaService({ auditoriaRepository });
   const conflictoDeIntereses = new ConflictoDeInteresesService({
     contextoUsuarioRepository,
   });
@@ -275,6 +290,7 @@ export function componerApp({
     auditoriaService,
     conflictoDeIntereses,
     diasSinActualizaciones,
+    avisoAutomaticoService,
   });
 
   const modalidadService = new ModalidadService({
@@ -293,6 +309,17 @@ export function componerApp({
     solicitudIngresoRepository,
     usuarioRepository,
     colectivoService,
+  });
+
+  const bajaPorInfraccionService = new BajaPorInfraccionService({
+    transacciones,
+    proyectoRepository,
+    revisionRepository,
+    colectivoService,
+    membresiaService,
+    notificacionService,
+    auditoriaService,
+    conflictoDeIntereses,
   });
 
   const liderazgoService = new LiderazgoService({
@@ -343,7 +370,10 @@ export function componerApp({
       revisionService,
       destacadoService,
       administradorService,
+      terminosService,
+      bajaPorInfraccionService,
     }),
+    terminos: new TerminosController({ terminosService }),
   };
 
   const services = {
@@ -367,6 +397,8 @@ export function componerApp({
     auditoriaService,
     destacadoService,
     revisionService,
+    terminosService,
+    bajaPorInfraccionService,
     modalidadService,
     membresiaService,
     liderazgoService,

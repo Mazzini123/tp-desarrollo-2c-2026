@@ -48,7 +48,15 @@ function rechazarPendientesDelPerfil(proyecto, perfil, fecha) {
 
 export function cerrarProyecto(proyecto, fecha) {
   proyecto.finalizarProyecto(fecha);
+  return terminarColaboraciones(proyecto, fecha);
+}
 
+export function darDeBajaProyecto(proyecto, motivo, fecha) {
+  proyecto.darDeBaja(motivo, fecha);
+  return terminarColaboraciones(proyecto, fecha);
+}
+
+function terminarColaboraciones(proyecto, fecha) {
   const finalizadas = proyecto.colaboraciones.filter((c) => c.estaAceptada());
   finalizadas.forEach((c) => c.finalizar(fecha));
 

@@ -62,10 +62,22 @@ function perfilParaRespuesta(perfil, proyecto, ahora = new Date()) {
   };
 }
 
-export function paginaDeResumenes(pagina) {
+export function paginaDeResumenes(
+  pagina,
+  armar = (proyecto) => resumenDeProyecto(proyecto),
+) {
+  return { ...pagina, items: pagina.items.map(armar) };
+}
+
+export function resumenParaAdministracion(proyecto, colectivosPropios = new Set()) {
+  const colectivoId = String(proyecto.colectivoId);
   return {
-    ...pagina,
-    items: pagina.items.map((proyecto) => resumenDeProyecto(proyecto)),
+    id: String(proyecto._id),
+    titulo: proyecto.titulo,
+    estado: proyecto.estado,
+    fechaCreacion: proyecto.fechaCreacion,
+    colectivo: { id: colectivoId, nombre: proyecto.datosDelColectivo.nombre },
+    conflictoDeIntereses: colectivosPropios.has(colectivoId),
   };
 }
 

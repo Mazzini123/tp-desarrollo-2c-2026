@@ -1,7 +1,13 @@
 import { resumenDeProyecto } from "./resumenDeProyecto.js";
 import { metaDePrimeraPagina } from "./paginacion.js";
 
-export function detalleDeProyecto(proyecto, pagina, aceptadasPorPerfil, esDueno) {
+export function detalleDeProyecto(
+  proyecto,
+  pagina,
+  aceptadasPorPerfil,
+  esDueno,
+  { conDatosDeGestion = false } = {},
+) {
   const respuesta = resumenDeProyecto(proyecto);
   for (const perfil of respuesta.perfiles) {
     perfil.cantidadAceptadas = aceptadasPorPerfil.get(perfil.id) ?? 0;
@@ -28,5 +34,28 @@ export function detalleDeProyecto(proyecto, pagina, aceptadasPorPerfil, esDueno)
     ...metaDePrimeraPagina(pagina.total),
     privadas: esDueno,
   };
+  if (conDatosDeGestion) {
+    respuesta.publicacion = publicacionDe(proyecto);
+    respuesta.terminos = proyecto.terminos
+      ? { version: proyecto.terminos.version, aceptadosEn: proyecto.terminos.aceptadosEn }
+      : null;
+    respuesta.baja = bajaDe(proyecto);
+  }
   return respuesta;
+}
+
+export function bajaDe({ baja }) {
+  return baja ? { motivo: baja.motivo, fecha: baja.fecha } : null;
+}
+
+export function publicacionDe({ publicacion }) {
+  if (!publicacion) return null;
+  return {
+    solicitadaEn: publicacion.solicitadaEn,
+    revisionId: String(publicacion.revisionId),
+    rechazo: publicacion.rechazo
+      ? { nota: publicacion.rechazo.nota, fecha: publicacion.rechazo.fecha }
+      : null,
+    aprobadaEn: publicacion.aprobadaEn ?? null,
+  };
 }

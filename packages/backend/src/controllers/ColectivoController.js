@@ -42,13 +42,18 @@ export class ColectivoController extends BaseController {
   obtenerPorId = async (req, res) => {
     const colectivo = await this.colectivoService.conPrimerosProyectos(
       await this.colectivoService.buscarPorId(req.params.id),
+      { esDueno: esElColectivo(req) },
     );
     res.status(200).json(esElColectivo(req) ? colectivo : colectivoPublico(colectivo));
   };
 
   actualizar = async (req, res) => {
     const colectivo = await this.colectivoService.actualizar(req.params.id, req.body);
-    res.status(200).json(await this.colectivoService.conPrimerosProyectos(colectivo));
+    res.status(200).json(
+      await this.colectivoService.conPrimerosProyectos(colectivo, {
+        esDueno: esElColectivo(req),
+      }),
+    );
   };
 
   mediosDeContacto = async (req, res) => {
@@ -70,7 +75,11 @@ export class ColectivoController extends BaseController {
     const colectivo = await this.membresiaService.darDeBajaColectivo(req.params.id, {
       contexto: req.contexto,
     });
-    res.status(200).json(await this.colectivoService.conPrimerosProyectos(colectivo));
+    res.status(200).json(
+      await this.colectivoService.conPrimerosProyectos(colectivo, {
+        esDueno: esElColectivo(req),
+      }),
+    );
   };
 
   crearProyecto = async (req, res) => {
@@ -85,7 +94,7 @@ export class ColectivoController extends BaseController {
   listarProyectos = async (req, res) => {
     const pagina = await this.proyectoService.listarResumenesPorColectivo(req.params.id, {
       ...this.aPaginacionDeDominio(req.consulta),
-      incluirPendientes: esElColectivo(req),
+      esDueno: esElColectivo(req),
     });
     this.responderPaginado(
       res,

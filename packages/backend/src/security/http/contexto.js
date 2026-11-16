@@ -9,3 +9,14 @@ export function colaboradorDelContexto(contexto) {
     ? String(contexto.colaboradorId)
     : null;
 }
+
+export function esAdministracion(contexto) {
+  return contexto?.tipo === TIPO_CONTEXTO.ADMINISTRACION;
+}
+
+export function lectorDelPedido(contexto) {
+  return {
+    colectivoId: colectivoDelContexto(contexto),
+    esAdministracion: esAdministracion(contexto),
+  };
+}
