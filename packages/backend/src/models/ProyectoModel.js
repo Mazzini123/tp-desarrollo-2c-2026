@@ -130,6 +130,40 @@ const destacadoSchema = new mongoose.Schema(
   DE_VALOR,
 );
 
+const rechazoDePublicacionSchema = new mongoose.Schema(
+  {
+    nota: { type: String, default: null },
+    fecha: { type: Date, required: true },
+  },
+  DE_VALOR,
+);
+
+const publicacionSchema = new mongoose.Schema(
+  {
+    solicitadaEn: { type: Date, required: true },
+    revisionId: { type: mongoose.Schema.Types.ObjectId, ref: "Revision", required: true },
+    rechazo: { type: rechazoDePublicacionSchema, default: null },
+    aprobadaEn: { type: Date, default: null },
+  },
+  DE_VALOR,
+);
+
+const terminosAceptadosSchema = new mongoose.Schema(
+  {
+    version: { type: Number, required: true, min: 1 },
+    aceptadosEn: { type: Date, required: true },
+  },
+  DE_VALOR,
+);
+
+const bajaSchema = new mongoose.Schema(
+  {
+    motivo: { type: String, required: true },
+    fecha: { type: Date, required: true },
+  },
+  DE_VALOR,
+);
+
 const datosDelColectivoSchema = new mongoose.Schema(
   {
     nombre: { type: String, required: true },
@@ -170,6 +204,9 @@ const proyectoSchema = new mongoose.Schema(
     fechaCierre: { type: Date, default: null },
     visualizaciones: { type: Number, default: 0 },
     destacado: { type: destacadoSchema, default: undefined },
+    publicacion: { type: publicacionSchema, default: undefined },
+    terminos: { type: terminosAceptadosSchema, default: undefined },
+    baja: { type: bajaSchema, default: undefined },
     idempotenciaPublicacion: {
       clave: String,
       huella: String,
@@ -223,6 +260,7 @@ aplicarFormatoJSON(proyectoSchema, {
     "fechaCierre",
     "visualizaciones",
     "colectivo",
+    "publicacion",
   ],
   transformar(_proyecto, salida) {
     salida.colaboraciones = (salida.colaboraciones ?? []).map((c) =>

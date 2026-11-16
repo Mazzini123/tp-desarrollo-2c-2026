@@ -163,11 +163,12 @@ export class ColectivoService {
     }));
   }
 
-  async conPrimerosProyectos(colectivo) {
+  async conPrimerosProyectos(colectivo, { esDueno = false } = {}) {
     const pagina = paginaDeResumenes(
       await this.proyectoRepository.listarPorColectivoPaginado(
         colectivo._id,
         PRIMERA_PAGINA,
+        { incluirNoPublicados: esDueno },
       ),
     );
     return {

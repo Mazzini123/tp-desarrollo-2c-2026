@@ -1,4 +1,4 @@
-import { detalleDeProyecto } from "../dto/detalleDeProyecto.js";
+import { bajaDe, detalleDeProyecto, publicacionDe } from "../dto/detalleDeProyecto.js";
 import { paginaDeResumenes, resumenDeProyecto } from "../dto/resumenDeProyecto.js";
 import { PRIMERA_PAGINA } from "../dto/paginacion.js";
 import { NotFoundError } from "../errors/NotFoundError.js";
@@ -12,6 +12,10 @@ import { armarPaginado } from "../utils/paginacion.js";
 import { normalizarEtiquetas } from "../domain/etiquetas.js";
 import { cerrarProyecto } from "./reglasDePostulacion.js";
 import { registro } from "../config/registro.js";
+import { ESTADOS_PUBLICADOS, PROYECTO_ESTADO } from "../domain/enums/PROYECTO_ESTADO.js";
+import { verificarEditable, verificarPublicable } from "./reglasDePublicacion.js";
+import { MOTIVO_REVISION } from "../domain/enums/MOTIVO_REVISION.js";
+import { aceptacionDeTerminos } from "./reglasDeTerminos.js";
 
 export class ProyectoService {
   constructor({
@@ -21,9 +25,13 @@ export class ProyectoService {
     perfilService,
     notificacionService,
     avisoAutomaticoService,
+    revisionRepository,
+    terminosService = null,
     transacciones,
   }) {
     this.transacciones = transacciones;
+    this.terminosService = terminosService;
+    this.revisionRepository = revisionRepository;
     this.colaboracionRepository = colaboracionRepository;
     this.proyectoRepository = proyectoRepository;
     this.colectivoService = colectivoService;
@@ -40,6 +48,8 @@ export class ProyectoService {
       perfiles,
       etiquetas = [],
       fechaCierre = null,
+      borrador = false,
+      terminosAceptados,
       claveIdempotencia,
     },
     ahora = new Date(),
@@ -47,13 +57,22 @@ export class ProyectoService {
     const publicacion = claveIdempotencia && {
       clave: claveIdempotencia,
       huella: createHash("sha256")
-        .update(JSON.stringify({ titulo, descripcion, perfiles, etiquetas, fechaCierre }))
+        .update(
+          JSON.stringify({
+            titulo,
+            descripcion,
+            perfiles,
+            etiquetas,
+            fechaCierre,
+            ...(borrador && { borrador }),
+            ...(terminosAceptados !== undefined && { terminosAceptados }),
+          }),
+        )
         .digest("hex"),
     };
 
     try {
       return await this.transacciones.ejecutar(async () => {
-        // La baja usa el mismo documento antes de buscar sus proyectos abiertos.
         const colectivo = await this.colectivoService.buscarPorId(colectivoId, {
           bloquear: true,
         });
@@ -67,6 +86,12 @@ export class ProyectoService {
           );
         }
 
+        const terminos = aceptacionDeTerminos(
+          await this.terminosService?.vigente(),
+          terminosAceptados,
+          ahora,
+        );
+
         const proyecto = this.proyectoRepository.nuevo({
           colectivoId: colectivo._id,
           datosDelColectivo: datosDelColectivo(colectivo),
@@ -76,13 +101,15 @@ export class ProyectoService {
           fechaCreacion: ahora,
           etiquetas: normalizarEtiquetas(etiquetas),
           idempotenciaPublicacion: publicacion,
+          estado: borrador ? PROYECTO_ESTADO.BORRADOR : PROYECTO_ESTADO.ABIERTO,
+          ...(terminos && { terminos }),
         });
 
         for (const datos of perfiles) {
           proyecto.agregarPerfil(await this.perfilService.construirPerfil(datos));
         }
         await this.proyectoRepository.guardar(proyecto);
-        await this.avisoAutomaticoService.avisarPorProyectoNuevo(proyecto);
+        if (!borrador) await this.avisoAutomaticoService.avisarPorProyectoNuevo(proyecto);
         return proyecto;
       });
     } catch (error) {
@@ -111,17 +138,26 @@ export class ProyectoService {
 
   async listarResumenesPorColectivo(
     colectivoId,
-    { numeroPagina = 1, limitePorPagina = 10, incluirPendientes = false } = {},
+    { numeroPagina = 1, limitePorPagina = 10, esDueno = false } = {},
   ) {
     await this.colectivoService.buscarPorId(colectivoId);
     const paginado = { numeroPagina, limitePorPagina };
     const pagina = paginaDeResumenes(
       armarPaginado(
-        await this.proyectoRepository.listarPorColectivoPaginado(colectivoId, paginado),
+        await this.proyectoRepository.listarPorColectivoPaginado(colectivoId, paginado, {
+          incluirNoPublicados: esDueno,
+        }),
         paginado,
       ),
+      esDueno
+        ? (proyecto) => ({
+            ...resumenDeProyecto(proyecto),
+            publicacion: publicacionDe(proyecto),
+            baja: bajaDe(proyecto),
+          })
+        : undefined,
     );
-    if (!incluirPendientes) return pagina;
+    if (!esDueno) return pagina;
 
     const pendientes = await this.colaboracionRepository.contarPendientesPorProyecto(
       pagina.items.map((proyecto) => proyecto.id),
@@ -133,11 +169,21 @@ export class ProyectoService {
     return pagina;
   }
 
-  async verDetalle(proyectoId, colectivoIdDeQuienConsulta = null) {
+  async exigirVisible(proyectoId, lector = {}) {
+    const proyecto = await this.proyectoRepository.buscarParaVisibilidad(proyectoId);
+    if (!proyecto || !puedeVer(proyecto, lector)) {
+      throw new NotFoundError("No existe ese proyecto");
+    }
+  }
+
+  async verDetalle(proyectoId, lector = {}) {
     const proyecto = await this.proyectoRepository.buscarParaDetalle(proyectoId);
-    if (!proyecto) throw new NotFoundError("No existe ese proyecto");
-    const esDueno = colectivoIdDeQuienConsulta === String(proyecto.colectivoId);
-    if (!esDueno) {
+    if (!proyecto || !puedeVer(proyecto, lector)) {
+      throw new NotFoundError("No existe ese proyecto");
+    }
+    const esDueno = esDelColectivo(proyecto, lector);
+    const publicado = ESTADOS_PUBLICADOS.includes(proyecto.estado);
+    if (!esDueno && publicado) {
       try {
         const cantidad = await this.proyectoRepository.registrarVisualizacion(proyectoId);
         if (cantidad !== undefined) proyecto.visualizaciones = cantidad;
@@ -155,7 +201,10 @@ export class ProyectoService {
     );
     const aceptadas =
       await this.colaboracionRepository.contarAceptadasPorPerfil(proyectoId);
-    return { proyecto: detalleDeProyecto(proyecto, pagina, aceptadas, esDueno), esDueno };
+    const respuesta = detalleDeProyecto(proyecto, pagina, aceptadas, esDueno, {
+      conDatosDeGestion: esDueno || Boolean(lector.esAdministracion),
+    });
+    return { proyecto: respuesta, esDueno };
   }
 
   async buscarPorId(proyectoId) {
@@ -180,7 +229,7 @@ export class ProyectoService {
 
   verificarAbierto(proyecto, accion) {
     if (!proyecto.estaAbierto()) {
-      throw new ConflictError(`No se puede ${accion} un proyecto finalizado`);
+      throw new ConflictError(`No se puede ${accion} un proyecto que no está abierto`);
     }
   }
 
@@ -190,7 +239,7 @@ export class ProyectoService {
     ahora = new Date(),
   ) {
     const proyecto = await this.buscarPorId(proyectoId);
-    this.verificarAbierto(proyecto, "modificar");
+    verificarEditable(proyecto, "modificar");
 
     if (titulo !== undefined) {
       proyecto.titulo = titulo;
@@ -211,6 +260,27 @@ export class ProyectoService {
 
     await this.proyectoRepository.guardar(proyecto);
     return proyecto;
+  }
+
+  async pedirPublicacion(proyectoId, ahora = new Date()) {
+    return this.transacciones.ejecutar(async () => {
+      const proyecto = await this.buscarPorId(proyectoId);
+      if (!proyecto.esBorrador()) {
+        throw new ConflictError("Solo se puede pedir la publicación de un borrador");
+      }
+      verificarPublicable(proyecto, ahora);
+      const revision = await this.revisionRepository.crearPendiente({
+        proyectoId: proyecto._id,
+        motivo: MOTIVO_REVISION.PUBLICACION,
+        creadaEn: ahora,
+      });
+      if (!revision) {
+        throw new ConflictError("La publicación de este proyecto ya está pedida");
+      }
+      proyecto.pedirPublicacion(revision._id, ahora);
+      await this.proyectoRepository.guardar(proyecto);
+      return proyecto;
+    });
   }
 
   async finalizar(proyectoId, ahora = new Date()) {
@@ -280,4 +350,16 @@ export function datosDelColectivo(colectivo) {
     tipoColectivo: colectivo.tipoColectivo,
     ubicacion: colectivo.ubicacion ?? null,
   };
+}
+
+function esDelColectivo(proyecto, { colectivoId = null } = {}) {
+  return colectivoId !== null && colectivoId === String(proyecto.colectivoId);
+}
+
+function puedeVer(proyecto, lector) {
+  return (
+    ESTADOS_PUBLICADOS.includes(proyecto.estado) ||
+    esDelColectivo(proyecto, lector) ||
+    Boolean(lector.esAdministracion)
+  );
 }

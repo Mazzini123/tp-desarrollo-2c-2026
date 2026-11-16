@@ -2,8 +2,11 @@ import { Router } from "express";
 import { validarIdsDeRuta } from "../middlewares/validarIds.js";
 import { validarBody, validarQuery } from "../middlewares/validar.js";
 import {
+  bajaPorInfraccionSchema,
   destacarProyectoSchema,
+  publicarTerminosSchema,
   listadoDeAuditoriaSchema,
+  listadoDeProyectosParaBajaSchema,
   listadoDeRevisionesSchema,
   otorgarAdministradorSchema,
   resolverRevisionSchema,
@@ -36,6 +39,11 @@ export function crearAdministracionRouter(controller, autorizacion) {
     controller.resolverRevision,
   );
 
+  router.get(
+    "/proyectos/destacados",
+    permiso(PERMISO.PROYECTO_DESTACAR),
+    controller.listarDestacados,
+  );
   router.put(
     "/proyectos/:id/destacado",
     permiso(PERMISO.PROYECTO_DESTACAR),
@@ -46,6 +54,32 @@ export function crearAdministracionRouter(controller, autorizacion) {
     "/proyectos/:id/destacado",
     permiso(PERMISO.PROYECTO_DESTACAR),
     controller.quitarDestacado,
+  );
+
+  router.get(
+    "/proyectos",
+    permiso(PERMISO.BAJA_POR_INFRACCION),
+    validarQuery(listadoDeProyectosParaBajaSchema),
+    controller.listarProyectos,
+  );
+  router.post(
+    "/proyectos/:id/baja",
+    permiso(PERMISO.BAJA_POR_INFRACCION),
+    validarBody(bajaPorInfraccionSchema),
+    controller.darDeBajaProyecto,
+  );
+  router.post(
+    "/colectivos/:id/baja",
+    permiso(PERMISO.BAJA_POR_INFRACCION),
+    validarBody(bajaPorInfraccionSchema),
+    controller.darDeBajaColectivo,
+  );
+
+  router.put(
+    "/terminos",
+    permiso(PERMISO.TERMINOS_GESTIONAR),
+    validarBody(publicarTerminosSchema),
+    controller.publicarTerminos,
   );
 
   router.post(

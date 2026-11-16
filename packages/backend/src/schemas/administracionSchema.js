@@ -10,9 +10,19 @@ import {
 import { MOTIVO_REVISION } from "../domain/enums/MOTIVO_REVISION.js";
 import { fechaDeCierreSchema, objectIdSchema } from "./comunesSchema.js";
 import { paginacionSchema } from "./paginacionSchema.js";
+import { PROYECTO_ESTADO } from "../domain/enums/PROYECTO_ESTADO.js";
+import { normalizarEtiqueta } from "../domain/etiquetas.js";
 
 export const destacarProyectoSchema = z
   .object({ hasta: fechaDeCierreSchema.unwrap() })
+  .strict();
+
+export const publicarTerminosSchema = z
+  .object({ texto: z.string().trim().min(1).max(50000) })
+  .strict();
+
+export const bajaPorInfraccionSchema = z
+  .object({ motivo: z.string().trim().min(1).max(1000) })
   .strict();
 
 export const resolverRevisionSchema = z
@@ -29,6 +39,16 @@ export const otorgarAdministradorSchema = z
 export const listadoDeRevisionesSchema = paginacionSchema.extend({
   estado: z.enum(Object.values(ESTADO_REVISION)).optional(),
   motivo: z.enum(Object.values(MOTIVO_REVISION)).optional(),
+});
+
+export const ESTADOS_PARA_BAJA = Object.values(PROYECTO_ESTADO).filter(
+  (estado) => estado !== PROYECTO_ESTADO.DADO_DE_BAJA,
+);
+
+export const listadoDeProyectosParaBajaSchema = paginacionSchema.extend({
+  q: z.string().trim().min(1).max(80).optional(),
+  etiqueta: z.string().trim().min(1).transform(normalizarEtiqueta).optional(),
+  estado: z.enum(ESTADOS_PARA_BAJA).optional(),
 });
 
 export const listadoDeAuditoriaSchema = paginacionSchema.extend({

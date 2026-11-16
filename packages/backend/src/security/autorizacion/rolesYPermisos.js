@@ -39,6 +39,8 @@ export const DESCRIPCION_DE_PERMISOS = {
   [PERMISO.REVISION_RESOLVER]: "Resolver las revisiones manuales de proyectos",
   [PERMISO.AUDITORIA_VER]: "Ver el registro de acciones administrativas",
   [PERMISO.ADMIN_GESTIONAR]: "Otorgar el rol de administracion de la plataforma",
+  [PERMISO.TERMINOS_GESTIONAR]: "Publicar nuevas versiones de los terminos y condiciones",
+  [PERMISO.BAJA_POR_INFRACCION]: "Dar de baja proyectos y colectivos en infraccion",
 };
 
 const PERMISOS_DE_COLABORADOR = [
@@ -82,6 +84,8 @@ const PERMISOS_DE_ADMIN = [
   PERMISO.REVISION_RESOLVER,
   PERMISO.AUDITORIA_VER,
   PERMISO.ADMIN_GESTIONAR,
+  PERMISO.TERMINOS_GESTIONAR,
+  PERMISO.BAJA_POR_INFRACCION,
 ];
 
 export const PERMISOS = Object.values(PERMISO).map((nombre) => ({

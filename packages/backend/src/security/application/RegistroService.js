@@ -23,7 +23,6 @@ export class RegistroService {
       return await registrar();
     } catch (error) {
       if (!(error instanceof DuplicadoError)) throw error;
-      // Mongo puede abortar la transacción al perder la carrera por un índice único.
       return registrar();
     }
   }

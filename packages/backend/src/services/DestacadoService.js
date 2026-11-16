@@ -10,6 +10,7 @@ import {
   motivoDeInelegibilidad,
   superaElTope,
 } from "./reglasDeDestacado.js";
+import { resumenDeProyecto } from "../dto/resumenDeProyecto.js";
 
 export class DestacadoService {
   constructor({
@@ -26,6 +27,18 @@ export class DestacadoService {
     this.auditoriaService = auditoriaService;
     this.conflictoDeIntereses = conflictoDeIntereses;
     this.maxDestacadosActivos = maxDestacadosActivos;
+  }
+
+  async listarVigentes({ usuarioId, ahora = new Date() }) {
+    const [proyectos, colectivosPropios] = await Promise.all([
+      this.proyectoRepository.listarDestacadosVigentes(ahora),
+      this.conflictoDeIntereses.colectivosDe(usuarioId),
+    ]);
+    return proyectos.map((proyecto) => ({
+      ...resumenDeProyecto(proyecto, ahora),
+      destacado: { desde: proyecto.destacado.desde, hasta: proyecto.destacado.hasta },
+      conflictoDeIntereses: colectivosPropios.has(String(proyecto.colectivoId)),
+    }));
   }
 
   async destacar({ proyectoId, hasta, actor, ahora = new Date() }) {

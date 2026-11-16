@@ -85,7 +85,10 @@ export const rutasColectivos = {
         "`fechaCierre` (req. 10) tiene que ser futura (422). Al crearlo, " +
         "se avisa a las personas compatibles (req. 9). Un colectivo dado de baja no puede " +
         "publicar proyectos (409). Repetir la clave con el mismo cuerpo devuelve el proyecto " +
-        "existente sin volver a enviar avisos. Con otros datos responde 409.",
+        "existente sin volver a enviar avisos. Con otros datos responde 409. Con " +
+        "`borrador: true` nace BORRADOR y no avisa a nadie (adicional 29). Si hay terminos y " +
+        "condiciones publicados (GET /terminos), exige `terminosAceptados` con la version " +
+        "vigente: si falta o no coincide, 422 TERMINOS_NO_ACEPTADOS (adicional 21).",
       parameters: [
         {
           name: "Idempotency-Key",
@@ -107,7 +110,10 @@ export const rutasColectivos = {
       tags: ["Proyectos"],
       summary: "Listar proyectos del colectivo",
       description:
-        "Resúmenes sin historial. El contexto dueño recibe postulacionesPendientes por proyecto y meta.perfiles_abiertos global.",
+        "Resúmenes sin historial. El contexto dueño recibe postulacionesPendientes por proyecto, " +
+        "meta.perfiles_abiertos global, `publicacion` y `baja` por proyecto (como en el " +
+        "detalle) y tambien sus proyectos BORRADOR, EN_REVISION y DADO_DE_BAJA; el resto " +
+        "solo ve los publicados (ABIERTO y FINALIZADO), sin `publicacion` ni `baja`.",
       parameters: paramsPaginacion,
       responses: { ...listado("ResumenProyecto"), 404: errores[404] },
     },

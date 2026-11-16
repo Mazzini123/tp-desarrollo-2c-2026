@@ -7,6 +7,7 @@ import { rutasCuenta } from "./rutas/cuenta.js";
 import { rutasCatalogos } from "./rutas/catalogos.js";
 import { rutasHabilidades } from "./rutas/habilidades.js";
 import { rutasAdministracion } from "./rutas/administracion.js";
+import { rutasTerminos } from "./rutas/terminos.js";
 import { respuestas } from "./esquemas/respuestas.js";
 import { entradas } from "./esquemas/entradas.js";
 import { errores } from "./comunes.js";
@@ -123,9 +124,16 @@ export const openapi = {
     {
       name: "Administracion",
       description:
-        "Administracion de la plataforma (req. adicionales 18 y 35): destacados, revisiones " +
-        "manuales, auditoria y altas de administradores. Solo para el contexto de " +
+        "Administracion de la plataforma (req. adicionales 13, 18, 21, 29 y 35): destacados, " +
+        "revisiones manuales, auditoria, altas de administradores, terminos y condiciones y " +
+        "bajas por infraccion. Solo para el contexto de " +
         "ADMINISTRACION, que no se obtiene por autoservicio.",
+    },
+    {
+      name: "Terminos",
+      description:
+        "Terminos y condiciones de la plataforma (req. adicional 21): una version vigente, " +
+        "publica, que se acepta al crear un proyecto.",
     },
     {
       name: "Estadisticas",
@@ -143,6 +151,7 @@ export const openapi = {
     ...rutasCatalogos,
     ...rutasHabilidades,
     ...rutasAdministracion,
+    ...rutasTerminos,
   },
 
   components: {
