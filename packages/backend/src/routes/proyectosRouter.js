@@ -36,6 +36,7 @@ export function crearProyectosRouter(controllers, autorizacion) {
   const editar = delDueno(PERMISO.PROYECTO_EDITAR);
   const reclutar = delDueno(PERMISO.RECLUTAMIENTO_GESTIONAR);
   const resolverPostulacion = delDueno(PERMISO.POSTULACION_RESOLVER);
+  const visible = [autorizacion.opcional, proyectoController.exigirVisible];
 
   router.get("/", validarQuery(listadoDeProyectosSchema), proyectoController.listar);
   router.get("/destacados", proyectoController.listarDestacados);
@@ -46,6 +47,8 @@ export function crearProyectosRouter(controllers, autorizacion) {
     validarBody(actualizarProyectoSchema),
     proyectoController.actualizar,
   );
+
+  router.post("/:id/publicacion", editar, proyectoController.pedirPublicacion);
 
   router.post(
     "/:id/finalizacion",
@@ -61,11 +64,12 @@ export function crearProyectosRouter(controllers, autorizacion) {
   );
   router.get(
     "/:id/participaciones",
+    visible,
     validarQuery(paginacionSchema),
     proyectoController.listarParticipaciones,
   );
-  router.get("/:id/perfiles", perfilController.listar);
-  router.get("/:id/perfiles/:perfilId", perfilController.obtenerPorId);
+  router.get("/:id/perfiles", visible, perfilController.listar);
+  router.get("/:id/perfiles/:perfilId", visible, perfilController.obtenerPorId);
   router.put(
     "/:id/perfiles/:perfilId",
     editar,
@@ -174,9 +178,9 @@ export function crearProyectosRouter(controllers, autorizacion) {
     logroController.crear,
   );
 
-  router.get("/:id/logros", logroController.listar);
+  router.get("/:id/logros", visible, logroController.listar);
 
-  router.get("/:id/logros/:logroId", logroController.buscarPorId);
+  router.get("/:id/logros/:logroId", visible, logroController.buscarPorId);
 
   router.put(
     "/:id/logros/:logroId",
@@ -195,9 +199,9 @@ export function crearProyectosRouter(controllers, autorizacion) {
     avanceController.registrar,
   );
 
-  router.get("/:id/avances", avanceController.listar);
+  router.get("/:id/avances", visible, avanceController.listar);
 
-  router.get("/:id/avances/:avanceId", avanceController.buscarPorId);
+  router.get("/:id/avances/:avanceId", visible, avanceController.buscarPorId);
 
   router.get(
     "/:id/colaboradores/:colaboradorId/contacto",

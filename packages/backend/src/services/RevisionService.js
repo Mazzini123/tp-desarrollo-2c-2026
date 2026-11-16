@@ -8,6 +8,8 @@ import { NotFoundError } from "../errors/NotFoundError.js";
 import { registro } from "../config/registro.js";
 import { armarPaginado } from "../utils/paginacion.js";
 import { debeMarcarse } from "./reglasDeSeguimiento.js";
+import { verificarPublicable } from "./reglasDePublicacion.js";
+import { ESTADO_REVISION } from "../domain/enums/ESTADO_REVISION.js";
 
 const comoTexto = (id) => (id == null ? null : String(id));
 
@@ -42,7 +44,9 @@ export class RevisionService {
     auditoriaService,
     conflictoDeIntereses,
     diasSinActualizaciones,
+    avisoAutomaticoService,
   }) {
+    this.avisoAutomaticoService = avisoAutomaticoService;
     this.transacciones = transacciones;
     this.revisionRepository = revisionRepository;
     this.proyectoRepository = proyectoRepository;
@@ -121,6 +125,10 @@ export class RevisionService {
         await this.conflictoDeIntereses.exigirSinConflicto(actor.usuarioId, colectivoId);
       }
 
+      if (revision.motivo === MOTIVO_REVISION.PUBLICACION) {
+        return this.resolverPublicacion({ revision, estado, nota, actor, ahora });
+      }
+
       const resuelta = await this.revisionRepository.resolverSiPendiente(revisionId, {
         estado,
         nota,
@@ -137,5 +145,39 @@ export class RevisionService {
       });
       return revisionDto(resuelta);
     });
+  }
+
+  async resolverPublicacion({ revision, estado, nota, actor, ahora }) {
+    const proyecto = await this.proyectoRepository.buscarPorId(revision.proyectoId);
+    if (!proyecto?.estaEnRevision()) {
+      throw new ConflictError("El proyecto ya no está esperando su publicación");
+    }
+    const aprobada = estado === ESTADO_REVISION.REVISADA;
+    if (aprobada) {
+      verificarPublicable(proyecto, ahora);
+      proyecto.aprobarPublicacion(ahora);
+    } else {
+      proyecto.rechazarPublicacion(nota, ahora);
+    }
+
+    const resuelta = await this.revisionRepository.resolverSiPendiente(revision._id, {
+      estado,
+      nota,
+      resueltaPor: actor.usuarioId,
+      resueltaEn: ahora,
+    });
+    if (!resuelta) throw new ConflictError("La revision ya fue resuelta");
+
+    await this.proyectoRepository.guardar(proyecto);
+    await this.auditoriaService.registrar({
+      actor,
+      accion: aprobada
+        ? ACCION_ADMINISTRATIVA.PROYECTO_PUBLICADO
+        : ACCION_ADMINISTRATIVA.PUBLICACION_RECHAZADA,
+      entidad: { tipo: TIPO_ENTIDAD_AUDITADA.PROYECTO, id: proyecto._id },
+      detalle: { revisionId: String(resuelta._id) },
+    });
+    if (aprobada) await this.avisoAutomaticoService.avisarPorProyectoNuevo(proyecto);
+    return revisionDto(resuelta);
   }
 }

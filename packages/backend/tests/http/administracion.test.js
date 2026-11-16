@@ -477,6 +477,8 @@ describe("HTTP · permisos de las rutas de administracion", () => {
   const rutas = [
     ["get", "/administracion/auditoria"],
     ["get", "/administracion/revisiones"],
+    ["get", "/administracion/proyectos"],
+    ["get", "/administracion/proyectos/destacados"],
     [
       "post",
       "/administracion/revisiones/64b000000000000000000001/resolucion",
@@ -492,6 +494,17 @@ describe("HTTP · permisos de las rutas de administracion", () => {
       "post",
       "/administracion/administradores",
       { usuarioId: "64b000000000000000000001" },
+    ],
+    ["put", "/administracion/terminos", { texto: "Reglas" }],
+    [
+      "post",
+      "/administracion/proyectos/64b000000000000000000001/baja",
+      { motivo: "Infraccion" },
+    ],
+    [
+      "post",
+      "/administracion/colectivos/64b000000000000000000001/baja",
+      { motivo: "Infraccion" },
     ],
   ];
 

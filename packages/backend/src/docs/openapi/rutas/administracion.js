@@ -38,13 +38,21 @@ export const rutasAdministracion = {
               "PROYECTO_DESTACADO_QUITADO",
               "REVISION_RESUELTA",
               "ADMIN_OTORGADO",
+              "PROYECTO_PUBLICADO",
+              "PUBLICACION_RECHAZADA",
+              "TERMINOS_ACTUALIZADOS",
+              "PROYECTO_DADO_DE_BAJA",
+              "COLECTIVO_DADO_DE_BAJA",
             ],
           },
         },
         {
           name: "entidadTipo",
           in: "query",
-          schema: { type: "string", enum: ["PROYECTO", "REVISION", "USUARIO"] },
+          schema: {
+            type: "string",
+            enum: ["PROYECTO", "REVISION", "USUARIO", "COLECTIVO", "TERMINOS"],
+          },
         },
         { name: "entidadId", in: "query", schema: OBJECT_ID },
         { name: "desde", in: "query", schema: { type: "string", format: "date-time" } },
@@ -59,10 +67,11 @@ export const rutasAdministracion = {
       tags: ["Administracion"],
       summary: "Cola de revisiones manuales",
       description:
-        `${REQUIERE_ADMINISTRACION} Permiso: REVISION_VER. Hoy solo existe el motivo ` +
-        "SIN_ACTUALIZACIONES: proyectos abiertos con colaboraciones aceptadas que no " +
-        "tienen avances ni logros nuevos en `DIAS_SIN_ACTUALIZACIONES` dias (30 por defecto). " +
-        "Un job las crea solo, sin duplicarlas y sin avisar a nadie.",
+        `${REQUIERE_ADMINISTRACION} Permiso: REVISION_VER. Motivos: SIN_ACTUALIZACIONES ` +
+        "(proyectos abiertos con colaboraciones aceptadas que no tienen avances ni logros " +
+        "nuevos en `DIAS_SIN_ACTUALIZACIONES` dias, 30 por defecto; un job las crea solo, " +
+        "sin duplicarlas y sin avisar a nadie) y PUBLICACION (un colectivo pidio publicar " +
+        "un borrador con POST /proyectos/{id}/publicacion).",
       parameters: [
         ...paramsPaginacion,
         {
@@ -73,7 +82,7 @@ export const rutasAdministracion = {
         {
           name: "motivo",
           in: "query",
-          schema: { type: "string", enum: ["SIN_ACTUALIZACIONES"] },
+          schema: { type: "string", enum: ["SIN_ACTUALIZACIONES", "PUBLICACION"] },
         },
       ],
       responses: { ...listado("Revision"), ...respuestasDeAdministracion },
@@ -87,7 +96,11 @@ export const rutasAdministracion = {
       description:
         `${REQUIERE_ADMINISTRACION} Permiso: REVISION_RESOLVER. Queda auditado. ` +
         "422 CONFLICTO_DE_INTERESES si quien resuelve es lider o miembro del colectivo del " +
-        "proyecto. 409 si la revision ya estaba resuelta.",
+        "proyecto. 409 si la revision ya estaba resuelta. Con motivo PUBLICACION: REVISADA " +
+        "publica el proyecto (pasa a ABIERTO, avisa a las compatibles, audita " +
+        "PROYECTO_PUBLICADO) y DESCARTADA lo vuelve a BORRADOR con la nota visible para el " +
+        "colectivo (audita PUBLICACION_RECHAZADA). 409 si el proyecto ya no esta EN_REVISION; " +
+        "422 si al aprobar la fecha de cierre ya paso.",
       parameters: [paramId],
       requestBody: body("ResolverRevision"),
       responses: {
@@ -96,6 +109,34 @@ export const rutasAdministracion = {
         404: errores[404],
         409: errores[409],
         422: errores[422],
+        ...respuestasDeAdministracion,
+      },
+    },
+  },
+
+  "/administracion/proyectos/destacados": {
+    get: {
+      tags: ["Administracion"],
+      summary: "Destacados vigentes, con su vencimiento",
+      description:
+        `${REQUIERE_ADMINISTRACION} Permiso: PROYECTO_DESTACAR. Los mismos proyectos y en ` +
+        "el mismo orden que GET /proyectos/destacados, pero `destacado` trae " +
+        "`{ desde, hasta }` en lugar de `true`, y cada uno suma `conflictoDeIntereses` " +
+        "(true si quien consulta es lider o miembro del colectivo: quitarlo o cambiarlo " +
+        "daria 422 CONFLICTO_DE_INTERESES).",
+      responses: {
+        200: {
+          description:
+            "Lista sin paginar (maximo `MAX_DESTACADOS_ACTIVOS`, 6 por defecto).",
+          content: {
+            "application/json": {
+              schema: {
+                type: "array",
+                items: { $ref: "#/components/schemas/DestacadoParaAdministracion" },
+              },
+            },
+          },
+        },
         ...respuestasDeAdministracion,
       },
     },
@@ -149,6 +190,117 @@ export const rutasAdministracion = {
         200: { description: "Ya era administradora. `{ usuarioId, creado: false }`" },
         400: errores[400],
         404: errores[404],
+        ...respuestasDeAdministracion,
+      },
+    },
+  },
+
+  "/administracion/terminos": {
+    put: {
+      tags: ["Administracion", "Terminos"],
+      summary: "Publicar una version nueva de los terminos y condiciones",
+      description:
+        `${REQUIERE_ADMINISTRACION} Permiso: TERMINOS_GESTIONAR. Crea la version siguiente ` +
+        "(la primera es 1) y la deja vigente; las anteriores quedan como historial. El texto " +
+        "es Markdown y se sanitiza. Audita TERMINOS_ACTUALIZADOS (entidad TERMINOS, detalle " +
+        "{ version }). 409 si otra version se publico al mismo tiempo.",
+      requestBody: body("PublicarTerminos"),
+      responses: {
+        ...recurso("TerminosPublicados", 201, "Version publicada."),
+        400: errores[400],
+        409: errores[409],
+        ...respuestasDeAdministracion,
+      },
+    },
+  },
+
+  "/administracion/proyectos": {
+    get: {
+      tags: ["Administracion"],
+      summary: "Listar proyectos para dar de baja",
+      description:
+        `${REQUIERE_ADMINISTRACION} Permiso: BAJA_POR_INFRACCION. Trae los proyectos en ` +
+        "BORRADOR, EN_REVISION, ABIERTO y FINALIZADO de todos los colectivos (nunca los " +
+        "DADO_DE_BAJA), del mas antiguo al mas nuevo. `conflictoDeIntereses` es true en los " +
+        "proyectos de colectivos donde quien consulta es lider o miembro: darlos de baja da " +
+        "422 CONFLICTO_DE_INTERESES (adicional 21).",
+      parameters: [
+        ...paramsPaginacion,
+        {
+          name: "q",
+          in: "query",
+          description:
+            "Busca en el titulo del proyecto o en el nombre del colectivo, sin distinguir " +
+            "mayusculas ni tildes. Hasta 80 caracteres.",
+          schema: { type: "string", minLength: 1, maxLength: 80 },
+        },
+        {
+          name: "etiqueta",
+          in: "query",
+          description: "Etiqueta exacta del proyecto (se normaliza como al guardarla).",
+          schema: { type: "string" },
+        },
+        {
+          name: "estado",
+          in: "query",
+          description: "Sin estado trae los cuatro. DADO_DE_BAJA da 400.",
+          schema: {
+            type: "string",
+            enum: ["BORRADOR", "EN_REVISION", "ABIERTO", "FINALIZADO"],
+          },
+        },
+      ],
+      responses: {
+        ...listado("ProyectoParaBaja"),
+        400: errores[400],
+        ...respuestasDeAdministracion,
+      },
+    },
+  },
+
+  "/administracion/proyectos/{id}/baja": {
+    post: {
+      tags: ["Administracion"],
+      summary: "Dar de baja un proyecto por infraccion",
+      description:
+        `${REQUIERE_ADMINISTRACION} Permiso: BAJA_POR_INFRACCION. El proyecto pasa a ` +
+        "DADO_DE_BAJA: sale de toda lectura publica (como un borrador) y el colectivo ve el " +
+        "motivo en `baja` del detalle. Rechaza las postulaciones pendientes, finaliza las " +
+        "colaboraciones aceptadas (avisando como al cerrarlo) y descarta sus revisiones " +
+        "pendientes con el motivo como nota. Audita PROYECTO_DADO_DE_BAJA (detalle " +
+        "{ motivo }). 409 si ya estaba dado de baja. 422 CONFLICTO_DE_INTERESES si quien " +
+        "lo hace es lider o miembro del colectivo.",
+      parameters: [paramId],
+      requestBody: body("BajaPorInfraccion"),
+      responses: {
+        ...recurso("BajaDeProyecto"),
+        400: errores[400],
+        404: errores[404],
+        409: errores[409],
+        422: errores[422],
+        ...respuestasDeAdministracion,
+      },
+    },
+  },
+
+  "/administracion/colectivos/{id}/baja": {
+    post: {
+      tags: ["Administracion"],
+      summary: "Dar de baja un colectivo por infraccion",
+      description:
+        `${REQUIERE_ADMINISTRACION} Permiso: BAJA_POR_INFRACCION. Hace la misma baja que ` +
+        "POST /colectivos/{id}/baja (cierra sus proyectos abiertos, cancela solicitudes y " +
+        "desactiva los contextos de sus miembros) y audita COLECTIVO_DADO_DE_BAJA (entidad " +
+        "COLECTIVO, detalle { motivo }). 409 si ya estaba dado de baja. 422 " +
+        "CONFLICTO_DE_INTERESES si quien lo hace es lider o miembro del colectivo.",
+      parameters: [paramId],
+      requestBody: body("BajaPorInfraccion"),
+      responses: {
+        ...recurso("BajaDeColectivo"),
+        400: errores[400],
+        404: errores[404],
+        409: errores[409],
+        422: errores[422],
         ...respuestasDeAdministracion,
       },
     },

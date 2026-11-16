@@ -3,18 +3,24 @@ import { ProyectoModel } from "../models/ProyectoModel.js";
 import { ColaboracionModel } from "../models/ColaboracionModel.js";
 import { transaccionesMongo } from "../config/transacciones.js";
 import { ConcurrenciaError } from "../errors/ConcurrenciaError.js";
-import { PROYECTO_ESTADO } from "../domain/enums/PROYECTO_ESTADO.js";
+import { ESTADOS_PUBLICADOS, PROYECTO_ESTADO } from "../domain/enums/PROYECTO_ESTADO.js";
 import { errorDeDuplicado, esDuplicado } from "./duplicados.js";
 import { esIdValido } from "./objectIds.js";
 import { paginar } from "./paginar.js";
 import { COLABORACION_ESTADO } from "../domain/enums/COLABORACION_ESTADO.js";
 import { ControlModel } from "../models/ControlModel.js";
 import { salto } from "../utils/paginacion.js";
+import { patronDeNombre } from "../domain/busquedaPorNombre.js";
 
 const ORDEN = { fechaCreacion: 1, _id: 1 };
 const ORDEN_DE_DESTACADOS = { "destacado.desde": -1, "destacado.hasta": 1, _id: 1 };
 const CAMPOS_DE_RESUMEN =
   "titulo descripcion estado porcentajeConcrecion perfiles etiquetas fechaCreacion fechaCierre colectivoId datosDelColectivo destacado";
+const CAMPOS_DE_GESTION = `${CAMPOS_DE_RESUMEN} publicacion baja`;
+const CAMPOS_PARA_ADMINISTRACION =
+  "titulo estado fechaCreacion colectivoId datosDelColectivo.nombre";
+
+const PUBLICADOS = { estado: { $in: ESTADOS_PUBLICADOS } };
 
 const filtroDeVigente = (ahora) => ({
   estado: PROYECTO_ESTADO.ABIERTO,
@@ -94,7 +100,7 @@ export class MongoProyectoRepository {
 
   async buscarParaTimeline(colectivoId) {
     if (!esIdValido(colectivoId)) return [];
-    return ProyectoModel.find({ colectivoId })
+    return ProyectoModel.find({ colectivoId, ...PUBLICADOS })
       .select("titulo fechaCreacion fechaFinalizacion logros avances")
       .sort(ORDEN)
       .lean();
@@ -104,6 +110,11 @@ export class MongoProyectoRepository {
     if (!esIdValido(id)) return null;
     const proyecto = await ProyectoModel.findById(id).select("colectivoId").lean();
     return proyecto?.colectivoId ?? null;
+  }
+
+  async buscarParaVisibilidad(id) {
+    if (!esIdValido(id)) return null;
+    return ProyectoModel.findById(id).select("estado colectivoId").lean();
   }
 
   async contarPerfilesAbiertos(colectivoId, ahora = new Date()) {
@@ -249,20 +260,38 @@ export class MongoProyectoRepository {
 
   async contarPorColectivos(ids) {
     const filas = await ProyectoModel.aggregate([
-      { $match: { colectivoId: { $in: ids } } },
+      { $match: { colectivoId: { $in: ids }, ...PUBLICADOS } },
       { $group: { _id: "$colectivoId", cantidad: { $sum: 1 } } },
     ]);
     return new Map(filas.map((fila) => [String(fila._id), fila.cantidad]));
   }
 
-  async listarPorColectivoPaginado(colectivoId, pagina) {
-    return this.paginarResumenes({ colectivoId }, pagina);
+  async listarPorColectivoPaginado(
+    colectivoId,
+    pagina,
+    { incluirNoPublicados = false } = {},
+  ) {
+    return incluirNoPublicados
+      ? this.paginarResumenes({ colectivoId }, pagina, CAMPOS_DE_GESTION)
+      : this.paginarResumenes({ colectivoId, ...PUBLICADOS }, pagina);
   }
 
-  async paginarResumenes(filtro, pagina) {
+  async listarParaAdministracion(pagina, { q, etiqueta, estado } = {}) {
+    const filtro = {
+      estado: estado ?? { $ne: PROYECTO_ESTADO.DADO_DE_BAJA },
+      ...(etiqueta && { etiquetas: etiqueta }),
+    };
+    if (q) {
+      const patron = { $regex: patronDeNombre(q), $options: "i" };
+      filtro.$or = [{ titulo: patron }, { "datosDelColectivo.nombre": patron }];
+    }
+    return this.paginarResumenes(filtro, pagina, CAMPOS_PARA_ADMINISTRACION);
+  }
+
+  async paginarResumenes(filtro, pagina, campos = CAMPOS_DE_RESUMEN) {
     return paginar(ProyectoModel, filtro, pagina, {
       orden: ORDEN,
-      ajustar: (consulta) => consulta.select(CAMPOS_DE_RESUMEN).lean(),
+      ajustar: (consulta) => consulta.select(campos).lean(),
     });
   }
 
@@ -317,9 +346,12 @@ function filtroDeListado({
   ubicacion,
   modalidad,
 }) {
-  const filtro = {};
+  const filtro = {
+    estado: {
+      $in: ESTADOS_PUBLICADOS.filter((publicado) => !estado || publicado === estado),
+    },
+  };
   if (etiqueta) filtro.etiquetas = etiqueta;
-  if (estado) filtro.estado = estado;
   if (tipoColectivo) filtro["datosDelColectivo.tipoColectivo"] = tipoColectivo;
   if (ubicacion) filtro["datosDelColectivo.ubicacion.nombre"] = ubicacion;
   if (modalidad) filtro["perfiles.modalidadColaboracion"] = modalidad;

@@ -1,8 +1,57 @@
-import { PROYECTO_ESTADO } from "./enums/PROYECTO_ESTADO.js";
+import {
+  ESTADOS_EDITABLES,
+  ESTADOS_PUBLICADOS,
+  PROYECTO_ESTADO,
+} from "./enums/PROYECTO_ESTADO.js";
 
 export class Proyecto {
   estaAbierto() {
     return this.estado === PROYECTO_ESTADO.ABIERTO;
+  }
+
+  estaPublicado() {
+    return ESTADOS_PUBLICADOS.includes(this.estado);
+  }
+
+  esBorrador() {
+    return this.estado === PROYECTO_ESTADO.BORRADOR;
+  }
+
+  estaEnRevision() {
+    return this.estado === PROYECTO_ESTADO.EN_REVISION;
+  }
+
+  esEditable() {
+    return ESTADOS_EDITABLES.includes(this.estado);
+  }
+
+  pedirPublicacion(revisionId, fecha = new Date()) {
+    this.estado = PROYECTO_ESTADO.EN_REVISION;
+    this.publicacion = {
+      solicitadaEn: fecha,
+      revisionId,
+      rechazo: null,
+      aprobadaEn: null,
+    };
+  }
+
+  aprobarPublicacion(fecha = new Date()) {
+    this.estado = PROYECTO_ESTADO.ABIERTO;
+    this.publicacion = { ...datosDePublicacion(this), rechazo: null, aprobadaEn: fecha };
+  }
+
+  rechazarPublicacion(nota, fecha = new Date()) {
+    this.estado = PROYECTO_ESTADO.BORRADOR;
+    this.publicacion = { ...datosDePublicacion(this), rechazo: { nota, fecha } };
+  }
+
+  estaDadoDeBaja() {
+    return this.estado === PROYECTO_ESTADO.DADO_DE_BAJA;
+  }
+
+  darDeBaja(motivo, fecha = new Date()) {
+    this.estado = PROYECTO_ESTADO.DADO_DE_BAJA;
+    this.baja = { motivo, fecha };
   }
 
   finalizarProyecto(fecha = new Date()) {
@@ -65,4 +114,11 @@ export class Proyecto {
       (c) => c.estaAceptada() && String(c.perfil) === String(perfil.id),
     ).length;
   }
+}
+
+function datosDePublicacion(proyecto) {
+  const publicacion = proyecto.publicacion;
+  const plano =
+    typeof publicacion?.toObject === "function" ? publicacion.toObject() : publicacion;
+  return { ...plano };
 }

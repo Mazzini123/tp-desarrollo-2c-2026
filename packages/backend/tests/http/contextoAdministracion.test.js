@@ -53,9 +53,11 @@ describe("HTTP · contexto de administracion", () => {
       [
         "ADMIN_GESTIONAR",
         "AUDITORIA_VER",
+        "BAJA_POR_INFRACCION",
         "PROYECTO_DESTACAR",
         "REVISION_RESOLVER",
         "REVISION_VER",
+        "TERMINOS_GESTIONAR",
       ].sort(),
     );
   });

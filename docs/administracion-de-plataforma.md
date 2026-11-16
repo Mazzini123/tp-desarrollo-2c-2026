@@ -83,7 +83,7 @@ Campo en el proyecto: `destacado: { desde, hasta, marcadoPor }` o ausente.
 - `hasta` es obligatorio y debe ser futuro. Máximo `MAX_DESTACADOS_ACTIVOS` activos a la vez (configurable, por defecto 6); si se supera, 409.
 - Un destacado está vigente cuando `desde <= ahora < hasta`.
 - Rotación: el endpoint de portada devuelve los vigentes ordenados por el que menos tiempo lleva destacado y, ante empate, por el que vence antes. Cuando uno vence deja de listarse solo; el administrador puede reemplazarlo.
-- Rutas: `PUT /administracion/proyectos/:id/destacado` (`{ hasta }`), `DELETE` del mismo recurso, `GET /proyectos/destacados` (público), y los listados públicos de proyectos ordenan los vigentes primero y los marcan con `destacado: true`.
+- Rutas: `PUT /administracion/proyectos/:id/destacado` (`{ hasta }`), `DELETE` del mismo recurso, `GET /proyectos/destacados` (público), y los listados públicos de proyectos ordenan los vigentes primero y los marcan con `destacado: true`. Para administración, `GET /administracion/proyectos/destacados` (permiso `PROYECTO_DESTACAR`) devuelve la misma lista con `destacado: { desde, hasta }` y `conflictoDeIntereses`, para mostrar hasta cuándo dura cada uno (`tests/http/destacadosDeAdministracion.test.js`).
 - Se audita cada alta, cambio y baja.
 
 ## Escenarios
@@ -156,7 +156,7 @@ Cada paso empieza por tests que fallan y termina con el código mínimo que los 
 ## Fuera de alcance
 
 - El front: sello «Destacado» y orden en la portada y el listado (fase 1); selector de contexto y «Mi cuenta» con el tercer tipo, y el área `/admin` con destacados, revisiones y auditoría (fase 2). Se hace después, en el repo del front, con su propia spec.
-- Los adicionales 21 (términos y condiciones) y 29 (borradores), y moderación y denuncias; se apoyan en esta base y en la cola de revisiones.
+- Los adicionales 21 (términos y condiciones) y 29 (borradores), y moderación y denuncias; se apoyan en esta base y en la cola de revisiones. Después se implementaron el 29 ([borradores-de-proyectos.md](borradores-de-proyectos.md)) y el 21 junto con el cierre de la auditoría del 13 ([terminos-y-condiciones.md](terminos-y-condiciones.md)).
 - Notificaciones a administradores por correo (decisión E: solo el listado).
 - Roles intermedios (`MODERADOR`).
 

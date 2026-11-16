@@ -115,7 +115,13 @@ function ocultarCodigoYEnlaces(texto) {
   return { textoOculto, fragmentos };
 }
 
-const CAMPOS_MARKDOWN = new Set(["descripcion", "presentacion", "comentario", "mensaje"]);
+const CAMPOS_MARKDOWN = new Set([
+  "descripcion",
+  "presentacion",
+  "comentario",
+  "mensaje",
+  "texto",
+]);
 
 function limpiar(valor, campo) {
   if (typeof valor === "string") {

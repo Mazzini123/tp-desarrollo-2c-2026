@@ -1,5 +1,7 @@
 import { aObjectId } from "./objectIds.js";
-import { PROYECTO_ESTADO } from "../domain/enums/PROYECTO_ESTADO.js";
+import { ESTADOS_PUBLICADOS, PROYECTO_ESTADO } from "../domain/enums/PROYECTO_ESTADO.js";
+
+const soloPublicados = { $match: { estado: { $in: ESTADOS_PUBLICADOS } } };
 
 const estaDadoDeBaja = { $eq: [{ $type: "$fechaBaja" }, "date"] };
 
@@ -16,7 +18,7 @@ export function colectivosPorEstado() {
 }
 
 export function proyectosPorEstado() {
-  return [{ $group: { _id: "$estado", cantidad: { $sum: 1 } } }];
+  return [soloPublicados, { $group: { _id: "$estado", cantidad: { $sum: 1 } } }];
 }
 
 export function colaboracionesPorEstado(filtro = {}) {
@@ -33,6 +35,7 @@ export function colaboracionesPorEstado(filtro = {}) {
 
 export function habilidadesMasRequeridas(limite) {
   return [
+    soloPublicados,
     { $unwind: "$perfiles" },
     { $unwind: "$perfiles.habilidadesRequeridas" },
     {
@@ -63,7 +66,12 @@ export function estadisticasDeColectivo(colectivoId) {
   const lista = (campo) => ({ $ifNull: [`$${campo}`, []] });
 
   return [
-    { $match: { colectivoId: aObjectId(colectivoId) } },
+    {
+      $match: {
+        colectivoId: aObjectId(colectivoId),
+        estado: { $in: ESTADOS_PUBLICADOS },
+      },
+    },
     {
       $lookup: {
         from: "colaboraciones",

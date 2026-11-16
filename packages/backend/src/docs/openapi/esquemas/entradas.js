@@ -159,6 +159,23 @@ export const entradas = {
         nullable: true,
         example: "2026-12-01T18:00:00-03:00",
       },
+      borrador: {
+        type: "boolean",
+        default: false,
+        description:
+          "Adicional 29. Con true el proyecto nace BORRADOR: no se publica, no avisa a nadie " +
+          "y solo lo ven su colectivo y administracion. Sin el campo se publica directo.",
+      },
+      terminosAceptados: {
+        type: "integer",
+        minimum: 1,
+        example: 1,
+        description:
+          "Adicional 21. Version de los terminos y condiciones que acepta el colectivo " +
+          "(GET /terminos). Si hay terminos publicados es obligatoria y tiene que ser la " +
+          "vigente: si falta o no coincide, 422 TERMINOS_NO_ACEPTADOS con " +
+          "detalle.versionVigente. Sin terminos publicados se ignora. Tambien en borradores.",
+      },
     },
   },
 
@@ -331,6 +348,27 @@ export const entradas = {
     properties: {
       estado: { type: "string", enum: ["REVISADA", "DESCARTADA"] },
       nota: { type: "string", maxLength: 1000 },
+    },
+  },
+  PublicarTerminos: {
+    type: "object",
+    required: ["texto"],
+    additionalProperties: false,
+    properties: {
+      texto: {
+        type: "string",
+        minLength: 1,
+        maxLength: 50000,
+        description: "Markdown. Se sanitiza como las descripciones (conserva el codigo).",
+      },
+    },
+  },
+  BajaPorInfraccion: {
+    type: "object",
+    required: ["motivo"],
+    additionalProperties: false,
+    properties: {
+      motivo: { type: "string", minLength: 1, maxLength: 1000 },
     },
   },
   OtorgarAdministrador: {

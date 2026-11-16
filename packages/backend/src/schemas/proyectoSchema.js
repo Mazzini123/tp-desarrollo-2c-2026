@@ -14,6 +14,8 @@ export const crearProyectoSchema = z
     perfiles: z.array(crearPerfilSchema).min(1),
     etiquetas: etiquetasSchema.default([]),
     fechaCierre: fechaCierreSchema.optional(),
+    borrador: z.boolean().optional(),
+    terminosAceptados: z.number().int().positive().optional(),
   })
   .strict();
 

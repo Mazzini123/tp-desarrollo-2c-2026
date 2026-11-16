@@ -10,6 +10,7 @@ import {
   aplicarModoDeAceptacion,
   validarModoDeAceptacion,
 } from "./reglasDePostulacion.js";
+import { verificarEditable } from "./reglasDePublicacion.js";
 
 const GRUPOS = {
   requerida: {
@@ -57,15 +58,9 @@ export class PerfilService {
     return (await this.buscarPerfilConProyecto(proyectoId, perfilId)).perfil;
   }
 
-  verificarProyectoAbierto(proyecto, accion) {
-    if (!proyecto.estaAbierto()) {
-      throw new ConflictError(`No se puede ${accion} un proyecto finalizado`);
-    }
-  }
-
   async crear(proyectoId, datos) {
     const proyecto = await buscarProyectoOFallar(this.proyectoRepository, proyectoId);
-    this.verificarProyectoAbierto(proyecto, "agregar perfiles a");
+    verificarEditable(proyecto, "agregar perfiles a");
 
     const perfil = proyecto.agregarPerfil(await this.construirPerfil(datos));
     await this.proyectoRepository.guardar(proyecto);
@@ -163,7 +158,7 @@ export class PerfilService {
   }
 
   verificarEdicion(proyecto, perfil, versionEdicion) {
-    this.verificarProyectoAbierto(proyecto, "modificar perfiles de");
+    verificarEditable(proyecto, "modificar perfiles de");
     if (versionEdicion !== undefined && versionEdicion !== perfil.versionEdicion) {
       throw new ConflictError("El perfil fue modificado desde que se abrió la edición");
     }
@@ -171,7 +166,7 @@ export class PerfilService {
 
   async eliminar(proyectoId, perfilId) {
     const { proyecto, perfil } = await this.buscarPerfilConProyecto(proyectoId, perfilId);
-    this.verificarProyectoAbierto(proyecto, "eliminar perfiles de");
+    verificarEditable(proyecto, "eliminar perfiles de");
 
     if (proyecto.perfiles.length <= 1) {
       throw new DomainError("El proyecto debe conservar al menos un perfil");
@@ -204,7 +199,7 @@ export class PerfilService {
 
   async agregarHabilidad(grupo, proyectoId, perfilId, codigoHabilidad) {
     const { proyecto, perfil } = await this.buscarPerfilConProyecto(proyectoId, perfilId);
-    this.verificarProyectoAbierto(proyecto, "agregar habilidades a perfiles de");
+    verificarEditable(proyecto, "agregar habilidades a perfiles de");
 
     const [habilidad] = await this.habilidadService.resolverPorCodigos([codigoHabilidad]);
     for (const existente of [GRUPOS[grupo.otro], grupo]) {
@@ -222,7 +217,7 @@ export class PerfilService {
 
   async quitarHabilidad(grupo, proyectoId, perfilId, codigoHabilidad) {
     const { proyecto, perfil } = await this.buscarPerfilConProyecto(proyectoId, perfilId);
-    this.verificarProyectoAbierto(proyecto, "quitar habilidades de perfiles de");
+    verificarEditable(proyecto, "quitar habilidades de perfiles de");
 
     const lista = grupo.lista(perfil);
     const habilidad = lista.find((item) => item.codigo === codigoHabilidad);

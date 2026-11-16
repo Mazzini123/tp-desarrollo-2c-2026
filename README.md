@@ -172,28 +172,30 @@ mapa, con el requerimiento del enunciado que resuelve cada cosa.
 
 ### Requerimientos adicionales
 
-| #      | Requerimiento                                    | Cómo                                                                                                                                                                       |
-| ------ | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 8      | Aceptación y rechazo automático de postulaciones | `modoAceptacion` y `limiteColaboraciones` en cada perfil; `POST .../colaboraciones/:colaboracionId/aceptacion` y `/rechazo`                                                |
-| 9      | Notificaciones automáticas                       | Al crear un proyecto se avisa a las personas compatibles; al crear una persona, se le avisa qué proyectos le sirven                                                        |
-| 10     | Cierre automático de proyectos                   | `fechaCierre` en el proyecto; `src/jobs/cierreAutomatico.js` revisa cada minuto                                                                                            |
-| 11     | Sanitización                                     | Quita los elementos HTML de los textos y conserva el texto con ángulos que no es HTML (`Array<string>`, `x<y`); en campos Markdown conserva código y autolinks             |
-| 14     | Límite de solicitudes                            | `src/middlewares/limiteDeTasa.js`: 300 cada 15 min por IP; 30 por minuto en búsquedas y estadísticas                                                                       |
-| 16, 30 | Estadísticas globales / API pública              | `GET /estadisticas`, con el Aggregation Framework                                                                                                                          |
-| 17     | Estadísticas por organización                    | `GET /colectivos/:id/estadisticas`; `GET /proyectos/:id` suma visualizaciones                                                                                              |
-| 18     | Proyectos destacados                             | `PUT/DELETE /administracion/proyectos/:id/destacado`, `GET /proyectos/destacados`; los listados ordenan primero los vigentes y los marcan con `destacado: true`            |
-| 19     | Línea de tiempo                                  | `GET /colectivos/:id/timeline`: alta, proyectos, logros, avances, colaboraciones cerradas y baja                                                                           |
-| 23     | Eliminación de colectivos                        | `POST /colectivos/:id/baja`                                                                                                                                                |
-| 27     | Redes sociales                                   | `redesSociales` en colectivos y colaboradores                                                                                                                              |
-| 34     | Etiquetas                                        | `etiquetas` en colectivos y proyectos; filtro `?etiqueta=` en los listados                                                                                                 |
-| 35     | Seguimiento de proyectos sin actualizaciones     | Job `src/jobs/seguimiento.js`; `GET /administracion/revisiones`, `POST /administracion/revisiones/:id/resolucion`                                                          |
-| 38     | Markdown (backend)                               | Las descripciones conservan la sintaxis Markdown y limpian HTML externo al código; el renderizado es del [frontend](https://github.com/Mazzini123/codigo-a-voluntad-front) |
-| 39     | Valoraciones mutuas                              | `POST .../colaboraciones/:colaboracionId/finalizacion` y `/valoraciones`; `GET /colaboradores/:id/valoraciones`, `GET /colectivos/:id/valoraciones`                        |
+| #      | Requerimiento                                    | Cómo                                                                                                                                                                         |
+| ------ | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 8      | Aceptación y rechazo automático de postulaciones | `modoAceptacion` y `limiteColaboraciones` en cada perfil; `POST .../colaboraciones/:colaboracionId/aceptacion` y `/rechazo`                                                  |
+| 9      | Notificaciones automáticas                       | Al crear un proyecto se avisa a las personas compatibles; al crear una persona, se le avisa qué proyectos le sirven                                                          |
+| 10     | Cierre automático de proyectos                   | `fechaCierre` en el proyecto; `src/jobs/cierreAutomatico.js` revisa cada minuto                                                                                              |
+| 11     | Sanitización                                     | Quita los elementos HTML de los textos y conserva el texto con ángulos que no es HTML (`Array<string>`, `x<y`); en campos Markdown conserva código y autolinks               |
+| 13     | Auditoría de acciones administrativas            | `GET /administracion/auditoria`, filtrable por acción, entidad y fecha; cada acción administrativa se registra en la misma transacción que el cambio                         |
+| 14     | Límite de solicitudes                            | `src/middlewares/limiteDeTasa.js`: 300 cada 15 min por IP; 30 por minuto en búsquedas y estadísticas                                                                         |
+| 16, 30 | Estadísticas globales / API pública              | `GET /estadisticas`, con el Aggregation Framework                                                                                                                            |
+| 17     | Estadísticas por organización                    | `GET /colectivos/:id/estadisticas`; `GET /proyectos/:id` suma visualizaciones                                                                                                |
+| 18     | Proyectos destacados                             | `PUT/DELETE /administracion/proyectos/:id/destacado`, `GET /proyectos/destacados`; los listados ordenan primero los vigentes y los marcan con `destacado: true`              |
+| 19     | Línea de tiempo                                  | `GET /colectivos/:id/timeline`: alta, proyectos, logros, avances, colaboraciones cerradas y baja                                                                             |
+| 21     | Términos y condiciones                           | `GET /terminos`, `PUT /administracion/terminos`; `terminosAceptados` al crear un proyecto; `POST /administracion/proyectos/:id/baja` y `/colectivos/:id/baja` por infracción |
+| 23     | Eliminación de colectivos                        | `POST /colectivos/:id/baja`                                                                                                                                                  |
+| 27     | Redes sociales                                   | `redesSociales` en colectivos y colaboradores                                                                                                                                |
+| 29     | Borradores con aprobación de administración      | `borrador: true` en `POST /colectivos/:id/proyectos`; `POST /proyectos/:id/publicacion`; administración aprueba o rechaza desde la cola de revisiones (motivo `PUBLICACION`) |
+| 34     | Etiquetas                                        | `etiquetas` en colectivos y proyectos; filtro `?etiqueta=` en los listados                                                                                                   |
+| 35     | Seguimiento de proyectos sin actualizaciones     | Job `src/jobs/seguimiento.js`; `GET /administracion/revisiones`, `POST /administracion/revisiones/:id/resolucion`                                                            |
+| 38     | Markdown (backend)                               | Las descripciones conservan la sintaxis Markdown y limpian HTML externo al código; el renderizado es del [frontend](https://github.com/Mazzini123/codigo-a-voluntad-front)   |
+| 39     | Valoraciones mutuas                              | `POST .../colaboraciones/:colaboracionId/finalizacion` y `/valoraciones`; `GET /colaboradores/:id/valoraciones`, `GET /colectivos/:id/valoraciones`                          |
 
-Los adicionales 18 y 35 se resuelven con el rol de administración (ver
-[Administración de la plataforma](#administración-de-la-plataforma)). Los adicionales 13
-(solo la parte de auditoría y destacados), 21 y 29 quedan para una próxima entrega: se
-apoyan en esa misma base.
+Los adicionales 13 (auditoría), 18, 21, 29 y 35 se resuelven con el rol de administración
+(ver [Administración de la plataforma](#administración-de-la-plataforma)): toda acción
+administrativa que cambia datos queda en `GET /administracion/auditoria`.
 
 ### Ciclo de una postulación
 
@@ -442,13 +444,16 @@ npm run admin:otorgar -- <usuarioId | proveedor:sub>
 (la cuenta tiene que haberse registrado antes con `POST /auth/registro`) y los siguientes los
 otorga un administrador con `POST /administracion/administradores`.
 
-| Ruta                                                     | Permiso             | Qué hace                                                         |
-| -------------------------------------------------------- | ------------------- | ---------------------------------------------------------------- |
-| `GET /administracion/auditoria`                          | `AUDITORIA_VER`     | Acciones administrativas, filtrables por acción, entidad y fecha |
-| `GET /administracion/revisiones`                         | `REVISION_VER`      | Cola de revisiones, filtrable por estado y motivo                |
-| `POST /administracion/revisiones/:id/resolucion`         | `REVISION_RESOLVER` | Pasa una revisión a `REVISADA` o `DESCARTADA`                    |
-| `PUT` / `DELETE /administracion/proyectos/:id/destacado` | `PROYECTO_DESTACAR` | Destaca un proyecto hasta una fecha futura, o lo quita           |
-| `POST /administracion/administradores`                   | `ADMIN_GESTIONAR`   | Otorga el rol a otra cuenta                                      |
+| Ruta                                                     | Permiso               | Qué hace                                                         |
+| -------------------------------------------------------- | --------------------- | ---------------------------------------------------------------- |
+| `GET /administracion/auditoria`                          | `AUDITORIA_VER`       | Acciones administrativas, filtrables por acción, entidad y fecha |
+| `GET /administracion/revisiones`                         | `REVISION_VER`        | Cola de revisiones, filtrable por estado y motivo                |
+| `POST /administracion/revisiones/:id/resolucion`         | `REVISION_RESOLVER`   | Pasa una revisión a `REVISADA` o `DESCARTADA`                    |
+| `PUT` / `DELETE /administracion/proyectos/:id/destacado` | `PROYECTO_DESTACAR`   | Destaca un proyecto hasta una fecha futura, o lo quita           |
+| `POST /administracion/administradores`                   | `ADMIN_GESTIONAR`     | Otorga el rol a otra cuenta                                      |
+| `PUT /administracion/terminos`                           | `TERMINOS_GESTIONAR`  | Publica una versión nueva de los términos y condiciones          |
+| `POST /administracion/proyectos/:id/baja`                | `BAJA_POR_INFRACCION` | Da de baja un proyecto en infracción (`DADO_DE_BAJA`)            |
+| `POST /administracion/colectivos/:id/baja`               | `BAJA_POR_INFRACCION` | Da de baja un colectivo en infracción                            |
 
 - **Auditoría.** Toda acción administrativa que cambia datos escribe su registro en la misma
   transacción: sin registro, no hay cambio. Las altas hechas por el comando quedan sin autor y
@@ -462,6 +467,31 @@ otorga un administrador con `POST /administracion/administradores`.
   `DIAS_SIN_ACTUALIZACIONES` días. Es idempotente (índice único parcial sobre las pendientes)
   y no avisa a nadie: los administradores la ven en el listado. Una revisión resuelta no se
   vuelve a crear hasta que pase otro período completo.
+- **Borradores (adicional 29).** Un proyecto creado con `borrador: true` queda `BORRADOR`: solo
+  lo ven su colectivo y administración, se edita como uno abierto y no avisa a nadie. Sin el
+  campo se publica directo, como siempre. `POST /proyectos/:id/publicacion` lo pasa a
+  `EN_REVISION` (ya no se edita) y crea una revisión `PUBLICACION`. Al resolverla, `REVISADA`
+  lo publica (`ABIERTO`, avisa a las compatibles, audita `PROYECTO_PUBLICADO`) y `DESCARTADA`
+  lo vuelve a `BORRADOR` con la nota en `publicacion.rechazo` (audita `PUBLICACION_RECHAZADA`).
+  `BORRADOR` y `EN_REVISION` no aparecen en ninguna lectura pública (listados, destacados,
+  compatibles, timeline, estadísticas y conteos), y su detalle y sub-recursos dan 404 a
+  cualquiera que no sea el colectivo dueño o administración. Detalle en
+  [docs/borradores-de-proyectos.md](docs/borradores-de-proyectos.md).
+- **Términos y condiciones (adicional 21).** Un único documento vigente (`version`, `texto`
+  en Markdown, `publicadoEn`), público en `GET /terminos` (404 si todavía no hay). Cada
+  `PUT /administracion/terminos` publica la versión siguiente y audita `TERMINOS_ACTUALIZADOS`.
+  Con términos publicados, `POST /colectivos/:id/proyectos` (también con `borrador: true`)
+  exige `terminosAceptados` igual a la versión vigente: si falta o no coincide, 422
+  `TERMINOS_NO_ACEPTADOS`. El proyecto guarda `terminos: { version, aceptadosEn }`, que el
+  colectivo dueño y administración ven en el detalle: una `version` menor que la vigente es
+  un proyecto que aceptó una versión vieja. Sin términos publicados, nada cambia.
+- **Bajas por infracción (adicional 21).** `POST /administracion/proyectos/:id/baja` deja el
+  proyecto `DADO_DE_BAJA`, con el motivo en `baja` para su colectivo; sale de toda lectura
+  pública igual que un borrador, rechaza las postulaciones pendientes, finaliza las aceptadas
+  y descarta sus revisiones pendientes. `POST /administracion/colectivos/:id/baja` hace la misma
+  baja que `POST /colectivos/:id/baja`. Las dos auditan con el motivo, dan 409 si ya estaba dado
+  de baja y 422 `CONFLICTO_DE_INTERESES` a quien es del colectivo. Detalle en
+  [docs/terminos-y-condiciones.md](docs/terminos-y-condiciones.md).
 - **Conflicto de intereses.** Un administrador que además es líder o miembro de un colectivo
   no puede destacar, quitar el destacado ni resolver revisiones de los proyectos de ese
   colectivo (422 `CONFLICTO_DE_INTERESES`).

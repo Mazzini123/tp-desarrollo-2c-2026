@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { paginacionSchema } from "./paginacionSchema.js";
 import { normalizarEtiqueta } from "../domain/etiquetas.js";
-import { PROYECTO_ESTADO } from "../domain/enums/PROYECTO_ESTADO.js";
+import { ESTADOS_PUBLICADOS } from "../domain/enums/PROYECTO_ESTADO.js";
 import { TIPO_COLECTIVO } from "../domain/enums/TIPO_COLECTIVO.js";
 import { MODALIDAD_COLABORACION } from "../domain/enums/MODALIDAD_COLABORACION.js";
 
@@ -32,7 +32,7 @@ export const etiquetasSchema = z.array(z.string().trim().min(1).max(30)).max(10)
 
 export const listadoDeProyectosSchema = paginacionSchema.extend({
   etiqueta: z.string().trim().min(1).transform(normalizarEtiqueta).optional(),
-  estado: z.enum(Object.values(PROYECTO_ESTADO)).optional(),
+  estado: z.enum(ESTADOS_PUBLICADOS).optional(),
   habilidad: z.string().trim().min(1).optional(),
   tipoColectivo: z.enum(Object.values(TIPO_COLECTIVO)).optional(),
   ubicacion: z.string().trim().min(1).optional(),

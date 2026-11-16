@@ -28,6 +28,13 @@ export class MongoRevisionRepository {
     );
   }
 
+  async descartarPendientesDeProyecto(proyectoId, { nota, resueltaPor, resueltaEn }) {
+    await RevisionModel.updateMany(
+      { proyectoId, estado: ESTADO_REVISION.PENDIENTE },
+      { $set: { estado: ESTADO_REVISION.DESCARTADA, nota, resueltaPor, resueltaEn } },
+    );
+  }
+
   async ultimaResolucionPorProyecto(proyectoIds, motivo) {
     const filas = await RevisionModel.aggregate([
       {
