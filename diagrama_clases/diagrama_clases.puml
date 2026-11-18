@@ -70,6 +70,8 @@ class Proyecto {
   -fechaFinalizacion: Date
   -fechaCierre: Date
   -visualizaciones: number
+  -publicacion: Publicacion
+  -baja: Baja
 
   +estaAbierto(): boolean
   +finalizarProyecto(fecha: Date): void
@@ -85,11 +87,39 @@ class Proyecto {
   +quitarLogro(logro: Logro): void
   +agregarAvance(avance: Avance): void
   +ultimoAvance(): Avance
+  +esBorrador(): boolean
+  +estaEnRevision(): boolean
+  +estaPublicado(): boolean
+  +esEditable(): boolean
+  +pedirPublicacion(fecha: Date): void
+  +aprobarPublicacion(fecha: Date): void
+  +rechazarPublicacion(nota: string, fecha: Date): void
+  +estaDadoDeBaja(): boolean
+  +darDeBaja(motivo: string, fecha: Date): void
 }
 
 enum PROYECTO_ESTADO {
+  BORRADOR
+  EN_REVISION
   ABIERTO
   FINALIZADO
+  DADO_DE_BAJA
+}
+
+class Publicacion {
+  -solicitadaEn: Date
+  -rechazo: Rechazo
+  -aprobadaEn: Date
+}
+
+class Rechazo {
+  -nota: string
+  -fecha: Date
+}
+
+class Baja {
+  -motivo: string
+  -fecha: Date
 }
 
 class Logro {
@@ -107,6 +137,9 @@ class Avance {
 
 Proyecto --> "1" Colectivo
 Proyecto --> PROYECTO_ESTADO
+Proyecto --> "0..1" Publicacion
+Proyecto --> "0..1" Baja
+Publicacion --> "0..1" Rechazo
 Proyecto --> "1..*" Perfil
 Proyecto --> "*" Colaboracion
 Proyecto --> "*" Logro
@@ -156,6 +189,12 @@ enum MODALIDAD_COLABORACION {
   EXISTE_POSIBILIDAD_DE_CONTRATACION
 }
 
+enum ESTADO_BUSQUEDA {
+  ABIERTA
+  LIMITE_ALCANZADO
+  CERRADA
+}
+
 enum MODO_ACEPTACION {
   REVISION_MANUAL
   TODO_SUMA
@@ -176,6 +215,7 @@ class Habilidad {
 Perfil --> Compromiso
 Perfil --> MODALIDAD_COLABORACION
 Perfil --> MODO_ACEPTACION
+Perfil ..> ESTADO_BUSQUEDA
 Perfil --> "1..*" Habilidad : requeridas
 Perfil --> "*" Habilidad : opcionales
 Compromiso --> PERIODO_COMPROMISO
@@ -220,6 +260,13 @@ class Valoracion {
   -comentario: string
   -fecha: Date
 }
+
+enum AUTOR_VALORACION {
+  COLECTIVO
+  COLABORADOR
+}
+
+Valoracion ..> AUTOR_VALORACION : autor
 
 Colaboracion --> Proyecto
 Colaboracion --> Colaborador
@@ -302,5 +349,17 @@ enum TIPO_NOTIFICACION {
 
 NotificacionInterna --> TIPO_NOTIFICACION
 NotificacionInterna --> Colaborador
+
+' ───────────────────────── Timeline ─────────────────────────
+
+enum TIPO_EVENTO_TIMELINE {
+  ALTA_DEL_COLECTIVO
+  PROYECTO_CREADO
+  LOGRO
+  AVANCE
+  COLABORACION_CERRADA
+  PROYECTO_FINALIZADO
+  BAJA_DEL_COLECTIVO
+}
 
 @enduml
