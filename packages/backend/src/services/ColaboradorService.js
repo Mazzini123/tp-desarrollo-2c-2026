@@ -92,10 +92,8 @@ export class ColaboradorService {
     return colaborador.mediosDeContacto.map(({ tipo, valor }) => ({ tipo, valor }));
   }
 
-  async buscarPorId(id, { bloquear = false } = {}) {
-    const colaborador = bloquear
-      ? await this.colaboradorRepository.bloquear(id)
-      : await this.colaboradorRepository.buscarPorId(id);
+  async buscarPorId(id) {
+    const colaborador = await this.colaboradorRepository.buscarPorId(id);
 
     if (!colaborador) {
       throw new NotFoundError(`No existe un colaborador con id "${id}"`);
