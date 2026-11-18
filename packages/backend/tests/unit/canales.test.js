@@ -33,6 +33,21 @@ test("SMS envia el contenido al destino con su propio remitente", async () => {
   });
 });
 
+test("SMS con plantilla de Twilio Trial envia la plantilla en lugar del contenido", async () => {
+  const create = jest.fn().mockResolvedValue({ sid: "SMprueba" });
+  const canal = new CanalSMS({
+    cliente: { messages: { create } },
+    remitente: "+12345678910",
+    plantilla: "sms_event_notifications",
+  });
+  await canal.enviar(mensaje);
+  expect(create).toHaveBeenCalledWith({
+    to: mensaje.destino,
+    from: "+12345678910",
+    body: "sms_event_notifications",
+  });
+});
+
 test.each([
   "1155551234",
   "+0123456789",
@@ -100,6 +115,40 @@ test("email propaga errores SMTP", async () => {
     remitente: "avisos@example.org",
   });
   await expect(canal.enviar(mensaje)).rejects.toThrow("SMTP caido");
+});
+
+test("WhatsApp con plantilla de Twilio Trial envia el ContentSid y no el texto", async () => {
+  const create = jest.fn().mockResolvedValue({ sid: "SMprueba" });
+  const canal = new CanalWhatsApp({
+    cliente: { messages: { create } },
+    remitente: "whatsapp:+12345678910",
+    plantilla: "HX0123456789abcdef0123456789abcdef",
+  });
+  await canal.enviar(mensaje);
+  expect(create).toHaveBeenCalledWith({
+    contentSid: "HX0123456789abcdef0123456789abcdef",
+    from: "whatsapp:+12345678910",
+    to: `whatsapp:${mensaje.destino}`,
+  });
+});
+
+test("WhatsApp puede usar una cuenta de Twilio propia, sin las credenciales generales", () => {
+  const canales = crearCanales({
+    TWILIO_WHATSAPP_ACCOUNT_SID: `AC${"1".repeat(32)}`,
+    TWILIO_WHATSAPP_AUTH_TOKEN: "token-de-whatsapp",
+    TWILIO_WHATSAPP_REMITENTE: "whatsapp:+12345678910",
+  });
+  expect(canales.WHATSAPP).toBeInstanceOf(CanalWhatsApp);
+  expect(canales.SMS).toBeInstanceOf(CanalSimulado);
+});
+
+test.each([
+  { TWILIO_WHATSAPP_ACCOUNT_SID: `AC${"1".repeat(32)}` },
+  { TWILIO_WHATSAPP_AUTH_TOKEN: "token-de-whatsapp" },
+])("credenciales propias de WhatsApp incompletas impiden arrancar %j", (parcial) => {
+  expect(() =>
+    crearCanales({ ...parcial, TWILIO_WHATSAPP_REMITENTE: "whatsapp:+12345678910" }),
+  ).toThrow("van juntas");
 });
 
 test("sin configuracion todos los canales se simulan", () => {

@@ -104,13 +104,15 @@ describe("ColaboracionService · postularse (con dobles)", () => {
       personas: [sinNode],
     });
 
-    await expect(
-      service.registrar({
+    const error = await service
+      .registrar({
         proyectoId: p.id,
         perfilId: p.perfiles[0].id,
         colaboradorId: sinNode.id,
-      }),
-    ).rejects.toBeInstanceOf(DomainError);
+      })
+      .catch((e) => e);
+    expect(error).toBeInstanceOf(DomainError);
+    expect(error.codigo).toBe("HABILIDADES_REQUERIDAS_FALTANTES");
     expect(proyectoRepository.guardar).not.toHaveBeenCalled();
   });
 
@@ -120,13 +122,15 @@ describe("ColaboracionService · postularse (con dobles)", () => {
     p.colaboraciones.push(colaboracion({ colaborador: ada, perfil: p.perfiles[0].id }));
     const { service } = armar({ proyectos: [p], personas: [ada] });
 
-    await expect(
-      service.registrar({
+    const error = await service
+      .registrar({
         proyectoId: p.id,
         perfilId: p.perfiles[0].id,
         colaboradorId: ada.id,
-      }),
-    ).rejects.toBeInstanceOf(ConflictError);
+      })
+      .catch((e) => e);
+    expect(error).toBeInstanceOf(ConflictError);
+    expect(error.codigo).toBe("POSTULACION_EXISTENTE");
   });
 
   test("una colaboradora dada de baja no puede postularse", async () => {
