@@ -64,9 +64,7 @@ export class ColaboracionService {
     ahora = new Date(),
   ) {
     const resultado = await this.transacciones.ejecutar(async () => {
-      const colaborador = await this.colaboradorService.buscarPorId(colaboradorId, {
-        bloquear: true,
-      });
+      const colaborador = await this.colaboradorService.buscarPorId(colaboradorId);
       this.colaboradorService.exigirActiva(colaborador);
       const proyecto = await this.proyectoService.buscarPorId(proyectoId);
       await this.exigirFueraDelColectivoDelProyecto(colaborador, proyecto);
